@@ -1,7 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import TrendingCategories from "@/components/TrendingCategories";
-import ServiceCategories from "@/components/ServiceCategories";
 import BrowseByEvent from "@/components/BrowseByEvent";
 import FeaturedCollections from "@/components/FeaturedCollections";
 import HowItWorks from "@/components/HowItWorks";
@@ -19,10 +18,6 @@ const Index = () => {
 
         {/* 2. Trending Categories — 15-icon scrollable grid */}
         <TrendingCategories />
-
-        {/* 3. Service Categories — existing 6-card grid, preserved */}
-        <ServiceCategories />
-
         {/* 4. Browse by Event — 12 event type cards */}
         <BrowseByEvent />
 

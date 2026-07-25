@@ -296,7 +296,6 @@ class SecurityMiddleware {
     try {
       // This would log to a rate_limits table for persistence
       // For now, we'll just log to console
-      console.log(`Rate limit: ${key} - ${count}/${limit} resets at ${resetTime.toISOString()}`)
     } catch (error) {
       console.error('Failed to log rate limit to database:', error)
     }
