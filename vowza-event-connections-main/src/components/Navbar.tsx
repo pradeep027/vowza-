@@ -3,15 +3,17 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, User, Sparkles, ShoppingBag, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useDashboardLink } from "@/hooks/useDashboardLink";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const { dashboardLink } = useDashboardLink();
   const { cart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
@@ -155,13 +157,12 @@ const Navbar = () => {
                 {/* Notifications */}
                 <NotificationBell />
 
-                {/* Dashboard — route depends on role (provider link works for both) */}
-                <Link to="/provider/dashboard">
-                  <Button variant="ghost" size="sm" className="text-sm">
-                    Dashboard
-                  </Button>
-                </Link>
-
+                {/* Dashboard */}
+<Link to={dashboardLink}>
+  <Button variant="ghost" size="sm" className="text-sm">
+    Dashboard
+  </Button>
+</Link>
                 {/* Sign out */}
                 <Button
                   variant="ghost"
@@ -267,7 +268,7 @@ const Navbar = () => {
                     Cart {cart.length > 0 && `(${cart.length})`}
                   </Link>
                   <Link
-                    to="/provider/dashboard"
+                    to={dashboardLink}
                     className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                   >
                     Dashboard

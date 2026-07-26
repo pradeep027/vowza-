@@ -12,7 +12,7 @@ import { CategoryStep } from '@/components/onboarding/steps/CategoryStep';
 import { PricingStep } from '@/components/onboarding/steps/PricingStep';
 import { PortfolioStep } from '@/components/onboarding/steps/PortfolioStep';
 import { ReviewStep } from '@/components/onboarding/steps/ReviewStep';
-import { useImageUpload } from '@/hooks/useImageUpload';
+import { resolveDashboard } from '@/hooks/useDashboardLink';
 import type { ProfessionType } from '@/data/artistCategories';
 
 const steps = [
@@ -226,8 +226,17 @@ const ArtistOnboarding = () => {
         .from('user_roles')
         .insert({ user_id: user.id, role: 'provider' });
 
+      // Insert provider role then navigate to the correct dashboard
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const roles = rolesData?.map(r => r.role as string) ?? ['provider'];
+      const destination = resolveDashboard(roles);
+
       toast.success('🎉 Welcome to Vowza! Your profile is now live.');
-      navigate('/provider/dashboard');
+      navigate(destination);
     } catch (error: any) {
       toast.error(error.message || 'Registration failed');
     } finally {

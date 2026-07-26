@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Music, Camera, Palette, Users, Sparkles, ArrowLeft, Upload, FileText, CheckCircle, XCircle, Shield, Send, Loader2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { resolveDashboard } from '@/hooks/useDashboardLink';
 
 type ProfessionType = Database['public']['Enums']['profession_type'] | string;
 
@@ -712,7 +713,13 @@ const ProviderRegistration = () => {
 
       toast.success('🎉 Registration submitted! Your profile is under review. You\'ll be notified once approved.');
       clearFormStorage();
-      navigate('/provider/dashboard');
+      // Fetch latest roles (user may be provider+admin) and route to correct dashboard
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      const roles = rolesData?.map(r => r.role as string) ?? ['customer'];
+      navigate(resolveDashboard(roles));
     } catch (error: any) {
       toast.error('Registration failed. Please try again or contact support.');
     } finally {

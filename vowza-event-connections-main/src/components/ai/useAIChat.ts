@@ -23,6 +23,7 @@ import {
   updateConversation, deleteConversation, touchConversation, listConversations,
 } from '@/lib/conversationRepository';
 import type { ConversationRow } from '@/lib/conversationTypes';
+import { useDashboardLink } from '@/hooks/useDashboardLink';
 
 // ─── sessionStorage keys ─────────────────────────────────────────────────────
 const CTX_KEY  = 'vowza_ai_context';
@@ -37,7 +38,7 @@ const NAV_COMMANDS: { pattern: RegExp; path: string }[] = [
   { pattern: /\bdj\b/i, path: '/artists?category=dj' },
   { pattern: /makeup/i, path: '/artists?category=makeup' },
   { pattern: /my booking/i, path: '/my-bookings' },
-  { pattern: /dashboard/i, path: '/provider/dashboard' },
+  { pattern: /dashboard/i, path: '' },  // resolved dynamically below
   { pattern: /^(home|homepage)$/i, path: '/' },
 ];
 
@@ -68,6 +69,7 @@ function saveConvId(id: string | null) {
 export function useAIChat() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { dashboardLink } = useDashboardLink();
 
   const [messages,        setMessages]        = useState<ChatMessage[]>([]);
   const [isStreaming,     setIsStreaming]      = useState(false);
@@ -160,7 +162,16 @@ export function useAIChat() {
     let   currentConvId   = convIdRef.current;
 
     // Navigation shortcut — handle before touching DB
-    const navPath = detectNavCommand(userText);
+    const navPath = (() => {
+      if (!/(take me|go to|open|navigate|show me|visit)/i.test(userText)) return null;
+      for (const cmd of NAV_COMMANDS) {
+        if (!cmd.path) continue; // skip dashboard placeholder
+        if (cmd.pattern.test(userText)) return cmd.path;
+      }
+      // Dashboard resolved dynamically from roles
+      if (/dashboard/i.test(userText)) return dashboardLink;
+      return null;
+    })();
     const userMsg: ChatMessage = {
       id:        `u-${Date.now()}`,
       role:      'user',

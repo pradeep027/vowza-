@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Calendar, MapPin, Sparkles, IndianRupee } from 'lucide-react';
 import ChatBox from '@/components/ChatBox';
 import type { Database } from '@/integrations/supabase/types';
+import { useDashboardLink } from '@/hooks/useDashboardLink';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
 
@@ -43,6 +44,7 @@ const BookingChat = () => {
   const [otherUserName, setOtherUserName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCustomer, setIsCustomer] = useState(false);
+  const { dashboardLink } = useDashboardLink();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -192,7 +194,7 @@ const BookingChat = () => {
                 )}
 
                 <div className="pt-4">
-                  <Link to={isCustomer ? '/my-bookings' : '/provider/dashboard'}>
+                  <Link to={isCustomer ? '/my-bookings' : dashboardLink}>
                     <Button variant="outline" className="w-full">
                       View All Bookings
                     </Button>
