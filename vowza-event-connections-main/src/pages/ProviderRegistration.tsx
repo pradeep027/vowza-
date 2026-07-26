@@ -133,9 +133,76 @@ const ProviderRegistration = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  // ── Form persistence key ───────────────────────────────────────────────────
+  const FORM_KEY = 'vowza_provider_reg_draft';
+
+  const saveFormToStorage = () => {
+    try {
+      localStorage.setItem(FORM_KEY, JSON.stringify({
+        fullName, phone, organizationName, profession, experienceYears,
+        priceMin, priceMax, travelCharges, extraCharges, bio,
+        city, area, state, specialties, languages, gstNumber,
+        instagram, facebook, youtube, website,
+        bankAccount, bankName, ifscCode, upiId,
+        profilePictureUrl, coverBannerUrl,
+        pricingPackages, timeSlots,
+      }));
+    } catch { /* storage full — ignore */ }
+  };
+
+  const clearFormStorage = () => {
+    try { localStorage.removeItem(FORM_KEY); } catch { /* ignore */ }
+  };
+
+  // Restore form from localStorage on mount
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
+    try {
+      const saved = localStorage.getItem(FORM_KEY);
+      if (!saved) return;
+      const d = JSON.parse(saved);
+      if (d.fullName)        setFullName(d.fullName);
+      if (d.phone)           setPhone(d.phone);
+      if (d.organizationName) setOrganizationName(d.organizationName);
+      if (d.profession)      setProfession(d.profession);
+      if (d.experienceYears) setExperienceYears(d.experienceYears);
+      if (d.priceMin)        setPriceMin(d.priceMin);
+      if (d.priceMax)        setPriceMax(d.priceMax);
+      if (d.travelCharges)   setTravelCharges(d.travelCharges);
+      if (d.extraCharges)    setExtraCharges(d.extraCharges);
+      if (d.bio)             setBio(d.bio);
+      if (d.city)            setCity(d.city);
+      if (d.area)            setArea(d.area);
+      if (d.state)           setState(d.state);
+      if (d.specialties)     setSpecialties(d.specialties);
+      if (d.languages)       setLanguages(d.languages);
+      if (d.gstNumber)       setGstNumber(d.gstNumber);
+      if (d.instagram)       setInstagram(d.instagram);
+      if (d.facebook)        setFacebook(d.facebook);
+      if (d.youtube)         setYoutube(d.youtube);
+      if (d.website)         setWebsite(d.website);
+      if (d.bankAccount)     setBankAccount(d.bankAccount);
+      if (d.bankName)        setBankName(d.bankName);
+      if (d.ifscCode)        setIfscCode(d.ifscCode);
+      if (d.upiId)           setUpiId(d.upiId);
+      if (d.profilePictureUrl) setProfilePictureUrl(d.profilePictureUrl);
+      if (d.coverBannerUrl)  setCoverBannerUrl(d.coverBannerUrl);
+      if (d.pricingPackages) setPricingPackages(d.pricingPackages);
+      if (d.timeSlots)       setTimeSlots(d.timeSlots);
+    } catch { /* corrupt storage — ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save form whenever any field changes
+  useEffect(() => {
+    if (user) saveFormToStorage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullName, phone, organizationName, profession, experienceYears, priceMin, priceMax,
+      travelCharges, extraCharges, bio, city, area, state, specialties, languages,
+      gstNumber, instagram, facebook, youtube, website, bankAccount, bankName, ifscCode,
+      upiId, profilePictureUrl, coverBannerUrl, pricingPackages, timeSlots]);
+
+  useEffect(() => {
+    if (!loading && !user) {      navigate('/auth');
       return;
     }
 
@@ -174,9 +241,21 @@ const ProviderRegistration = () => {
     }
   };
 
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const ALLOWED_DOC_TYPES   = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+  const MAX_IMAGE_SIZE_MB   = 10;
+  const MAX_IMAGE_SIZE      = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
   const handleProfilePictureUpload = async (file: File) => {
     if (!user) return;
-
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Only JPG, PNG, and WebP files are accepted for profile pictures.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(`Profile picture must be under ${MAX_IMAGE_SIZE_MB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+      return;
+    }
     setUploadingProfile(true);
 
     try {
@@ -213,11 +292,10 @@ const ProviderRegistration = () => {
         .getPublicUrl(filePath);
 
       setProfilePictureUrl(publicUrl);
-
       toast.success('Profile picture uploaded successfully');
     } catch (error: any) {
-      console.error('Profile upload error:', error);
-      toast.error(error.message || 'Failed to upload profile picture. Please try again.');
+      const msg = error?.message || error?.error_description || 'Upload failed';
+      toast.error(`Profile picture upload failed: ${msg}`);
     } finally {
       setUploadingProfile(false);
     }
@@ -225,7 +303,14 @@ const ProviderRegistration = () => {
 
   const handleCoverBannerUpload = async (file: File) => {
     if (!user) return;
-
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Only JPG, PNG, and WebP files are accepted for cover banners.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(`Cover banner must be under ${MAX_IMAGE_SIZE_MB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
+      return;
+    }
     setUploadingBanner(true);
 
     try {
@@ -244,11 +329,10 @@ const ProviderRegistration = () => {
         .getPublicUrl(filePath);
 
       setCoverBannerUrl(publicUrl);
-
       toast.success('Cover banner uploaded successfully');
     } catch (error: any) {
-      console.error('Cover banner upload error:', error);
-      toast.error(error.message || 'Failed to upload cover banner. Please try again.');
+      const msg = error?.message || error?.error_description || 'Upload failed';
+      toast.error(`Cover banner upload failed: ${msg}`);
     } finally {
       setUploadingBanner(false);
     }
@@ -256,7 +340,14 @@ const ProviderRegistration = () => {
 
   const handlePortfolioUpload = async (index: number, file: File) => {
     if (!user) return;
-
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type) && !file.type.startsWith('video/')) {
+      toast.error('Only JPG, PNG, WebP images and videos are accepted for portfolio.');
+      return;
+    }
+    if (!file.type.startsWith('video/') && file.size > MAX_IMAGE_SIZE) {
+      toast.error(`Image must be under ${MAX_IMAGE_SIZE_MB}MB.`);
+      return;
+    }
     setUploadingPortfolio(index);
 
     try {
@@ -303,8 +394,8 @@ const ProviderRegistration = () => {
 
       toast.success('Portfolio item uploaded successfully');
     } catch (error: any) {
-      console.error('Portfolio upload error:', error);
-      toast.error(error.message || 'Failed to upload portfolio item. Please try again.');
+      const msg = error?.message || error?.error_description || 'Upload failed';
+      toast.error(`Portfolio upload failed: ${msg}`);
     } finally {
       setUploadingPortfolio(null);
     }
@@ -312,7 +403,14 @@ const ProviderRegistration = () => {
 
   const handleDocumentUpload = async (index: number, file: File) => {
     if (!user) return;
-
+    if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+      toast.error('Only JPG, PNG, WebP, and PDF files are accepted for documents.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(`Document must be under ${MAX_IMAGE_SIZE_MB}MB.`);
+      return;
+    }
     setUploadingDoc(index);
 
     try {
@@ -340,8 +438,8 @@ const ProviderRegistration = () => {
 
       toast.success('Document uploaded successfully');
     } catch (error: any) {
-      console.error('Document upload error:', error);
-      toast.error(error.message || 'Failed to upload document. Please try again.');
+      const msg = error?.message || error?.error_description || 'Upload failed';
+      toast.error(`Document upload failed: ${msg}`);
     } finally {
       setUploadingDoc(null);
     }
@@ -437,8 +535,34 @@ const ProviderRegistration = () => {
       return;
     }
 
+    if (!organizationName.trim()) {
+      toast.error('Organization / Artist Name is required');
+      return;
+    }
+
+    if (!fullName.trim()) {
+      toast.error('Please enter your full name');
+      return;
+    }
+
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
     if (!otpVerified) {
       toast.error('Please verify your phone number with OTP');
+      return;
+    }
+
+    if (!city.trim()) {
+      toast.error('Please enter your city');
+      return;
+    }
+
+    if (!bio.trim()) {
+      toast.error('Please write something about yourself in the "About You" section');
       return;
     }
 
@@ -468,8 +592,7 @@ const ProviderRegistration = () => {
         .eq('id', user.id);
 
       if (profileError) {
-        console.error('Profile update error:', profileError);
-        toast.error(`Profile update failed: ${profileError.message}`);
+        toast.error('We could not update your profile. Please check your details and try again.');
         throw profileError;
       }
 
@@ -483,9 +606,13 @@ const ProviderRegistration = () => {
           price_min: parseInt(priceMin) || null,
           price_max: parseInt(priceMax) || null,
           bio,
-          specialties: specialties ? specialties.split(',').map(s => s.trim()) : [],
-          languages,
-          available_dates: availableDates,
+          specialties: specialties.trim()
+            ? specialties.split(',').map(s => s.trim()).filter(Boolean)
+            : [],
+          languages: languages.trim()
+            ? languages.split(',').map(l => l.trim()).filter(Boolean)
+            : [],
+          available_dates: null,
           gst_number: gstNumber || null,
           instagram: instagram || null,
           facebook: facebook || null,
@@ -500,18 +627,12 @@ const ProviderRegistration = () => {
         .single();
 
       if (providerError) {
-        console.error('Provider profile error:', providerError);
-        // Rollback: Update phone_verified back to false
-        await supabase
-          .from('profiles')
-          .update({ phone_verified: false } as any)
-          .eq('id', user.id);
-          
+        // Rollback profile phone_verified
+        await supabase.from('profiles').update({ phone_verified: false } as any).eq('id', user.id);
         if (providerError.code === '23505') {
-          toast.error('You have already submitted a verification request');
+          toast.error('You have already submitted a registration request. Please wait for review.');
         } else {
-          toast.error(`Provider profile creation failed: ${providerError.message}`);
-          throw providerError;
+          toast.error('Registration could not be completed. Please try again or contact support.');
         }
         return;
       }
@@ -589,10 +710,11 @@ const ProviderRegistration = () => {
         }
       }
 
-      toast.success('Registration submitted! Your documents are under review. You will be notified once approved.');
-      navigate('/');
+      toast.success('🎉 Registration submitted! Your profile is under review. You\'ll be notified once approved.');
+      clearFormStorage();
+      navigate('/provider/dashboard');
     } catch (error: any) {
-      toast.error(error.message || 'Registration failed');
+      toast.error('Registration failed. Please try again or contact support.');
     } finally {
       setIsLoading(false);
     }
@@ -626,9 +748,6 @@ const ProviderRegistration = () => {
             <CardDescription>
               Register your talent and start receiving bookings
             </CardDescription>
-            <div className="mt-4 p-3 bg-green-100 border border-green-500 rounded-lg">
-              <p className="text-green-800 font-semibold">✓ UPDATED VERSION - All Features Loaded</p>
-            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -724,22 +843,26 @@ const ProviderRegistration = () => {
                         </Button>
                       </div>
                       <div className="mt-2 text-xs text-blue-600">
-                        Demo OTP: Check browser console (F12) for the OTP
+                        OTP shown in the toast notification above.
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="organizationName">Organization Name</Label>
+                  <Label htmlFor="organizationName">Organization / Artist Name *</Label>
                   <Input
                     id="organizationName"
                     type="text"
-                    placeholder="Enter your organization name (optional)"
+                    placeholder="Enter your organization or artist name"
                     value={organizationName}
                     onChange={(e) => setOrganizationName(e.target.value)}
+                    required
                     className="border-border focus:border-gold"
                   />
+                  {!organizationName.trim() && organizationName !== '' && (
+                    <p className="text-xs text-destructive">This field is required.</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1307,31 +1430,7 @@ const ProviderRegistration = () => {
                   </div>
                 ))}
 
-                {/* Social Media Links */}
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="youtubeLink">YouTube Channel URL</Label>
-                    <Input
-                      id="youtubeLink"
-                      type="url"
-                      placeholder="https://youtube.com/@yourchannel"
-                      value={youtube}
-                      onChange={(e) => setYoutube(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="instagramLink">Instagram Profile URL</Label>
-                    <Input
-                      id="instagramLink"
-                      type="url"
-                      placeholder="https://instagram.com/@yourprofile"
-                      value={instagram}
-                      onChange={(e) => setInstagram(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
+                {/* Social Media Links — removed duplicate (already in Business Details) */}
               </div>
 
               {/* Document Upload Section */}
@@ -1358,7 +1457,7 @@ const ProviderRegistration = () => {
 
                     <Input
                       type="text"
-                      placeholder="Document Number (optional)"
+                      placeholder={doc.type === 'aadhaar' ? '12-digit Aadhaar number' : doc.type === 'pan' ? 'PAN number (e.g. ABCDE1234F)' : 'Document number (optional)'}
                       value={doc.number}
                       onChange={(e) => {
                         const newDocs = [...documents];
@@ -1367,6 +1466,12 @@ const ProviderRegistration = () => {
                       }}
                       className="border-border focus:border-gold"
                     />
+                    {doc.type === 'aadhaar' && doc.number && !/^\d{12}$/.test(doc.number.replace(/\s/g, '')) && (
+                      <p className="text-xs text-destructive">Please enter a valid 12-digit Aadhaar number.</p>
+                    )}
+                    {doc.type === 'pan' && doc.number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(doc.number.toUpperCase()) && (
+                      <p className="text-xs text-destructive">Please enter a valid PAN number (e.g. ABCDE1234F).</p>
+                    )}
 
                     <div className="flex items-center gap-3">
                       <Input
