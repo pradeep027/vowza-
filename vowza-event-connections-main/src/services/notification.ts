@@ -106,8 +106,8 @@ class NotificationService {
           title: payload.title,
           message: payload.message,
           type: payload.type,
-          reference_id: payload.referenceId,
-          data: payload.data
+          reference_id: payload.referenceId || null,
+          is_read: false
         })
         .select()
         .single()

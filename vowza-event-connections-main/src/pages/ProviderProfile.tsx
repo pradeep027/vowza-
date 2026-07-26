@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { NotificationService } from '@/services/notificationService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,10 +31,15 @@ import {
   Image as ImageIcon,
   Video,
   CalendarDays,
-  Heart
+  Heart,
+  Flag,
+  Download,
+  Shield,
+  TrendingUp
 } from 'lucide-react';
 import BookingModal from '@/components/BookingModal';
 import type { Database } from '@/integrations/supabase/types';
+import { useAvailability } from '@/hooks/useArtists';
 
 type ProfessionType = Database['public']['Enums']['profession_type'];
 
@@ -115,6 +121,7 @@ interface ProfileData {
   state?: string | null;
   address?: string | null;
   phone: string | null;
+  email: string | null;
 }
 
 interface PortfolioItem {
@@ -144,11 +151,17 @@ const ProviderProfile = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [pricingPackages, setPricingPackages] = useState<any[]>([]);
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -221,7 +234,7 @@ const ProviderProfile = () => {
       // Fetch user profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url, city, area, phone, state, address')
+        .select('full_name, avatar_url, city, area, phone, state, address, email')
         .eq('id', providerData.user_id)
         .single();
 
@@ -293,6 +306,70 @@ const ProviderProfile = () => {
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (!user) { toast.error('Please login to leave a review'); return; }
+    if (!provider) return;
+    setSubmittingReview(true);
+    try {
+      // Find a completed booking between this user and this provider
+      const { data: completedBooking } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('customer_id', user.id)
+        .eq('provider_id', provider.id)
+        .eq('status', 'completed')
+        .limit(1)
+        .maybeSingle();
+
+      if (!completedBooking) {
+        toast.error('You can only review artists you have booked and completed an event with.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          booking_id:  completedBooking.id,
+          customer_id: user.id,
+          provider_id: provider.id,
+          rating:      reviewRating,
+          review_text: reviewText.trim() || null,
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('You have already reviewed this booking.');
+        } else {
+          toast.error('Failed to submit review. Please try again.');
+        }
+        return;
+      }
+
+      // Notify the artist
+      const { data: customerProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      await NotificationService.notifyNewReview(
+        provider.user_id,
+        customerProfile?.full_name ?? 'A customer',
+        reviewRating,
+        completedBooking.id
+      );
+
+      toast.success('Review submitted successfully! Thank you.');
+      setReviewText('');
+      setReviewRating(5);
+      fetchProviderData(); // refresh reviews
+    } catch (err: any) {
+      toast.error('Failed to submit review.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const handleBookNow = () => {
     if (!user) {
       toast.error('Please login to book');
@@ -326,6 +403,42 @@ const ProviderProfile = () => {
 
     toast.success('Added to cart');
   };
+
+  const handleReportProfile = async () => {
+    if (!user) {
+      toast.error('Please login to report a profile');
+      navigate('/auth');
+      return;
+    }
+
+    if (!reportReason.trim()) {
+      toast.error('Please provide a reason for reporting');
+      return;
+    }
+
+    try {
+      // Use direct SQL call via RPC or insert into a reports table
+      const { error } = await supabase
+        .from('notifications' as any)
+        .insert({
+          user_id: user.id,
+          title: 'Profile Reported',
+          message: `Profile ${id} reported for: ${reportReason}`,
+          type: 'report',
+          reference_id: id
+        });
+
+      if (error) throw error;
+
+      toast.success('Profile reported successfully');
+      setShowReportModal(false);
+      setReportReason('');
+    } catch (error) {
+      toast.error('Failed to report profile');
+    }
+  };
+
+  const { data: isAvailable } = useAvailability(id || '', selectedDate || new Date());
 
   if (isLoading) {
     return (
@@ -727,6 +840,44 @@ const ProviderProfile = () => {
                     ))}
                   </div>
                 )}
+
+                {/* Review submission form — only for logged-in customers */}
+                {user && (
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <h4 className="text-sm font-semibold mb-3">Leave a Review</h4>
+                    <div className="flex items-center gap-1 mb-3">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setReviewRating(i + 1)}
+                          className="focus:outline-none"
+                        >
+                          <Star className={`w-6 h-6 transition-colors ${i < reviewRating ? 'fill-gold text-gold' : 'text-muted-foreground hover:text-gold'}`} />
+                        </button>
+                      ))}
+                      <span className="text-sm text-muted-foreground ml-2">{reviewRating} / 5</span>
+                    </div>
+                    <textarea
+                      value={reviewText}
+                      onChange={e => setReviewText(e.target.value)}
+                      placeholder="Share your experience with this artist... (optional)"
+                      rows={3}
+                      className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:border-gold transition-colors resize-none mb-3"
+                    />
+                    <Button
+                      onClick={handleSubmitReview}
+                      disabled={submittingReview}
+                      size="sm"
+                      className="bg-gradient-gold text-foreground hover:opacity-90"
+                    >
+                      {submittingReview ? 'Submitting…' : 'Submit Review'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      You can only review artists after completing a booking with them.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -773,8 +924,24 @@ const ProviderProfile = () => {
                   {provider.is_available ? 'Book Now' : 'Not Available'}
                 </Button>
 
+                {/* Availability Check */}
+                <div className="pt-4 border-t border-border">
+                  <label className="text-sm font-medium mb-2 block">Check Availability</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:border-gold"
+                    onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                  {selectedDate && isAvailable !== undefined && (
+                    <div className={`mt-2 text-sm ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                      {isAvailable ? '✓ Available on this date' : '✗ Not available on this date'}
+                    </div>
+                  )}
+                </div>
+
                 {/* Contact Buttons */}
-                <div className="space-y-2">
+                <div className="space-y-2 pt-4 border-t border-border">
                   {profile.phone && (
                     <a
                       href={`tel:${profile.phone}`}
@@ -805,6 +972,47 @@ const ProviderProfile = () => {
                     </a>
                   )}
                 </div>
+
+                {/* Report Profile */}
+                <Button
+                  variant="outline"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => setShowReportModal(true)}
+                >
+                  <Flag className="w-4 h-4 mr-2" />
+                  Report Profile
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Stats Card */}
+            <Card className="border-gold/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-gold" />
+                  Statistics
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Bookings</span>
+                  <span className="font-semibold">{provider.total_bookings || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Reviews</span>
+                  <span className="font-semibold">{provider.total_reviews || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Average Rating</span>
+                  <span className="font-semibold flex items-center gap-1">
+                    <Star className="w-4 h-4 text-gold fill-gold" />
+                    {provider.average_rating?.toFixed(1) || '0.0'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Experience</span>
+                  <span className="font-semibold">{provider.experience_years || 0} years</span>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -823,6 +1031,44 @@ const ProviderProfile = () => {
           }}
           providerName={profile.full_name}
         />
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Report Profile</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <textarea
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                placeholder="Please describe why you're reporting this profile..."
+                rows={4}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:border-gold resize-none"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowReportModal(false);
+                    setReportReason('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  onClick={handleReportProfile}
+                >
+                  Submit Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

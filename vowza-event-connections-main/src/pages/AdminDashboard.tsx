@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +93,9 @@ const AdminDashboard = () => {
   const [newCategory, setNewCategory] = useState({ name: '', profession_type: '', description: '', icon: '' });
   const [analytics, setAnalytics] = useState<any[]>([]);
   const [commissions, setCommissions] = useState<any[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
 
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
@@ -380,6 +383,33 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSendAnnouncement = async () => {
+    if (!announcementTitle.trim() || !announcementMessage.trim()) {
+      toast.error('Please enter both a title and message for the announcement.');
+      return;
+    }
+    setSendingAnnouncement(true);
+    try {
+      // Fetch all user IDs from auth
+      const { data: allUsers } = await supabase
+        .from('profiles')
+        .select('id');
+      const userIds = (allUsers ?? []).map((u: any) => u.id);
+      if (userIds.length === 0) {
+        toast.error('No users found to send announcement to.');
+        return;
+      }
+      await NotificationService.sendAdminAnnouncement(userIds, announcementTitle.trim(), announcementMessage.trim());
+      toast.success(`Announcement sent to ${userIds.length} users!`);
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+    } catch {
+      toast.error('Failed to send announcement. Please try again.');
+    } finally {
+      setSendingAnnouncement(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -445,6 +475,14 @@ const AdminDashboard = () => {
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Analytics
+          </Button>
+          <Button
+            variant={activeTab === 'announcements' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('announcements' as any)}
+            className="bg-maroon/10 text-maroon border-maroon/30 hover:bg-maroon hover:text-white"
+          >
+            <Bell className="w-4 h-4 mr-2" />
+            Announcements
           </Button>
         </div>
 
@@ -974,6 +1012,54 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
         )}
+
+        {/* Announcement Panel */}
+        {(activeTab as string) === 'announcements' && (
+          <div className="max-w-xl">
+            <Card className="border-gold/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-gold" />
+                  Send Announcement to All Users
+                </CardTitle>
+                <CardDescription>
+                  This will send a notification to every registered user on Vowza.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ann-title">Announcement Title *</Label>
+                  <Input
+                    id="ann-title"
+                    placeholder="e.g., New Feature: AI Event Planner"
+                    value={announcementTitle}
+                    onChange={e => setAnnouncementTitle(e.target.value)}
+                    className="border-border focus:border-gold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ann-msg">Message *</Label>
+                  <Textarea
+                    id="ann-msg"
+                    placeholder="Write your announcement message here..."
+                    value={announcementMessage}
+                    onChange={e => setAnnouncementMessage(e.target.value)}
+                    rows={4}
+                    className="border-border focus:border-gold resize-none"
+                  />
+                </div>
+                <Button
+                  onClick={handleSendAnnouncement}
+                  disabled={sendingAnnouncement || !announcementTitle.trim() || !announcementMessage.trim()}
+                  className="w-full bg-gradient-maroon text-primary-foreground hover:opacity-90"
+                >
+                  {sendingAnnouncement ? 'Sending…' : 'Send Announcement to All Users'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
       </main>
     </div>
   );

@@ -41,15 +41,6 @@ class AdminVerificationService {
         .from('worker_profiles')
         .select(`
           *,
-          profiles!inner(
-            id,
-            full_name,
-            phone,
-            email,
-            avatar_url,
-            city,
-            area
-          ),
           worker_documents(
             id,
             document_type,
@@ -60,53 +51,54 @@ class AdminVerificationService {
         `)
         .in('verification_status', ['pending', 'under_review'])
 
-      // Apply filters
       if (filters.status) {
         query = query.eq('verification_status', filters.status)
       }
-
       if (filters.serviceType) {
         query = query.eq('service_type', filters.serviceType)
       }
-
       if (filters.city) {
         query = query.eq('service_city', filters.city)
       }
-
-      if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
-      }
-
-      // Get total count
-      const { count } = await query
-
-      // Apply pagination
       if (filters.limit) {
         query = query.limit(filters.limit)
       }
-
       if (filters.offset) {
         query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1)
       }
-
-      // Order by creation date
       query = query.order('created_at', { ascending: false })
 
       const { data: workers, error } = await query
+      if (error) return { success: false, message: 'Failed to fetch pending workers' }
+      if (!workers || workers.length === 0) return { success: true, message: 'No pending workers', workers: [], totalCount: 0 }
 
-      if (error) {
-        console.error('Get pending workers error:', error)
-        return { success: false, message: 'Failed to fetch pending workers' }
+      // Fetch profiles separately (no direct FK between worker_profiles and profiles)
+      const userIds = workers.map(w => w.user_id).filter(Boolean)
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, email, avatar_url, city, area')
+        .in('id', userIds)
+
+      const profileMap = new Map((profilesData ?? []).map(p => [p.id, p]))
+
+      let enriched = workers.map(w => ({
+        ...w,
+        profiles: profileMap.get(w.user_id) ?? null,
+      }))
+
+      // Client-side search filter
+      if (filters.search) {
+        const s = filters.search.toLowerCase()
+        enriched = enriched.filter(w =>
+          w.full_name?.toLowerCase().includes(s) ||
+          w.phone?.toLowerCase().includes(s) ||
+          w.email?.toLowerCase().includes(s) ||
+          (profileMap.get(w.user_id)?.full_name ?? '').toLowerCase().includes(s)
+        )
       }
 
-      return {
-        success: true,
-        message: 'Pending workers fetched successfully',
-        workers: workers || [],
-        totalCount: count || 0
-      }
+      return { success: true, message: 'Pending workers fetched successfully', workers: enriched, totalCount: enriched.length }
     } catch (error) {
-      console.error('Get pending workers error:', error)
       return { success: false, message: 'Failed to fetch pending workers' }
     }
   }
@@ -120,15 +112,6 @@ class AdminVerificationService {
         .from('worker_profiles')
         .select(`
           *,
-          profiles!inner(
-            id,
-            full_name,
-            phone,
-            email,
-            avatar_url,
-            city,
-            area
-          ),
           worker_documents(
             id,
             document_type,
@@ -138,53 +121,52 @@ class AdminVerificationService {
           )
         `)
 
-      // Apply filters
       if (filters.status) {
         query = query.eq('verification_status', filters.status)
       }
-
       if (filters.serviceType) {
         query = query.eq('service_type', filters.serviceType)
       }
-
       if (filters.city) {
         query = query.eq('service_city', filters.city)
       }
-
-      if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
-      }
-
-      // Get total count
-      const { count } = await query
-
-      // Apply pagination
       if (filters.limit) {
         query = query.limit(filters.limit)
       }
-
       if (filters.offset) {
         query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1)
       }
-
-      // Order by creation date
       query = query.order('created_at', { ascending: false })
 
       const { data: workers, error } = await query
+      if (error) return { success: false, message: 'Failed to fetch workers' }
+      if (!workers || workers.length === 0) return { success: true, message: 'No workers found', workers: [], totalCount: 0 }
 
-      if (error) {
-        console.error('Get all workers error:', error)
-        return { success: false, message: 'Failed to fetch workers' }
+      const userIds = workers.map(w => w.user_id).filter(Boolean)
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, email, avatar_url, city, area')
+        .in('id', userIds)
+
+      const profileMap = new Map((profilesData ?? []).map(p => [p.id, p]))
+
+      let enriched = workers.map(w => ({
+        ...w,
+        profiles: profileMap.get(w.user_id) ?? null,
+      }))
+
+      if (filters.search) {
+        const s = filters.search.toLowerCase()
+        enriched = enriched.filter(w =>
+          w.full_name?.toLowerCase().includes(s) ||
+          w.phone?.toLowerCase().includes(s) ||
+          w.email?.toLowerCase().includes(s) ||
+          (profileMap.get(w.user_id)?.full_name ?? '').toLowerCase().includes(s)
+        )
       }
 
-      return {
-        success: true,
-        message: 'Workers fetched successfully',
-        workers: workers || [],
-        totalCount: count || 0
-      }
+      return { success: true, message: 'Workers fetched successfully', workers: enriched, totalCount: enriched.length }
     } catch (error) {
-      console.error('Get all workers error:', error)
       return { success: false, message: 'Failed to fetch workers' }
     }
   }
@@ -198,16 +180,6 @@ class AdminVerificationService {
         .from('worker_profiles')
         .select(`
           *,
-          profiles!inner(
-            id,
-            full_name,
-            phone,
-            email,
-            avatar_url,
-            city,
-            area,
-            created_at
-          ),
           worker_documents(
             id,
             document_type,
@@ -226,13 +198,19 @@ class AdminVerificationService {
         return { success: false, message: 'Worker not found' }
       }
 
+      // Fetch profile separately
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, email, avatar_url, city, area, created_at')
+        .eq('id', workerId)
+        .maybeSingle()
+
       return {
         success: true,
-        worker,
+        worker: { ...worker, profiles: profile ?? null },
         message: 'Worker details fetched successfully'
       }
     } catch (error) {
-      console.error('Get worker details error:', error)
       return { success: false, message: 'Failed to fetch worker details' }
     }
   }
@@ -468,31 +446,38 @@ class AdminVerificationService {
     message: string
   }> {
     try {
-      const { data: activities, error } = await supabase
+      // audit_log.user_id → auth.users; no direct FK to profiles → fetch separately
+      const { data: logs, error } = await supabase
         .from('audit_log')
-        .select(`
-          *,
-          profiles(
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .or('action.eq.WORKER_VERIFICATION_APPROVED,action.eq.WORKER_VERIFICATION_REJECTED')
         .order('created_at', { ascending: false })
         .limit(limit)
 
       if (error) {
-        console.error('Get recent activities error:', error)
         return { success: false, message: 'Failed to fetch recent activities' }
       }
 
-      return {
-        success: true,
-        activities: activities || [],
-        message: 'Recent activities fetched successfully'
+      if (!logs || logs.length === 0) {
+        return { success: true, activities: [], message: 'No recent activities' }
       }
+
+      // Fetch admin profiles separately using user_id
+      const adminIds = [...new Set(logs.map(l => l.user_id).filter(Boolean))]
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', adminIds)
+
+      const profileMap = new Map((profilesData ?? []).map(p => [p.id, p]))
+
+      const activities = logs.map(log => ({
+        ...log,
+        profiles: profileMap.get(log.user_id) ?? null,
+      }))
+
+      return { success: true, activities, message: 'Recent activities fetched successfully' }
     } catch (error) {
-      console.error('Get recent activities error:', error)
       return { success: false, message: 'Failed to fetch recent activities' }
     }
   }

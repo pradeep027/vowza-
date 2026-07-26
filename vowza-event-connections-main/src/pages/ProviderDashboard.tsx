@@ -251,8 +251,10 @@ const ProviderDashboard = () => {
       // Send notification to customer
       if (action === 'accepted') {
         await NotificationService.notifyBookingAccepted(booking.customer_id, user?.id || '', bookingId);
-      } else {
+      } else if (action === 'rejected') {
         await NotificationService.notifyBookingRejected(booking.customer_id, user?.id || '', bookingId);
+      } else if (action === 'completed') {
+        await NotificationService.notifyBookingCompleted(booking.customer_id, user?.id || '', bookingId);
       }
 
       toast.success(`Booking ${action}`);
@@ -310,6 +312,8 @@ const ProviderDashboard = () => {
       toast.success('Profile updated successfully');
       setShowEditProfile(false);
       fetchProviderData();
+      // Notify user their profile was updated
+      if (user) await NotificationService.notifyProfileUpdated(user.id);
     } catch (error: any) {
       toast.error(error.message);
     }

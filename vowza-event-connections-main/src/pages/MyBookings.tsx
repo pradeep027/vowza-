@@ -121,16 +121,15 @@ const MyBookings = () => {
     setIsCancelling(true);
     try {
       await cancelBooking(cancelTarget);
-      // Notify artist
+      // Notify both customer and artist
       const booking = bookings.find(b => b.id === cancelTarget);
       if (booking && user) {
-        await NotificationService.createNotification({
-          userId: booking.provider_id,
-          type: 'booking_received',
-          title: 'Booking Cancelled',
-          message: 'A customer has cancelled their booking request.',
-          metadata: { bookingId: cancelTarget },
-        });
+        await NotificationService.notifyBookingCancelled(
+          user.id,
+          booking.provider_id,
+          cancelTarget,
+          'customer'
+        );
       }
       toast.success('Booking cancelled successfully.');
       setCancelTarget(null);

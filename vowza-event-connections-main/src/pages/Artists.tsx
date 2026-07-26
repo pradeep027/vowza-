@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -8,153 +7,52 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, MapPin, Star, Clock, IndianRupee, SlidersHorizontal, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Filter, MapPin, Star, Clock, IndianRupee, SlidersHorizontal, X, Calendar, Award, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Artist {
-  id: string;
-  full_name: string;
-  category: string;
-  subcategory: string;
-  city: string;
-  state: string;
-  experience: string;
-  starting_price: number;
-  bio: string;
-  profile_image: string;
-  rating: number;
-  total_reviews: number;
-  verified: boolean;
-  available: boolean;
-  approval_status: string;
-}
+import { useArtists, useCategories, ArtistFilters } from '@/hooks/useArtists';
 
 const Artists = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const categoryParam = searchParams.get('category');
 
-  const [artists, setArtists] = useState<Artist[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Enhanced filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedBudget, setSelectedBudget] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
-  const [sortBy, setSortBy] = useState('rating');
+  const [selectedExperience, setSelectedExperience] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('');
+  const [sortBy, setSortBy] = useState<'rating' | 'price-low' | 'price-high' | 'newest' | 'experience'>('rating');
   const [showFilters, setShowFilters] = useState(false);
+  const [filterVerified, setFilterVerified] = useState(false);
+  const [filterFeatured, setFilterFeatured] = useState(false);
+  const [filterAvailable, setFilterAvailable] = useState(false);
 
-  useEffect(() => {
-    fetchArtists();
-
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('artists-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'provider_profiles'
-        },
-        () => {
-          fetchArtists();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [categoryParam, searchQuery, selectedCity, selectedBudget, selectedRating, sortBy]);
-
-  const fetchArtists = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('provider_profiles')
-        .select(`
-          *,
-          profiles!inner(full_name, city, state, avatar_url)
-        `)
-        .eq('verification_status', 'verified');
-
-      if (categoryParam) {
-        query = query.eq('profession', getCategoryName(categoryParam) as any);
-      }
-
-      if (searchQuery) {
-        query = query.ilike('profiles.full_name', `%${searchQuery}%`);
-      }
-
-      if (selectedCity) {
-        query = query.eq('profiles.city', selectedCity);
-      }
-
-      if (selectedBudget) {
-        const [min, max] = selectedBudget.split('-').map(Number);
-        query = query.gte('min_price', min).lte('max_price', max);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      let artistsData = data?.map((artist: any) => ({
-        id: artist.id,
-        full_name: artist.profiles?.full_name || 'Unknown',
-        category: artist.profession || 'Artist',
-        subcategory: artist.specialties || '',
-        city: artist.profiles?.city || '',
-        state: artist.profiles?.state || '',
-        experience: artist.experience_years ? `${artist.experience_years} years` : '',
-        starting_price: artist.min_price || 0,
-        bio: artist.bio || '',
-        profile_image: artist.profiles?.avatar_url || '/placeholder.svg',
-        rating: 4.5,
-        total_reviews: 0,
-        verified: artist.verification_status === 'verified',
-        available: true,
-        approval_status: artist.verification_status
-      })) || [];
-
-      // Sort
-      artistsData = sortArtists(artistsData);
-
-      setArtists(artistsData);
-    } catch (error: any) {
-      toast.error('Failed to fetch artists');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+  // Build filters object for React Query
+  const filters: ArtistFilters = {
+    category: categoryParam || undefined,
+    search: searchQuery || undefined,
+    city: selectedCity || undefined,
+    budgetMin: selectedBudget ? parseInt(selectedBudget.split('-')[0]) : undefined,
+    budgetMax: selectedBudget ? parseInt(selectedBudget.split('-')[1]) : undefined,
+    rating: selectedRating ? parseFloat(selectedRating) : undefined,
+    experience: selectedExperience ? parseInt(selectedExperience) : undefined,
+    language: selectedLanguage || undefined,
+    sortBy,
+    verified: filterVerified || undefined,
+    featured: filterFeatured || undefined,
+    available: filterAvailable || undefined,
   };
+
+  // Use React Query for data fetching
+  const { data: artists = [], isLoading, error } = useArtists(filters);
+  const { data: categories = [] } = useCategories();
 
   const getCategoryName = (categoryId: string) => {
-    const categoryMap: Record<string, string> = {
-      'bands': 'Music Band',
-      'traditional-bands': 'Traditional Band',
-      'dj': 'DJ',
-      'photographers': 'Photographer',
-      'dancers': 'Dancer',
-      'decorators': 'Event Decorator'
-    };
-    return categoryMap[categoryId] || categoryId;
-  };
-
-  const sortArtists = (data: Artist[]) => {
-    const sorted = [...data];
-    switch (sortBy) {
-      case 'price-low':
-        return sorted.sort((a, b) => a.starting_price - b.starting_price);
-      case 'price-high':
-        return sorted.sort((a, b) => b.starting_price - a.starting_price);
-      case 'rating':
-        return sorted.sort((a, b) => b.rating - a.rating);
-      case 'newest':
-        return sorted.reverse();
-      default:
-        return sorted;
-    }
+    const category = categories.find((c: any) => c.profession_type === categoryId);
+    return category?.name || categoryId;
   };
 
   const clearFilters = () => {
@@ -162,12 +60,21 @@ const Artists = () => {
     setSelectedCity('');
     setSelectedBudget('');
     setSelectedRating('');
+    setSelectedExperience('');
+    setSelectedLanguage('');
     setSortBy('rating');
+    setFilterVerified(false);
+    setFilterFeatured(false);
+    setFilterAvailable(false);
   };
 
   const handleArtistClick = (artistId: string) => {
     navigate(`/artist/${artistId}`);
   };
+
+  if (error) {
+    toast.error('Failed to load artists');
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -219,6 +126,7 @@ const Artists = () => {
               <SelectItem value="rating">Highest Rated</SelectItem>
               <SelectItem value="price-low">Lowest Price</SelectItem>
               <SelectItem value="price-high">Highest Price</SelectItem>
+              <SelectItem value="experience">Most Experience</SelectItem>
               <SelectItem value="newest">Newest</SelectItem>
             </SelectContent>
           </Select>
@@ -235,7 +143,7 @@ const Artists = () => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* City */}
               <div>
                 <label className="text-sm font-medium mb-2 block">City</label>
@@ -299,6 +207,81 @@ const Artists = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Experience */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Experience</label>
+                <Select value={selectedExperience} onValueChange={setSelectedExperience}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select experience" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1+ Years</SelectItem>
+                    <SelectItem value="3">3+ Years</SelectItem>
+                    <SelectItem value="5">5+ Years</SelectItem>
+                    <SelectItem value="10">10+ Years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Language */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Language</label>
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Hindi">Hindi</SelectItem>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Telugu">Telugu</SelectItem>
+                    <SelectItem value="Tamil">Tamil</SelectItem>
+                    <SelectItem value="Kannada">Kannada</SelectItem>
+                    <SelectItem value="Marathi">Marathi</SelectItem>
+                    <SelectItem value="Bengali">Bengali</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium block">Quick Filters</label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="verified"
+                      checked={filterVerified}
+                      onCheckedChange={(checked) => setFilterVerified(checked as boolean)}
+                    />
+                    <label htmlFor="verified" className="text-sm cursor-pointer flex items-center gap-1">
+                      <Award className="w-4 h-4" />
+                      Verified Only
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="featured"
+                      checked={filterFeatured}
+                      onCheckedChange={(checked) => setFilterFeatured(checked as boolean)}
+                    />
+                    <label htmlFor="featured" className="text-sm cursor-pointer flex items-center gap-1">
+                      <Star className="w-4 h-4" />
+                      Featured Only
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="available"
+                      checked={filterAvailable}
+                      onCheckedChange={(checked) => setFilterAvailable(checked as boolean)}
+                    />
+                    <label htmlFor="available" className="text-sm cursor-pointer flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      Available Now
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -306,7 +289,7 @@ const Artists = () => {
 
       {/* Artists Grid */}
       <div className="container px-4 py-8">
-        {loading ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <Card key={i} className="animate-pulse">
@@ -342,7 +325,7 @@ const Artists = () => {
                 >
                   <div className="relative h-56 bg-muted overflow-hidden">
                     <img
-                      src={artist.profile_image}
+                      src={artist.cover_image_url || artist.avatar_url || '/placeholder.svg'}
                       alt={artist.full_name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -350,12 +333,17 @@ const Artists = () => {
                     
                     {/* Badges */}
                     <div className="absolute top-3 left-3 flex gap-2">
-                      {artist.verified && (
+                      {artist.is_verified && (
                         <Badge className="bg-gold text-foreground border-0 shadow-gold">
                           ✓ Verified
                         </Badge>
                       )}
-                      {artist.available ? (
+                      {artist.is_featured && (
+                        <Badge className="bg-purple-500 text-primary-foreground border-0">
+                          ⭐ Featured
+                        </Badge>
+                      )}
+                      {artist.is_available ? (
                         <Badge className="bg-emerald-500 text-primary-foreground border-0">
                           Available
                         </Badge>
@@ -369,7 +357,7 @@ const Artists = () => {
                     {/* Rating */}
                     <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-card/90 backdrop-blur-sm px-2 py-1 rounded-lg">
                       <Star className="w-4 h-4 text-gold fill-gold" />
-                      <span className="text-sm font-semibold text-foreground">{artist.rating}</span>
+                      <span className="text-sm font-semibold text-foreground">{artist.average_rating.toFixed(1)}</span>
                       <span className="text-xs text-muted-foreground">({artist.total_reviews})</span>
                     </div>
                   </div>
@@ -378,7 +366,7 @@ const Artists = () => {
                     <h3 className="text-lg font-display font-semibold text-foreground mb-1 group-hover:text-maroon transition-colors">
                       {artist.full_name}
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-3">{artist.category}</p>
+                    <p className="text-sm text-muted-foreground mb-3">{artist.category_name || artist.profession}</p>
 
                     <div className="flex items-center gap-4 mb-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -387,7 +375,7 @@ const Artists = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        <span>{artist.experience}</span>
+                        <span>{artist.experience_years} yrs</span>
                       </div>
                     </div>
 
@@ -396,7 +384,7 @@ const Artists = () => {
                         <p className="text-xs text-muted-foreground">Starting from</p>
                         <p className="text-sm font-semibold text-foreground">
                           <IndianRupee className="w-3 h-3 inline" />
-                          {artist.starting_price.toLocaleString()}
+                          {artist.price_min.toLocaleString()}
                         </p>
                       </div>
                       <Button size="sm" className="bg-gradient-maroon text-primary-foreground">

@@ -4,8 +4,13 @@ export type NotificationType =
   | 'booking_received'
   | 'booking_accepted'
   | 'booking_rejected'
+  | 'booking_cancelled'
+  | 'booking_completed'
   | 'artist_approved'
   | 'artist_rejected'
+  | 'new_review'
+  | 'profile_updated'
+  | 'admin_announcement'
   | 'email_verification'
   | 'password_reset';
 
@@ -168,5 +173,95 @@ export const NotificationService = {
       message: 'Your password has been reset successfully.',
       metadata: {}
     });
+  },
+
+  // Booking cancelled
+  async notifyBookingCancelled(customerId: string, providerId: string, bookingId: string, cancelledBy?: string) {
+    const cancellerLabel = cancelledBy === 'provider' ? 'The provider' : 'The customer';
+    await this.createNotification({
+      userId: customerId,
+      type: 'booking_cancelled',
+      title: 'Booking Cancelled',
+      message: `${cancellerLabel} has cancelled the booking. Please check your bookings for details.`,
+      metadata: { bookingId }
+    });
+    await this.createNotification({
+      userId: providerId,
+      type: 'booking_cancelled',
+      title: 'Booking Cancelled',
+      message: `${cancellerLabel} has cancelled the booking.`,
+      metadata: { bookingId }
+    });
+  },
+
+  // Booking completed
+  async notifyBookingCompleted(customerId: string, providerId: string, bookingId: string) {
+    await this.createNotification({
+      userId: customerId,
+      type: 'booking_completed',
+      title: 'Booking Completed',
+      message: 'Your event is complete! We hope you had a wonderful experience. Please leave a review.',
+      metadata: { bookingId }
+    });
+    await this.createNotification({
+      userId: providerId,
+      type: 'booking_completed',
+      title: 'Booking Completed',
+      message: 'Great work! The booking has been marked as completed. Payment will be processed shortly.',
+      metadata: { bookingId }
+    });
+  },
+
+  // New review
+  async notifyNewReview(providerId: string, customerName: string, rating: number, bookingId: string) {
+    await this.createNotification({
+      userId: providerId,
+      type: 'new_review',
+      title: 'New Review Received',
+      message: `${customerName} gave you a ${rating}-star review. Check your profile to see the feedback.`,
+      metadata: { bookingId, rating }
+    });
+  },
+
+  // Profile updated
+  async notifyProfileUpdated(userId: string) {
+    await this.createNotification({
+      userId,
+      type: 'profile_updated',
+      title: 'Profile Updated',
+      message: 'Your profile has been updated successfully.',
+      metadata: {}
+    });
+  },
+
+  // Admin announcement
+  async sendAdminAnnouncement(userIds: string[], title: string, message: string) {
+    for (const userId of userIds) {
+      await this.createNotification({
+        userId,
+        type: 'admin_announcement',
+        title,
+        message,
+        metadata: {}
+      });
+    }
+  },
+
+  // Delete a notification
+  async deleteNotification(notificationId: string) {
+    try {
+      await supabase.from('notifications').delete().eq('id', notificationId);
+    } catch { /* ignore */ }
+  },
+
+  // Get notifications for a user
+  async getNotifications(userId: string, limit = 30) {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return data ?? [];
   }
 };
