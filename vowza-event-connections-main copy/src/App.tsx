@@ -29,8 +29,6 @@ const Checkout             = lazy(() => import("./pages/Checkout"));
 const Cart                 = lazy(() => import("./components/Cart"));
 const NotFound             = lazy(() => import("./pages/NotFound"));
 const AIPlanner            = lazy(() => import("./pages/AIPlanner"));
-const EventPlanning        = lazy(() => import("./pages/EventPlanning"));
-const CustomerEventDashboard = lazy(() => import("./pages/CustomerEventDashboard"));
 
 // ─── Page loader fallback ─────────────────────────────────────────────────────
 const PageLoader = () => (
@@ -72,7 +70,6 @@ const AppContent = () => {
           <Route path="/test-features" element={<TestFeatures />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/artists" element={<Artists />} />
-          <Route path="/event/:eventId" element={<EventPlanning />} />
           <Route path="/ai-planner" element={<AIPlanner />} />
           <Route path="/provider/:id" element={<ProviderProfile />} />
           <Route path="/artist/:id" element={<ProviderProfile />} />
@@ -86,9 +83,6 @@ const AppContent = () => {
           } />
           <Route path="/my-bookings" element={
             <ProtectedRoute><MyBookings /></ProtectedRoute>
-          } />
-          <Route path="/event-dashboard" element={
-            <ProtectedRoute><CustomerEventDashboard /></ProtectedRoute>
           } />
           <Route path="/chat/:bookingId" element={
             <ProtectedRoute><BookingChat /></ProtectedRoute>

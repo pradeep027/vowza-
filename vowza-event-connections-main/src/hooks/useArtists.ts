@@ -48,6 +48,7 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
   return useQuery({
     queryKey: ['artists', filters],
     queryFn: async () => {
+      // @ts-ignore - Supabase types don't include artist_categories yet
       let query = (supabase as any)
         .from('provider_profiles')
         .select(`
@@ -85,7 +86,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
 
       // Apply filters
       if (filters.category) {
-        query = query.eq('profession', filters.category as any);
+        // @ts-ignore
+        query = query.eq('profession', filters.category);
       }
 
       if (filters.budgetMin !== undefined) {
@@ -101,7 +103,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       }
 
       if (filters.featured !== undefined) {
-        query = query.eq('is_featured', filters.featured as any);
+        // @ts-ignore
+        query = query.eq('is_featured', filters.featured);
       }
 
       if (filters.available !== undefined) {
@@ -244,8 +247,9 @@ export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
+      // @ts-ignore - artist_categories table exists but not in types yet
       const { data, error } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
@@ -262,7 +266,8 @@ export function useAvailability(providerId: string, date: Date) {
   return useQuery({
     queryKey: ['availability', providerId, date.toISOString().split('T')[0]],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      // @ts-ignore - RPC function exists but not in types yet
+      const { data, error } = await supabase
         .rpc('check_provider_availability', {
           p_provider_id: providerId,
           p_event_date: date.toISOString().split('T')[0],
@@ -286,13 +291,15 @@ export function useToggleFavorite() {
       if (!user) throw new Error('Not authenticated');
 
       if (isFavorite) {
-        await (supabase as any)
+        // @ts-ignore - favorites table exists but not in types yet
+        await supabase
           .from('favorites')
           .delete()
           .eq('user_id', user.id)
           .eq('provider_id', providerId);
       } else {
-        await (supabase as any).from('favorites').insert({
+        // @ts-ignore - favorites table exists but not in types yet
+        await supabase.from('favorites').insert({
           user_id: user.id,
           provider_id: providerId,
         });
@@ -312,7 +319,8 @@ export function useFavorites() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      const { data, error } = await (supabase as any)
+      // @ts-ignore - favorites table exists but not in types yet
+      const { data, error } = await supabase
         .from('favorites')
         .select(`
           provider_id,

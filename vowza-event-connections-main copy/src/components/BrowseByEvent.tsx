@@ -6,7 +6,7 @@ const BrowseByEvent = () => {
   const navigate = useNavigate();
 
   const handleClick = (eventId: string) => {
-    navigate(`/event/${eventId}`);
+    navigate(`/artists?event=${eventId}`);
   };
 
   return (
