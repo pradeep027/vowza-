@@ -49,26 +49,21 @@ const Auth = () => {
     if (!loginEmail.trim() || !loginPassword) return;
     setIsLoading(true);
     
-    console.log('[Auth] Login attempt for:', loginEmail.trim());
     const { error } = await signIn(loginEmail.trim(), loginPassword);
     
     if (error) {
-      console.error('[Auth] Login failed:', error);
-      // Display the exact error message from Supabase for debugging
-      const errorMessage = error.message || 'Login failed. Please try again.';
-      
-      if (errorMessage.toLowerCase().includes('invalid login credentials') ||
-          errorMessage.toLowerCase().includes('invalid email or password')) {
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('invalid login credentials') ||
+          msg.toLowerCase().includes('invalid email or password')) {
         toast.error('Incorrect email or password. Please check your credentials.');
-      } else if (errorMessage.toLowerCase().includes('email not confirmed')) {
-        toast.error('Please check your email and confirm your account before logging in.');
-      } else if (errorMessage.toLowerCase().includes('user not found')) {
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        toast.error('Please verify your email before logging in. Check your inbox.');
+      } else if (msg.toLowerCase().includes('user not found')) {
         toast.error('No account found with this email. Please sign up.');
       } else {
-        toast.error(errorMessage);
+        toast.error(msg || 'Login failed. Please try again.');
       }
     } else {
-      console.log('[Auth] Login successful');
       toast.success('Welcome back! 🎉');
       navigate('/');
     }
@@ -79,13 +74,9 @@ const Auth = () => {
     e.preventDefault();
     if (!signupFullName.trim()) { toast.error('Please enter your full name'); return; }
     if (signupPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    
-    console.log('[Auth] Signup attempt for:', signupEmail.trim());
     setIsLoading(true);
     const { error } = await signUp(signupEmail.trim(), signupPassword, signupFullName.trim(), signupPhone.trim() || undefined);
-    
     if (error) {
-      console.error('[Auth] Signup failed:', error);
       if (error.message?.toLowerCase().includes('already registered') ||
           error.message?.toLowerCase().includes('user already registered')) {
         toast.error('This email is already registered. Please log in instead.');
@@ -93,7 +84,6 @@ const Auth = () => {
         toast.error(error.message ?? 'Sign up failed. Please try again.');
       }
     } else {
-      console.log('[Auth] Signup successful');
       setSignupDone(true);
     }
     setIsLoading(false);
@@ -104,22 +94,23 @@ const Auth = () => {
     if (!resetEmail.trim()) { toast.error('Please enter your email'); return; }
     
     const normalizedEmail = resetEmail.trim().toLowerCase();
-    console.log('[Auth] Password reset requested for:', normalizedEmail);
     setIsLoading(true);
     
+    const redirectTo = `${window.location.origin}/auth?mode=reset`;
+    
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${window.location.origin}/auth?mode=reset`,
+      redirectTo,
     });
     
     if (error) {
-      console.error('[Auth] Password reset failed:', error);
-      toast.error(error.message ?? 'Failed to send reset email');
+      // Show the actual error — never silently swallow it
+      toast.error(error.message || 'Failed to send reset email. Please try again.');
     } else {
-      console.log('[Auth] Password reset email sent successfully');
-      toast.success('Password reset link sent! Check your inbox.');
-      // Don't redirect immediately - let user see the success message
-      // setShowResetForm(false);
-      // setResetEmail('');
+      // Supabase always returns success even if email doesn't exist (prevents user enumeration).
+      // Advise user to check spam too.
+      toast.success('If an account exists for this email, a reset link has been sent. Check your inbox and spam folder.', { duration: 8000 });
+      setResetEmail('');
+      setShowResetForm(false);
     }
     setIsLoading(false);
   };
@@ -127,30 +118,19 @@ const Auth = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    
-    console.log('[Auth] Attempting to update password');
     setIsLoading(true);
-    
-    // First check if we have a valid session from the reset link
     const { data: { session } } = await supabase.auth.getSession();
-    
     if (!session) {
-      console.error('[Auth] No session found for password reset');
       toast.error('Invalid or expired reset link. Please request a new password reset.');
       navigate('/auth');
       setIsLoading(false);
       return;
     }
-    
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    
     if (error) {
-      console.error('[Auth] Password update failed:', error);
       toast.error(error.message ?? 'Failed to update password');
     } else {
-      console.log('[Auth] Password updated successfully');
-      toast.success('Password updated! You can now log in.');
-      // Sign out to force re-login with new password
+      toast.success('Password updated successfully! Please log in with your new password.');
       await supabase.auth.signOut();
       navigate('/auth');
     }

@@ -81,12 +81,8 @@ const ProtectedRoute = ({
         }
 
         const roles = data.map(r => r.role as string);
-
-console.log("User ID:", user.id);
-console.log("Roles from database:", roles);
-
-setUserRoles(roles);
-roleCache.set(user.id, roles);
+        setUserRoles(roles);
+        roleCache.set(user.id, roles);
       } catch (err) {
         // Network/unexpected error — fail open with customer
         const fallback = ['customer'];
@@ -134,15 +130,9 @@ roleCache.set(user.id, roles);
   }
 
   // ── Role check ────────────────────────────────────────────────────────────
-   if (allowedRoles.length > 0) {
-   console.log("Allowed Roles:", allowedRoles);
-  console.log("Current User Roles:", userRoles);
-
-   const hasRole = allowedRoles.some(role => userRoles.includes(role));
-
- console.log("Has Role:", hasRole);
-
- if (!hasRole) {
+  if (allowedRoles.length > 0) {
+    const hasRole = allowedRoles.some(role => userRoles.includes(role));
+    if (!hasRole) {
       toast.error('Access denied. You do not have permission to access this page.');
       return <Navigate to="/" replace />;
     }

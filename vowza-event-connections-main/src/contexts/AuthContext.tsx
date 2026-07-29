@@ -54,9 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     const redirectUrl = `${window.location.origin}/`;
     const normalizedEmail = email.toLowerCase().trim();
-    
-    console.log('[Auth] Attempting sign up for:', normalizedEmail);
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
@@ -64,35 +62,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: { full_name: fullName, phone: phone ?? '' },
       },
     });
-    
-    if (error) {
-      console.error('[Auth] Sign up error:', error);
-    } else {
-      console.log('[Auth] Sign up successful:', data.user?.email);
-    }
-    
     return { error };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    // Clear any stale inactivity flag from previous sessions
     localStorage.removeItem('inactivityLogout');
-    
-    // Normalize email to lowercase (Supabase is case-insensitive but this ensures consistency)
     const normalizedEmail = email.toLowerCase().trim();
-    
-    console.log('[Auth] Attempting sign in for:', normalizedEmail);
-    const { data, error } = await supabase.auth.signInWithPassword({ 
-      email: normalizedEmail, 
-      password 
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
     });
-    
-    if (error) {
-      console.error('[Auth] Sign in error:', error);
-    } else {
-      console.log('[Auth] Sign in successful:', data.user?.email);
-    }
-    
     return { error };
   }, []);
 
