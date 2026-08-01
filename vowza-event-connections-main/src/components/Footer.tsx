@@ -62,7 +62,7 @@ const Footer = () => {
 
       {/* ── Newsletter ────────────────────────────────────────────────── */}
       <div className="border-b border-white/8">
-        <div className="container px-4 py-12">
+        <div className="container px-4 py-12 md:py-14">
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div className="max-w-md">
               <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-2">
@@ -90,7 +90,7 @@ const Footer = () => {
       </div>
 
       {/* ── Main grid ─────────────────────────────────────────────────── */}
-      <div className="container px-4 py-14 md:py-20">
+      <div className="container px-4 py-12 md:py-20">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-10">
 
           {/* Brand */}

@@ -2,7 +2,7 @@
 import { Smartphone, Star, Users, ArrowRight } from "lucide-react";
 
 const DownloadApp = () => (
-  <section className="py-20 md:py-28 bg-[#09090f] overflow-hidden">
+  <section className="py-14 md:py-24 bg-[#09090f] overflow-hidden">
     <div className="container px-4">
       <div className="relative max-w-4xl mx-auto text-center">
         {/* Glow */}

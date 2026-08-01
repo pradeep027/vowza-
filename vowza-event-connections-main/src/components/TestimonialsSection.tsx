@@ -20,13 +20,12 @@ const TestimonialsSection = () => {
   const highlighted = featured[activeIndex];
 
   return (
-    <section className="py-20 md:py-28 bg-[#09090f] overflow-hidden">
+    <section className="py-16 md:py-24 bg-[#09090f] overflow-hidden">
       <div className="container px-4">
 
-        {/* Header */}
-        <div className="text-center mb-12">
+          <div className="text-center mb-10 md:mb-12">
           <div className="section-label bg-white/8 text-white/60 mb-5 mx-auto inline-flex">Real Stories</div>
-          <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-3">
+          <h2 className="text-2xl md:text-4xl font-display font-bold text-white mb-3">
             Customer Success Stories
           </h2>
           <p className="text-white/45 max-w-xl mx-auto text-sm">
@@ -35,34 +34,42 @@ const TestimonialsSection = () => {
         </div>
 
         {/* Featured testimonial */}
-        <div className="relative max-w-3xl mx-auto mb-8">
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-7 md:p-10 backdrop-blur-sm">
-            <Quote className="w-10 h-10 text-gold/25 mb-5" />
-            <p className="text-base md:text-lg text-white/85 leading-relaxed italic mb-6">
+        <div className="relative max-w-3xl mx-auto mb-8 px-6 md:px-0">
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 md:p-10 backdrop-blur-sm">
+            <Quote className="w-8 h-8 md:w-10 md:h-10 text-gold/25 mb-4 md:mb-5" />
+            <p className="text-sm md:text-lg text-white/85 leading-relaxed italic mb-5 md:mb-6">
               "{highlighted.review}"
             </p>
             <StarRow rating={highlighted.rating} />
-            <div className="flex items-center gap-4 mt-6 pt-6 border-t border-white/10">
-              <div className="w-11 h-11 rounded-xl bg-gradient-gold flex items-center justify-center text-gray-900 font-bold text-base flex-shrink-0">
+            <div className="flex items-center gap-3 md:gap-4 mt-5 md:mt-6 pt-5 md:pt-6 border-t border-white/10">
+              <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl bg-gradient-gold flex items-center justify-center text-gray-900 font-bold text-sm md:text-base flex-shrink-0">
                 {highlighted.customerName.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-white text-sm">{highlighted.customerName}</p>
-                <p className="text-xs text-white/45 mt-0.5">{highlighted.customerLocation} · {highlighted.eventDate}</p>
+                <p className="text-xs text-white/45 mt-0.5 truncate">{highlighted.customerLocation} · {highlighted.eventDate}</p>
               </div>
-              <div className="text-right hidden sm:block">
+              <div className="text-right hidden sm:block flex-shrink-0">
                 <p className="text-xs font-semibold text-gold">{highlighted.artistName}</p>
                 <span className="text-[10px] font-semibold text-white/40 mt-0.5 block">{highlighted.eventType}</span>
               </div>
             </div>
           </div>
 
-          {/* Nav arrows */}
-          <button onClick={prev} className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-white transition-colors">
-            <ChevronLeft className="w-5 h-5" />
+          {/* Nav arrows — moved inside padding so they don't overlap on 320px */}
+          <button
+            onClick={prev}
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 md:w-10 md:h-10 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-white transition-colors"
+            aria-label="Previous testimonial"
+          >
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
           </button>
-          <button onClick={next} className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-white transition-colors">
-            <ChevronRight className="w-5 h-5" />
+          <button
+            onClick={next}
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 md:w-10 md:h-10 rounded-full bg-white/8 hover:bg-white/15 flex items-center justify-center text-white transition-colors"
+            aria-label="Next testimonial"
+          >
+            <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
           </button>
 
           {/* Dots */}

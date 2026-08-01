@@ -72,8 +72,7 @@ const BrowseByEvent = () => {
   };
 
   return (
-    <section className="py-14 md:py-20 bg-secondary">
-      <div className="container px-4">
+    <section className="py-14 md:py-20 bg-secondary">      <div className="container px-4">
         {/* Header */}
         <div className="text-center mb-10 md:mb-14">
           <span className="inline-block px-4 py-1.5 rounded-full bg-maroon/10 text-maroon text-sm font-medium mb-4">

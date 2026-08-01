@@ -469,7 +469,10 @@ const Navbar = () => {
         {/* ── Mobile menu ───────────────────────────────────────────────── */}
         {isOpen && (
           <div className="lg:hidden border-t border-border/40 bg-white dark:bg-gray-950 animate-fade-down">
-            <div className="container py-4 space-y-1">
+            <div
+              className="container py-4 space-y-1"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+            >
           {/* Vowza AI Planner highlight */}
               <Link
                 to="/ai-planner"
@@ -492,7 +495,7 @@ const Navbar = () => {
                 <Link
                   key={slug}
                   to={`/artists?category=${slug}`}
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors min-h-[44px]"
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   {label}
@@ -510,22 +513,22 @@ const Navbar = () => {
 
               {user ? (
                 <>
-                  <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
-                  <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
+                  <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
+                  <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
                   <div className="h-px bg-border my-2" />
-                  <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/5 transition-colors">
+                  <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-destructive hover:bg-destructive/5 transition-colors">
                     <LogOut className="w-4 h-4" /> Sign out
                   </button>
                 </>
               ) : (
                 <div className="flex flex-col gap-2 pt-2">
                   <Link to="/auth">
-                    <button className="w-full px-4 py-3 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-secondary transition-colors">
+                    <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-medium border border-border text-foreground hover:bg-secondary transition-colors">
                       Sign in
                     </button>
                   </Link>
                   <Link to="/provider/register">
-                    <button className="w-full px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon">
+                    <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon">
                       Join as Artist — Free
                     </button>
                   </Link>

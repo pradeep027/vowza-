@@ -59,23 +59,35 @@ const AIFloatingButton = () => {
 
   return (
     <>
-      {/* FAB */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center">
+      {/* FAB — smaller on mobile, safe-area bottom, never covers main CTAs */}
+      <div className="fixed z-50 flex items-center"
+        style={{
+          bottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
+          right: "1rem",
+        }}
+      >
         <FloatingLabel visible={showLabel && !isOpen} />
 
         <motion.button
           onClick={toggle}
           onMouseEnter={() => !isOpen && setShowLabel(true)}
           onMouseLeave={() => setShowLabel(false)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.94 }}
-          className="relative w-14 h-14 rounded-2xl bg-gradient-gold shadow-gold
+          whileHover={{ scale: 1.07 }}
+          whileTap={{ scale: 0.92 }}
+          /* Mobile: 48×48 (min touch target). Desktop: 52×52 */
+          className="relative rounded-2xl bg-gradient-gold
             flex items-center justify-center overflow-hidden
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          aria-label={isOpen ? 'Close AI planner' : 'Open AI event planner'}
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2
+            w-12 h-12 md:w-[52px] md:h-[52px]"
+          style={{
+            boxShadow:
+              "0 4px 20px -4px hsl(40 95% 52% / 0.55)," +
+              "0 1px 3px hsl(0 0% 0% / 0.12)",
+          }}
+          aria-label={isOpen ? 'Close Vowza AI Planner' : 'Open Vowza AI Planner'}
           aria-expanded={isOpen}
         >
-          {/* Animated shimmer */}
+          {/* Shimmer */}
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
             animate={{ x: ['-100%', '200%'] }}
@@ -89,7 +101,7 @@ const AIFloatingButton = () => {
                 animate={{ rotate: 0, opacity: 1 }}
                 exit={{ rotate: 90, opacity: 0 }}
                 transition={{ duration: 0.18 }}>
-                <X className="w-5 h-5 text-foreground" />
+                <X className="w-[18px] h-[18px] md:w-5 md:h-5 text-foreground" />
               </motion.div>
             ) : (
               <motion.div key="open"
@@ -97,17 +109,15 @@ const AIFloatingButton = () => {
                 animate={{ rotate: 0, opacity: 1 }}
                 exit={{ rotate: -90, opacity: 0 }}
                 transition={{ duration: 0.18 }}>
-                <Sparkles className="w-5 h-5 text-foreground" />
+                <Sparkles className="w-[18px] h-[18px] md:w-5 md:h-5 text-foreground" />
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Notification dot */}
           {hasUnread && !isOpen && <NotificationDot />}
         </motion.button>
       </div>
 
-      {/* Chat panel */}
       <AIChatPanel isOpen={isOpen} onClose={() => setIsOpen(false)} prefillQuery={prefillQuery} onPrefillConsumed={() => setPrefillQuery(undefined)} />
     </>
   );

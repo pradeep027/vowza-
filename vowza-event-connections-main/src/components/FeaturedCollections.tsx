@@ -140,7 +140,7 @@ const FeaturedCollections = () => {
   if (!isLoading && artists.length === 0) return null;
 
   return (
-    <section className="py-20 md:py-28 bg-surface-2">
+    <section className="py-16 md:py-24 bg-surface-2">
       <div className="container px-4">
 
         {/* Header */}

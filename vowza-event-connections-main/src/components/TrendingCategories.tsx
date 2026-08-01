@@ -285,7 +285,7 @@ const TrendingCategories = () => {
     cat.types.reduce((sum, t) => sum + (countMap.get(t) ?? 0), 0);
 
   return (
-    <section className="py-16 md:py-24 bg-background">
+    <section className="py-14 md:py-24 bg-background">
       <div className="container px-4">
 
         {/* ── Section header ── */}
