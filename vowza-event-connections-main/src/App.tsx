@@ -11,7 +11,6 @@ import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import InactivityWarning from "@/components/InactivityWarning";
 import AIFloatingButton from "@/components/ai/AIFloatingButton";
 
-// ─── Code-split all pages — only homepage loads on first visit ────────────────
 const Index                = lazy(() => import("./pages/Index"));
 const Auth                 = lazy(() => import("./pages/Auth"));
 const AccountTypeSelection = lazy(() => import("./pages/AccountTypeSelection"));
@@ -23,7 +22,6 @@ const CustomerDashboard    = lazy(() => import("./pages/CustomerDashboard"));
 const ProviderProfile      = lazy(() => import("./pages/ProviderProfile"));
 const MyBookings           = lazy(() => import("./pages/MyBookings"));
 const BookingChat          = lazy(() => import("./pages/BookingChat"));
-const AdminDashboard       = lazy(() => import("./pages/AdminDashboard"));
 const Artists              = lazy(() => import("./pages/Artists"));
 const Checkout             = lazy(() => import("./pages/Checkout"));
 const Cart                 = lazy(() => import("./components/Cart"));
@@ -31,6 +29,31 @@ const NotFound             = lazy(() => import("./pages/NotFound"));
 const AIPlanner            = lazy(() => import("./pages/AIPlanner"));
 const EventPlanning        = lazy(() => import("./pages/EventPlanning"));
 const CustomerEventDashboard = lazy(() => import("./pages/CustomerEventDashboard"));
+const Contact              = lazy(() => import("./pages/Contact"));
+const PrivacyPolicy        = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService       = lazy(() => import("./pages/TermsOfService"));
+
+// ─── Admin (new enterprise layout) ───────────────────────────────────────────
+const AdminLayout          = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminDashboardHome   = lazy(() => import("./pages/admin/AdminDashboardHome"));
+const AdminArtists         = lazy(() => import("./pages/admin/AdminArtists"));
+const AdminCustomers       = lazy(() => import("./pages/admin/AdminCustomers"));
+const AdminBookings        = lazy(() => import("./pages/admin/AdminBookings"));
+const AdminPayments        = lazy(() => import("./pages/admin/AdminPayments"));
+const AdminCategories      = lazy(() => import("./pages/admin/AdminCategories"));
+const AdminReviews         = lazy(() => import("./pages/admin/AdminReviews"));
+const AdminAnnouncements   = lazy(() => import("./pages/admin/AdminAnnouncements"));
+const AdminNotifications   = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminAnalytics       = lazy(() => import("./pages/admin/AdminAnalytics"));
+const AdminCoupons         = lazy(() => import("./pages/admin/AdminCoupons"));
+const AdminReports         = lazy(() => import("./pages/admin/AdminReports"));
+const AdminSupport         = lazy(() => import("./pages/admin/AdminSupport"));
+const AdminAIPlanner       = lazy(() => import("./pages/admin/AdminAIPlanner"));
+const AdminCMS             = lazy(() => import("./pages/admin/AdminCMS"));
+const AdminSettings        = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
+const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
+const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
 
 // ─── Page loader fallback ─────────────────────────────────────────────────────
 const PageLoader = () => (
@@ -74,6 +97,9 @@ const AppContent = () => {
           <Route path="/artists" element={<Artists />} />
           <Route path="/event/:eventId" element={<EventPlanning />} />
           <Route path="/ai-planner" element={<AIPlanner />} />
+          <Route path="/contact"    element={<Contact />} />
+          <Route path="/privacy"    element={<PrivacyPolicy />} />
+          <Route path="/terms"      element={<TermsOfService />} />
           <Route path="/provider/:id" element={<ProviderProfile />} />
           <Route path="/artist/:id" element={<ProviderProfile />} />
 
@@ -108,9 +134,29 @@ const AppContent = () => {
           <Route path="/provider/dashboard" element={
             <ProtectedRoute allowedRoles={['provider']}><ProviderDashboard /></ProtectedRoute>
           } />
-          <Route path="/admin/dashboard" element={
-            <ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>
-          } />
+
+          {/* ── Admin — nested layout with sidebar ───────────────────────── */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard"    element={<AdminDashboardHome />} />
+            <Route path="artists"      element={<AdminArtists />} />
+            <Route path="customers"    element={<AdminCustomers />} />
+            <Route path="bookings"     element={<AdminBookings />} />
+            <Route path="payments"     element={<AdminPayments />} />
+            <Route path="categories"   element={<AdminCategories />} />
+            <Route path="reviews"      element={<AdminReviews />} />
+            <Route path="announcements"element={<AdminAnnouncements />} />
+            <Route path="notifications"element={<AdminNotifications />} />
+            <Route path="analytics"    element={<AdminAnalytics />} />
+            <Route path="coupons"      element={<AdminCoupons />} />
+            <Route path="reports"      element={<AdminReports />} />
+            <Route path="support"      element={<AdminSupport />} />
+            <Route path="ai-planner"   element={<AdminAIPlanner />} />
+            <Route path="cms"          element={<AdminCMS />} />
+            <Route path="settings"     element={<AdminSettings />} />
+            <Route path="admins"       element={<AdminAdmins />} />
+            <Route path="audit-logs"   element={<AdminAuditLogs />} />
+            <Route path="system-health"element={<AdminSystemHealth />} />
+          </Route>
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

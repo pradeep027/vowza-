@@ -1,138 +1,345 @@
-// ─── TrendingCategories — Dynamic from Supabase ───────────────────────────────
-// Shows real provider counts per category. Falls back gracefully.
+// ─── TrendingCategories — Premium Merged Categories ──────────────────────────
+// 19 consolidated categories with unique icons, brand colours, hover animations.
+// Fully responsive: 3 cols mobile → 4 tablet → 5 desktop → 7 wide.
+// Uses live DB counts when available; gracefully shows static list as fallback.
 
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Music, Camera, Users, Palette, Mic2, Disc3, Video, Sparkles, Star, Utensils, CalendarDays, Volume2, Lightbulb, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Camera,           // Photographers
+  Video,            // Videographers
+  Drone,            // Drone Photography  — not in lucide, use Move3d as proxy
+  Music2,           // Bands
+  Disc3,            // DJs
+  Mic,              // Singers
+  PersonStanding,   // Dancers
+  Users,            // Choreographers
+  Paintbrush,       // Decorators
+  Sparkles,         // Makeup Artists
+  Hand,             // Mehendi Artists
+  Wand2,            // Magicians
+  PresentationIcon, // not available — use MonitorPlay as proxy
+  Theater,          // Performers
+  CalendarCheck,    // Event Planners
+  Utensils,         // Catering Services
+  Lightbulb,        // Lighting Services
+  Volume2,          // Sound Services
+  Wrench,           // Event Support
+  MonitorPlay,      // Anchors & Hosts proxy
+} from "lucide-react";
 import { useCategories } from "@/hooks/useArtists";
-import { trendingCategories } from "@/data/services"; // fallback static data
 
-const iconMap: Record<string, React.ReactNode> = {
-  Camera:       <Camera className="w-6 h-6" />,
-  Palette:      <Palette className="w-6 h-6" />,
-  Music:        <Music className="w-6 h-6" />,
-  Disc3:        <Disc3 className="w-6 h-6" />,
-  Sparkles:     <Sparkles className="w-6 h-6" />,
-  Mic2:         <Mic2 className="w-6 h-6" />,
-  Users:        <Users className="w-6 h-6" />,
-  Utensils:     <Utensils className="w-6 h-6" />,
-  CalendarDays: <CalendarDays className="w-6 h-6" />,
-  Lightbulb:    <Lightbulb className="w-6 h-6" />,
-  Volume2:      <Volume2 className="w-6 h-6" />,
-  Video:        <Video className="w-6 h-6" />,
-  Star:         <Star className="w-6 h-6" />,
-  camera:       <Camera className="w-6 h-6" />,
-  palette:      <Palette className="w-6 h-6" />,
-  music:        <Music className="w-6 h-6" />,
-  disc3:        <Disc3 className="w-6 h-6" />,
-  sparkles:     <Sparkles className="w-6 h-6" />,
-  mic2:         <Mic2 className="w-6 h-6" />,
-  users:        <Users className="w-6 h-6" />,
-  utensils:     <Utensils className="w-6 h-6" />,
-  lightbulb:    <Lightbulb className="w-6 h-6" />,
-  volume2:      <Volume2 className="w-6 h-6" />,
-  video:        <Video className="w-6 h-6" />,
-};
+// ── 19 canonical categories — module scope, never re-created ─────────────────
+interface CategoryDef {
+  id:    string;                        // slug used for DB query
+  name:  string;                        // display label
+  icon:  React.ElementType;             // Lucide icon component
+  color: string;                        // Tailwind bg on icon wrapper
+  text:  string;                        // Tailwind text colour for icon
+  ring:  string;                        // Tailwind ring colour on hover
+  // Merged DB profession_types — any of these in the DB map to this card
+  types: string[];
+}
 
-// Colour pairs for each category slot
-const colourPairs = [
-  { color: "text-gold",   bgColor: "bg-gold/10"   },
-  { color: "text-maroon", bgColor: "bg-maroon/10" },
-  { color: "text-royal",  bgColor: "bg-royal/10"  },
-  { color: "text-gold",   bgColor: "bg-gold/10"   },
-  { color: "text-maroon", bgColor: "bg-blush"      },
-  { color: "text-royal",  bgColor: "bg-royal/10"  },
-  { color: "text-gold",   bgColor: "bg-gold/10"   },
-  { color: "text-maroon", bgColor: "bg-maroon/10" },
-  { color: "text-royal",  bgColor: "bg-royal/10"  },
-  { color: "text-gold",   bgColor: "bg-gold/10"   },
+const CATEGORIES: CategoryDef[] = [
+  {
+    id:    "photographer",
+    name:  "Photographers",
+    icon:  Camera,
+    color: "bg-rose-50 dark:bg-rose-950/40",
+    text:  "text-rose-600 dark:text-rose-400",
+    ring:  "ring-rose-200 dark:ring-rose-800",
+    types: ["photographer"],
+  },
+  {
+    id:    "videographer",
+    name:  "Videographers",
+    icon:  Video,
+    color: "bg-pink-50 dark:bg-pink-950/40",
+    text:  "text-pink-600 dark:text-pink-400",
+    ring:  "ring-pink-200 dark:ring-pink-800",
+    types: ["videographer","cinematographer"],
+  },
+  {
+    id:    "drone_operator",
+    name:  "Drone Photography",
+    icon:  MonitorPlay,
+    color: "bg-slate-50 dark:bg-slate-950/40",
+    text:  "text-slate-600 dark:text-slate-400",
+    ring:  "ring-slate-200 dark:ring-slate-800",
+    types: ["drone_operator"],
+  },
+  {
+    id:    "music_band",
+    name:  "Bands",
+    icon:  Music2,
+    color: "bg-amber-50 dark:bg-amber-950/40",
+    text:  "text-amber-600 dark:text-amber-400",
+    ring:  "ring-amber-200 dark:ring-amber-800",
+    types: ["music_band","normal_band","maharashtra_band","traditional_band","musician","instrumental_artist","classical_musician"],
+  },
+  {
+    id:    "dj",
+    name:  "DJs",
+    icon:  Disc3,
+    color: "bg-violet-50 dark:bg-violet-950/40",
+    text:  "text-violet-600 dark:text-violet-400",
+    ring:  "ring-violet-200 dark:ring-violet-800",
+    types: ["dj"],
+  },
+  {
+    id:    "singer",
+    name:  "Singers",
+    icon:  Mic,
+    color: "bg-sky-50 dark:bg-sky-950/40",
+    text:  "text-sky-600 dark:text-sky-400",
+    ring:  "ring-sky-200 dark:ring-sky-800",
+    types: ["singer"],
+  },
+  {
+    id:    "dancer",
+    name:  "Dancers",
+    icon:  PersonStanding,
+    color: "bg-fuchsia-50 dark:bg-fuchsia-950/40",
+    text:  "text-fuchsia-600 dark:text-fuchsia-400",
+    ring:  "ring-fuchsia-200 dark:ring-fuchsia-800",
+    types: ["dancer","kuchipudi_dancer","classical_dancer","western_dancer"],
+  },
+  {
+    id:    "choreographer",
+    name:  "Choreographers",
+    icon:  Users,
+    color: "bg-purple-50 dark:bg-purple-950/40",
+    text:  "text-purple-600 dark:text-purple-400",
+    ring:  "ring-purple-200 dark:ring-purple-800",
+    types: ["choreographer"],
+  },
+  {
+    id:    "wedding_decorator",
+    name:  "Decorators",
+    icon:  Paintbrush,
+    color: "bg-lime-50 dark:bg-lime-950/40",
+    text:  "text-lime-700 dark:text-lime-400",
+    ring:  "ring-lime-200 dark:ring-lime-800",
+    types: ["wedding_decorator","stage_decorator","event_decorator"],
+  },
+  {
+    id:    "makeup_artist",
+    name:  "Makeup Artists",
+    icon:  Sparkles,
+    color: "bg-orange-50 dark:bg-orange-950/40",
+    text:  "text-orange-600 dark:text-orange-400",
+    ring:  "ring-orange-200 dark:ring-orange-800",
+    types: ["makeup_artist"],
+  },
+  {
+    id:    "mehendi_artist",
+    name:  "Mehendi Artists",
+    icon:  Hand,
+    color: "bg-green-50 dark:bg-green-950/40",
+    text:  "text-green-600 dark:text-green-400",
+    ring:  "ring-green-200 dark:ring-green-800",
+    types: ["mehendi_artist"],
+  },
+  {
+    id:    "magician",
+    name:  "Magicians",
+    icon:  Wand2,
+    color: "bg-indigo-50 dark:bg-indigo-950/40",
+    text:  "text-indigo-600 dark:text-indigo-400",
+    ring:  "ring-indigo-200 dark:ring-indigo-800",
+    types: ["magician"],
+  },
+  {
+    id:    "anchor",
+    name:  "Anchors & Hosts",
+    icon:  MonitorPlay,
+    color: "bg-cyan-50 dark:bg-cyan-950/40",
+    text:  "text-cyan-600 dark:text-cyan-400",
+    ring:  "ring-cyan-200 dark:ring-cyan-800",
+    types: ["anchor","host"],
+  },
+  {
+    id:    "celebrity_artist",
+    name:  "Performers",
+    icon:  Theater,
+    color: "bg-red-50 dark:bg-red-950/40",
+    text:  "text-red-600 dark:text-red-400",
+    ring:  "ring-red-200 dark:ring-red-800",
+    types: ["celebrity_artist","live_performer","folk_artist","stand_up_comedian"],
+  },
+  {
+    id:    "event_planner",
+    name:  "Event Planners",
+    icon:  CalendarCheck,
+    color: "bg-teal-50 dark:bg-teal-950/40",
+    text:  "text-teal-600 dark:text-teal-400",
+    ring:  "ring-teal-200 dark:ring-teal-800",
+    types: ["event_planner","wedding_planner"],
+  },
+  {
+    id:    "catering_services",
+    name:  "Catering Services",
+    icon:  Utensils,
+    color: "bg-yellow-50 dark:bg-yellow-950/40",
+    text:  "text-yellow-700 dark:text-yellow-400",
+    ring:  "ring-yellow-200 dark:ring-yellow-800",
+    types: ["catering_services"],
+  },
+  {
+    id:    "lighting_services",
+    name:  "Lighting Services",
+    icon:  Lightbulb,
+    color: "bg-amber-50 dark:bg-amber-950/40",
+    text:  "text-amber-700 dark:text-amber-500",
+    ring:  "ring-amber-300 dark:ring-amber-800",
+    types: ["lighting_services"],
+  },
+  {
+    id:    "sound_services",
+    name:  "Sound Services",
+    icon:  Volume2,
+    color: "bg-blue-50 dark:bg-blue-950/40",
+    text:  "text-blue-600 dark:text-blue-400",
+    ring:  "ring-blue-200 dark:ring-blue-800",
+    types: ["sound_services"],
+  },
+  {
+    id:    "event_support",
+    name:  "Event Support",
+    icon:  Wrench,
+    color: "bg-stone-50 dark:bg-stone-950/40",
+    text:  "text-stone-600 dark:text-stone-400",
+    ring:  "ring-stone-200 dark:ring-stone-800",
+    types: ["event_support","event_support_staff"],
+  },
 ];
 
+// ── Category Card — module scope to avoid focus/remount bugs ─────────────────
+interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }
+
+const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => (
+  <button
+    onClick={onClick}
+    aria-label={`Browse ${cat.name}`}
+    className={`
+      group relative flex flex-col items-center gap-3
+      p-4 md:p-5 rounded-2xl
+      bg-surface-1 border border-border/60
+      ring-2 ring-transparent hover:${cat.ring}
+      hover:border-transparent hover:shadow-lg
+      transition-all duration-300 hover:-translate-y-1.5
+      animate-fade-up focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+    `}
+    style={{ animationDelay: `${Math.min(idx, 15) * 0.035}s` }}
+  >
+    {/* Icon bubble */}
+    <div
+      className={`
+        w-12 h-12 md:w-14 md:h-14 rounded-2xl
+        ${cat.color}
+        flex items-center justify-center flex-shrink-0
+        group-hover:scale-110 transition-transform duration-300
+      `}
+    >
+      <cat.icon className={`w-5 h-5 md:w-6 md:h-6 ${cat.text}`} aria-hidden />
+    </div>
+
+    {/* Label */}
+    <span className="text-[11px] md:text-xs font-semibold text-foreground text-center leading-snug group-hover:text-maroon transition-colors">
+      {cat.name}
+    </span>
+
+    {/* Live count — only shown when real data exists */}
+    {count > 0 && (
+      <span className="text-[9px] md:text-[10px] font-medium text-muted-foreground -mt-1">
+        {count}+ artists
+      </span>
+    )}
+  </button>
+));
+CategoryCard.displayName = "CategoryCard";
+
+// ── Skeleton card ─────────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="rounded-2xl skeleton h-[108px] md:h-[120px]" />
+);
+
+// ── Main Section ──────────────────────────────────────────────────────────────
 const TrendingCategories = () => {
   const navigate = useNavigate();
-  const { data: dbCategories, isLoading } = useCategories();
+  const { data: dbCats, isLoading } = useCategories();
 
-  // Use DB categories when available; fallback to static data
-  const categories = dbCategories && dbCategories.length > 0
-    ? dbCategories.map((cat: any, i: number) => ({
-        id:      cat.profession_type || cat.id,
-        name:    cat.name,
-        icon:    cat.icon || 'Sparkles',
-        count:   cat.provider_count ?? 0,
-        slug:    cat.profession_type || cat.id,
-        ...colourPairs[i % colourPairs.length],
-      }))
-    : trendingCategories;
+  // Build a count-map keyed by profession_type from the DB
+  const countMap = new Map<string, number>();
+  if (dbCats && dbCats.length > 0) {
+    (dbCats as any[]).forEach((c: any) => {
+      const type = c.profession_type || c.id;
+      if (type) countMap.set(type, c.provider_count ?? 0);
+    });
+  }
+
+  // For each canonical category, sum counts across all merged types
+  const getCategoryCount = (cat: CategoryDef): number =>
+    cat.types.reduce((sum, t) => sum + (countMap.get(t) ?? 0), 0);
 
   return (
-    <section className="py-14 md:py-20 bg-background">
+    <section className="py-16 md:py-24 bg-background">
       <div className="container px-4">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-8">
+
+        {/* ── Section header ── */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10 md:mb-12">
           <div>
-            <span className="inline-block px-4 py-1.5 rounded-full bg-gold/10 text-gold-dark text-sm font-medium mb-3">
-              Browse by Category
-            </span>
-            <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground">
-              Trending Categories
+            <div className="section-label bg-maroon/8 text-maroon mb-4 inline-flex">
+              Browse Categories
+            </div>
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
+              What are you looking for?
             </h2>
+            <p className="text-muted-foreground mt-2 max-w-lg text-sm">
+              From photographers to caterers — every service you need for a perfect event.
+            </p>
           </div>
           <button
             onClick={() => navigate("/artists")}
-            className="hidden md:flex items-center gap-1.5 text-sm font-medium text-maroon hover:gap-2.5 transition-all"
+            className="hidden md:flex items-center gap-1.5 text-sm font-semibold text-maroon hover:gap-2.5 transition-all group flex-shrink-0"
+            aria-label="View all categories"
           >
-            View all <ArrowRight className="w-4 h-4" />
+            All categories
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
-        {/* Grid */}
+        {/* ── Grid ── */}
         {isLoading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 md:gap-4">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-muted animate-pulse" style={{ height: 110 }} />
-            ))}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+            {Array.from({ length: 19 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 gap-3 md:gap-4">
-            {categories.map((cat: any, index: number) => (
-              <button
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+            {CATEGORIES.map((cat, i) => (
+              <CategoryCard
                 key={cat.id}
-                onClick={() => navigate(`/artists?category=${cat.slug || cat.id}`)}
-                className="group flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-card border border-border/60
-                           hover:border-gold/40 hover:shadow-gold transition-all duration-300 hover:-translate-y-1
-                           animate-fade-in"
-                style={{ animationDelay: `${index * 0.04}s` }}
-              >
-                {/* Icon */}
-                <div className={`w-12 h-12 rounded-xl ${cat.bgColor} flex items-center justify-center
-                                 group-hover:scale-110 transition-transform duration-300`}>
-                  <span className={cat.color}>
-                    {iconMap[cat.icon] ?? iconMap[cat.icon?.toLowerCase?.()] ?? <Sparkles className="w-6 h-6" />}
-                  </span>
-                </div>
-
-                {/* Label */}
-                <span className="text-xs font-semibold text-foreground text-center leading-tight group-hover:text-maroon transition-colors">
-                  {cat.name}
-                </span>
-
-                {/* Count — real from DB or static */}
-                <span className="text-[10px] text-muted-foreground">
-                  {cat.count > 0 ? `${cat.count}+` : '—'}
-                </span>
-              </button>
+                cat={cat}
+                count={getCategoryCount(cat)}
+                idx={i}
+                onClick={() => navigate(`/artists?category=${cat.id}`)}
+              />
             ))}
           </div>
         )}
 
-        {/* Mobile "View all" */}
-        <div className="mt-6 text-center md:hidden">
+        {/* ── Mobile CTA ── */}
+        <div className="mt-8 text-center md:hidden">
           <button
             onClick={() => navigate("/artists")}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-maroon"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-maroon"
           >
             View all categories <ArrowRight className="w-4 h-4" />
           </button>
         </div>
+
       </div>
     </section>
   );

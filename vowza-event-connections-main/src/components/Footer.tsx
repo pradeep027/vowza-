@@ -1,12 +1,7 @@
+// ─── Footer — Corporate Premium Edition ──────────────────────────────────────
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Sparkles, Instagram, Facebook, Twitter, Youtube,
-  Mail, Phone, MapPin, Shield, Star, BadgeCheck,
-  ArrowRight, Smartphone,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Sparkles, Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, Star, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 const Footer = () => {
@@ -14,116 +9,110 @@ const Footer = () => {
 
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) {
-      toast.error("Please enter a valid email address.");
-      return;
-    }
-    toast.success("You're subscribed! 🎉 Watch for exclusive deals.");
+    if (!email.trim() || !email.includes("@")) { toast.error("Please enter a valid email."); return; }
+    toast.success("Subscribed! 🎉 Watch for exclusive deals.");
     setEmail("");
   };
 
-  const quickLinks = [
-    { name: "Find Artists",     href: "/artists" },
-    { name: "How It Works",     href: "/#how-it-works" },
-    { name: "Browse by Event",  href: "/artists?view=events" },
-    { name: "Popular Cities",   href: "/artists?view=cities" },
-    { name: "Collections",      href: "/artists?view=collections" },
-    { name: "About Us",         href: "#" },
-  ];
-
-  const artistLinks = [
-    { name: "Join as Artist",      href: "/provider/register" },
-    { name: "Artist Dashboard",    href: "/provider/dashboard" },
-    { name: "Verification Guide",  href: "#" },
-    { name: "Pricing & Packages",  href: "#" },
-    { name: "Success Stories",     href: "#" },
-    { name: "Artist Resources",    href: "#" },
-  ];
-
-  const supportLinks = [
-    { name: "Help Center",       href: "#" },
-    { name: "Contact Us",        href: "#" },
-    { name: "Terms of Service",  href: "#" },
-    { name: "Privacy Policy",    href: "#" },
-    { name: "Cancellation Policy", href: "#" },
-    { name: "Refund Policy",     href: "#" },
-  ];
-
-  const trustBadges = [
-    { icon: Shield,     label: "Secure Payments" },
-    { icon: BadgeCheck, label: "Verified Artists" },
-    { icon: Star,       label: "4.9★ Rated" },
+  const cols = [
+    {
+      heading: "Explore",
+      links: [
+        { name: "Find Artists",     href: "/artists"          },
+        { name: "How It Works",     href: "/#how-it-works"    },
+        { name: "Browse by Event",  href: "/artists"          },
+        { name: "Vowza AI Planner", href: "/ai-planner"       },
+        { name: "Contact Us",       href: "/contact"          },
+        { name: "About Us",         href: "/contact"          },
+      ],
+    },
+    {
+      heading: "For Artists",
+      links: [
+        { name: "Join as Artist",     href: "/provider/register"   },
+        { name: "Artist Dashboard",   href: "/provider/dashboard"  },
+        { name: "Verification Guide", href: "/contact"             },
+        { name: "Pricing Guide",      href: "/contact"             },
+        { name: "Success Stories",    href: "/artists"             },
+        { name: "Resources",          href: "/contact"             },
+      ],
+    },
+    {
+      heading: "Support",
+      links: [
+        { name: "Help Center",         href: "/contact"  },
+        { name: "Contact Us",          href: "/contact"  },
+        { name: "Terms of Service",    href: "/terms"    },
+        { name: "Privacy Policy",      href: "/privacy"  },
+        { name: "Cancellation Policy", href: "/terms"    },
+        { name: "Refund Policy",       href: "/terms"    },
+      ],
+    },
   ];
 
   const socials = [
     { Icon: Instagram, href: "#", label: "Instagram" },
-    { Icon: Facebook,  href: "#", label: "Facebook" },
-    { Icon: Twitter,   href: "#", label: "Twitter / X" },
-    { Icon: Youtube,   href: "#", label: "YouTube" },
+    { Icon: Facebook,  href: "#", label: "Facebook"  },
+    { Icon: Twitter,   href: "#", label: "Twitter"   },
+    { Icon: Youtube,   href: "#", label: "YouTube"   },
   ];
 
   return (
-    <footer className="bg-foreground text-primary-foreground">
+    <footer className="bg-[#09090f] text-white">
 
-      {/* ── Newsletter banner ──────────────────────────────────────── */}
-      <div className="border-b border-primary-foreground/10">
-        <div className="container px-4 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
-            <div>
-              <h3 className="text-xl md:text-2xl font-display font-bold mb-1">
-                Get exclusive deals & artist recommendations
+      {/* ── Newsletter ────────────────────────────────────────────────── */}
+      <div className="border-b border-white/8">
+        <div className="container px-4 py-12">
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="max-w-md">
+              <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-2">
+                Get exclusive deals & artist picks
               </h3>
-              <p className="text-primary-foreground/60 text-sm">
-                Join 25,000+ event planners who get weekly inspiration and offers.
-              </p>
+              <p className="text-white/45 text-sm">Join 25,000+ planners who get weekly inspiration and offers.</p>
             </div>
-            <form
-              onSubmit={handleNewsletter}
-              className="flex w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]"
-            >
-              <Input
+            <form onSubmit={handleNewsletter} className="flex w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]">
+              <input
                 type="email"
-                placeholder="Your email address"
+                placeholder="your@email.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40 focus-visible:ring-gold"
+                onChange={e => setEmail(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl bg-white/8 border border-white/12 text-white placeholder:text-white/35 text-sm focus:outline-none focus:border-gold/40 transition-colors"
               />
-              <Button
+              <button
                 type="submit"
-                className="bg-gradient-gold text-foreground font-semibold hover:opacity-90 flex-shrink-0"
+                className="px-5 py-3 rounded-xl bg-gradient-gold text-gray-900 font-semibold text-sm shadow-gold hover:opacity-90 transition-all flex-shrink-0 flex items-center gap-1.5"
               >
-                Subscribe
-                <ArrowRight className="w-4 h-4 ml-1.5" />
-              </Button>
+                Subscribe <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </form>
           </div>
         </div>
       </div>
 
-      {/* ── Main footer ────────────────────────────────────────────── */}
-      <div className="container px-4 py-14 md:py-16">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 md:gap-10">
+      {/* ── Main grid ─────────────────────────────────────────────────── */}
+      <div className="container px-4 py-14 md:py-20">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-10">
 
-          {/* Brand column */}
+          {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-foreground" />
+            <Link to="/" className="inline-flex items-center gap-2.5 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
+                <Sparkles className="w-4.5 h-4.5 text-white" />
               </div>
-              <span className="text-2xl font-display font-bold">Vowza</span>
+              <span className="text-xl font-display font-bold text-white">Vowza</span>
             </Link>
-
-            <p className="text-primary-foreground/65 mb-5 max-w-xs text-sm leading-relaxed">
-              India's premium AI-powered event marketplace. Connecting customers with verified artists for unforgettable celebrations.
+            <p className="text-white/45 text-sm leading-relaxed max-w-xs mb-6">
+              India's premium AI-powered event marketplace. Connecting clients with verified artists for unforgettable celebrations.
             </p>
 
             {/* Trust badges */}
-            <div className="flex flex-wrap gap-3 mb-6">
-              {trustBadges.map(({ icon: Icon, label }) => (
-                <div
-                  key={label}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-foreground/10 text-xs font-medium text-primary-foreground/80"
-                >
+            <div className="flex flex-wrap gap-2 mb-7">
+              {[
+                { Icon: Shield,     label: "Secure Payments" },
+                { Icon: BadgeCheck, label: "Verified Artists" },
+                { Icon: Star,       label: "4.9★ Rating" },
+              ].map(({ Icon, label }) => (
+                <div key={label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/6 border border-white/8 text-xs font-medium text-white/60">
                   <Icon className="w-3.5 h-3.5 text-gold" />
                   {label}
                 </div>
@@ -131,13 +120,13 @@ const Footer = () => {
             </div>
 
             {/* Socials */}
-            <div className="flex gap-3">
+            <div className="flex gap-2.5">
               {socials.map(({ Icon, href, label }) => (
                 <a
                   key={label}
                   href={href}
                   aria-label={label}
-                  className="w-9 h-9 rounded-full bg-primary-foreground/10 flex items-center justify-center hover:bg-gold hover:text-foreground transition-colors"
+                  className="w-9 h-9 rounded-xl bg-white/8 border border-white/8 flex items-center justify-center hover:bg-gold hover:text-gray-900 hover:border-transparent transition-all duration-200"
                 >
                   <Icon className="w-4 h-4" />
                 </a>
@@ -145,107 +134,53 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Quick links */}
-          <div>
-            <h4 className="font-display font-semibold mb-4 text-sm uppercase tracking-wide text-primary-foreground/50">
-              Explore
-            </h4>
-            <ul className="space-y-2.5">
-              {quickLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-primary-foreground/65 hover:text-gold transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Artist links */}
-          <div>
-            <h4 className="font-display font-semibold mb-4 text-sm uppercase tracking-wide text-primary-foreground/50">
-              For Artists
-            </h4>
-            <ul className="space-y-2.5">
-              {artistLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-primary-foreground/65 hover:text-gold transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support + Contact */}
-          <div>
-            <h4 className="font-display font-semibold mb-4 text-sm uppercase tracking-wide text-primary-foreground/50">
-              Support
-            </h4>
-            <ul className="space-y-2.5 mb-6">
-              {supportLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-primary-foreground/65 hover:text-gold transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            {/* Contact */}
-            <div className="space-y-2">
-              <a href="mailto:hello@vowza.com" className="flex items-center gap-2 text-sm text-primary-foreground/65 hover:text-gold transition-colors">
-                <Mail className="w-4 h-4 flex-shrink-0" />
-                hello@vowza.com
-              </a>
-              <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-primary-foreground/65 hover:text-gold transition-colors">
-                <Phone className="w-4 h-4 flex-shrink-0" />
-                +91 98765 43210
-              </a>
-              <div className="flex items-start gap-2 text-sm text-primary-foreground/65">
-                <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                Mumbai, Maharashtra, India
-              </div>
+          {/* Link columns */}
+          {cols.map(col => (
+            <div key={col.heading}>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-5">{col.heading}</h4>
+              <ul className="space-y-3">
+                {col.links.map(l => (
+                  <li key={l.name}>
+                    <Link to={l.href} className="text-sm text-white/50 hover:text-white transition-colors">
+                      {l.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          ))}
         </div>
 
-        {/* App download row */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 pt-8 border-t border-primary-foreground/10">
-          <div className="flex items-center gap-2 text-sm text-primary-foreground/60">
-            <Smartphone className="w-4 h-4" />
-            <span>Mobile app coming soon for iOS & Android</span>
+        {/* Contact + App row */}
+        <div className="mt-14 pt-10 border-t border-white/8 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+          <div className="flex flex-wrap gap-5">
+            <a href="mailto:hello@vowza.com" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              <Mail className="w-3.5 h-3.5" /> hello@vowza.com
+            </a>
+            <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              <Phone className="w-3.5 h-3.5" /> +91 98765 43210
+            </a>
+            <div className="flex items-center gap-2 text-sm text-white/40">
+              <MapPin className="w-3.5 h-3.5" /> Mumbai, India
+            </div>
           </div>
-          <div className="flex gap-3">
-            <div className="px-4 py-2 rounded-lg border border-primary-foreground/20 text-xs text-primary-foreground/50 cursor-not-allowed">
-              📱 App Store — Coming Soon
-            </div>
-            <div className="px-4 py-2 rounded-lg border border-primary-foreground/20 text-xs text-primary-foreground/50 cursor-not-allowed">
-              📱 Play Store — Coming Soon
-            </div>
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-3.5 h-3.5 text-white/25" />
+            <span className="text-xs text-white/30">Mobile app coming soon</span>
           </div>
         </div>
       </div>
 
-      {/* ── Bottom bar ─────────────────────────────────────────────── */}
-      <div className="border-t border-primary-foreground/10">
+      {/* ── Bottom bar ────────────────────────────────────────────────── */}
+      <div className="border-t border-white/6">
         <div className="container px-4 py-5">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-primary-foreground/40">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/25">
             <p>© {new Date().getFullYear()} Vowza Technologies Pvt. Ltd. All rights reserved.</p>
-            <div className="flex gap-5">
-              <Link to="#" className="hover:text-gold transition-colors">Terms</Link>
-              <Link to="#" className="hover:text-gold transition-colors">Privacy</Link>
-              <Link to="#" className="hover:text-gold transition-colors">Cookies</Link>
-              <Link to="#" className="hover:text-gold transition-colors">Sitemap</Link>
+            <div className="flex gap-6">
+              <Link to="/terms"   className="hover:text-white/60 transition-colors">Terms</Link>
+              <Link to="/privacy" className="hover:text-white/60 transition-colors">Privacy</Link>
+              <Link to="/contact" className="hover:text-white/60 transition-colors">Contact</Link>
+              <Link to="/contact" className="hover:text-white/60 transition-colors">Sitemap</Link>
             </div>
           </div>
         </div>

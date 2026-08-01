@@ -1,148 +1,152 @@
+// ─── AccountTypeSelection — Corporate Premium Edition ────────────────────────
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { User, Mic2, Sparkles } from 'lucide-react';
+import { User, Mic2, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const options = [
+  {
+    type: 'customer' as const,
+    icon: User,
+    title: 'Customer',
+    subtitle: 'I want to book artists for events',
+    gradient: 'bg-gradient-gold',
+    shadow: 'shadow-gold',
+    ring: 'ring-gold/30',
+    perks: [
+      'Browse 1,500+ verified artists',
+      'Compare prices & packages',
+      'Book multiple artists at once',
+      'Secure escrow payments',
+      'Track bookings in real-time',
+    ],
+    cta: 'Continue as Customer',
+    ctaClass: 'btn-gold',
+  },
+  {
+    type: 'provider' as const,
+    icon: Mic2,
+    title: 'Artist / Provider',
+    subtitle: 'I want to offer my services',
+    gradient: 'bg-gradient-maroon',
+    shadow: 'shadow-maroon',
+    ring: 'ring-maroon/30',
+    perks: [
+      'Free professional profile',
+      'Set your own pricing packages',
+      'Manage your availability',
+      'Receive instant booking requests',
+      'Get paid securely after events',
+    ],
+    cta: 'Continue as Artist',
+    ctaClass: 'btn-primary',
+  },
+];
 
 const AccountTypeSelection = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const navigate  = useNavigate();
+  const [selected, setSelected] = useState<'customer' | 'provider' | null>(null);
+  const [loading,  setLoading]  = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
+  useEffect(() => { if (!user) navigate('/auth'); }, [user, navigate]);
+  if (!user) return null;
 
-  const handleSelectType = async (type: 'customer' | 'provider') => {
+  const handleContinue = async () => {
+    if (!selected) return;
     setLoading(true);
-    try {
-      // The role will be set during registration flow
-      // For now, redirect to appropriate page
-      if (type === 'provider') {
-        navigate('/provider/register');
-      } else {
-        navigate('/');
-      }
-    } catch (error) {
-      console.error('Error selecting account type:', error);
-    } finally {
-      setLoading(false);
-    }
+    if (selected === 'provider') navigate('/provider/register');
+    else navigate('/');
+    setLoading(false);
   };
 
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream via-background to-blush/20 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground mb-4">
-            Choose Your Account Type
+    <div className="min-h-screen bg-surface-2 flex flex-col">
+      {/* Header */}
+      <header className="bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-border/60 px-6 py-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-base font-display font-bold text-foreground">Vowza</span>
+        </Link>
+        <p className="text-xs text-muted-foreground hidden sm:block">Signed in as {user.email}</p>
+      </header>
+
+      {/* Body */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        <div className="text-center mb-10 max-w-lg">
+          <div className="section-label bg-gold/10 text-gold-dark mb-5 mx-auto inline-flex">Welcome to Vowza</div>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
+            How will you use Vowza?
           </h1>
-          <p className="text-muted-foreground text-lg">
-            Select how you want to use Vowza
+          <p className="text-muted-foreground text-sm">
+            Choose your account type to get started. You can always add more roles later.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Customer Card */}
-          <Card 
-            className="group cursor-pointer hover:shadow-elevated transition-all duration-300 border-border/50 hover:border-gold/50 animate-fade-in"
-            onClick={() => !loading && handleSelectType('customer')}
-          >
-            <CardHeader className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-gold flex items-center justify-center text-foreground shadow-gold group-hover:scale-110 transition-transform">
-                <User className="w-10 h-10" />
+        {/* Cards */}
+        <div className="grid md:grid-cols-2 gap-5 w-full max-w-3xl mb-8">
+          {options.map((opt, i) => (
+            <button
+              key={opt.type}
+              onClick={() => setSelected(opt.type)}
+              className={cn(
+                'text-left p-6 rounded-3xl border-2 transition-all duration-200 bg-surface-1',
+                'hover:-translate-y-1 hover:shadow-xl animate-fade-up',
+                selected === opt.type
+                  ? `border-maroon ring-4 ${opt.ring} shadow-lg`
+                  : 'border-border/60 hover:border-border',
+              )}
+              style={{ animationDelay: `${i * 0.1}s` }}
+            >
+              {/* Icon + selected check */}
+              <div className="flex items-start justify-between mb-5">
+                <div className={`w-14 h-14 rounded-2xl ${opt.gradient} flex items-center justify-center ${opt.shadow}`}>
+                  <opt.icon className="w-7 h-7 text-white" />
+                </div>
+                <div className={cn(
+                  'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
+                  selected === opt.type ? 'border-maroon bg-maroon' : 'border-border',
+                )}>
+                  {selected === opt.type && <CheckCircle className="w-4 h-4 text-white" />}
+                </div>
               </div>
-              <CardTitle className="text-2xl">Customer</CardTitle>
-              <CardDescription>
-                Discover and book amazing artists for your events
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <ul className="text-left space-y-2 mb-6 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  Browse verified artists
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  Compare prices and packages
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  Book multiple artists at once
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  Secure payments
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                  Track bookings in real-time
-                </li>
-              </ul>
-              <Button 
-                className="w-full bg-gradient-gold hover:opacity-90"
-                disabled={loading}
-              >
-                Continue as Customer
-              </Button>
-            </CardContent>
-          </Card>
 
-          {/* Artist Card */}
-          <Card 
-            className="group cursor-pointer hover:shadow-elevated transition-all duration-300 border-border/50 hover:border-gold/50 animate-fade-in"
-            style={{ animationDelay: '0.2s' }}
-            onClick={() => !loading && handleSelectType('provider')}
-          >
-            <CardHeader className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-maroon flex items-center justify-center text-white shadow-maroon group-hover:scale-110 transition-transform">
-                <Mic2 className="w-10 h-10" />
-              </div>
-              <CardTitle className="text-2xl">Artist</CardTitle>
-              <CardDescription>
-                Showcase your talent and grow your business
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <ul className="text-left space-y-2 mb-6 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-maroon" />
-                  Create professional portfolio
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-maroon" />
-                  Set your own pricing packages
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-maroon" />
-                  Manage availability
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-maroon" />
-                  Receive booking notifications
-                </li>
-                <li className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-maroon" />
-                  Track earnings and reviews
-                </li>
+              <h3 className="text-lg font-display font-bold text-foreground mb-1">{opt.title}</h3>
+              <p className="text-sm text-muted-foreground mb-5">{opt.subtitle}</p>
+
+              <ul className="space-y-2">
+                {opt.perks.map(p => (
+                  <li key={p} className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                    {p}
+                  </li>
+                ))}
               </ul>
-              <Button 
-                className="w-full bg-gradient-maroon hover:opacity-90"
-                disabled={loading}
-              >
-                Continue as Artist
-              </Button>
-            </CardContent>
-          </Card>
+            </button>
+          ))}
         </div>
+
+        {/* Continue button */}
+        <button
+          onClick={handleContinue}
+          disabled={!selected || loading}
+          className={cn(
+            'flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-bold transition-all',
+            selected
+              ? 'btn-primary'
+              : 'bg-muted text-muted-foreground cursor-not-allowed',
+          )}
+        >
+          {loading ? 'Loading…' : 'Continue'}
+          {!loading && <ArrowRight className="w-4 h-4" />}
+        </button>
+
+        <p className="text-xs text-muted-foreground mt-4">
+          You can change this later from your account settings.
+        </p>
       </div>
     </div>
   );

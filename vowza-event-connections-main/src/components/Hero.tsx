@@ -1,312 +1,538 @@
-import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Calendar, Sparkles, TrendingUp, Clock, ChevronDown, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { trendingSearches, popularCities } from "@/data/services";
+// ─── Hero — Balanced, Compact, Investor-Ready ────────────────────────────────
+// Desktop: single horizontal search bar [Event Type | Location | Button]
+// Tablet/Mobile: stacked layout
+// Only heading + description + toggle + search + 5 trending chips above the fold
 
-// ─── Vowza Planner suggestions ────────────────────────────────────────────────
-const plannerSuggestions = [
+import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { Search, MapPin, Sparkles, TrendingUp, ChevronDown, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+// ── Static data ───────────────────────────────────────────────────────────────
+const EVENT_OPTIONS = [
+  "Wedding","Reception","Birthday Party","Corporate Event",
+  "Haldi Ceremony","Sangeet Night","Engagement","House Warming",
+  "Baby Shower","College Fest","Private Party","Anniversary",
+] as const;
+
+const PLANNER_SUGGESTIONS = [
   "Plan a wedding for 300 guests in Hyderabad under ₹12 lakh",
   "Birthday party for 100 people in Bangalore under ₹2 lakh",
   "Corporate event for 200 guests in Mumbai under ₹5 lakh",
   "Sangeet night for 150 guests in Delhi under ₹3 lakh",
   "Engagement ceremony in Pune for 80 guests",
-  "Full wedding package in Chennai for 500 guests with ₹20 lakh budget",
-];
+] as const;
 
-const eventOptions = [
-  "Wedding", "Reception", "Birthday", "Corporate Event",
-  "Haldi Ceremony", "Sangeet Night", "Engagement",
-  "House Warming", "Baby Shower", "College Fest",
-  "Temple Event", "Private Party",
-];
+// Exactly 5 trending chips
+const TRENDING = [
+  "Wedding Photographers",
+  "DJ for Sangeet",
+  "Bridal Makeup",
+  "Wedding Decorators",
+  "Caterers",
+] as const;
 
+// ── Background — module scope, never remounts ─────────────────────────────────
+const HeroBg = memo(() => (
+  <>
+    <div
+      aria-hidden
+      style={{
+        position:"absolute", top:"-18%", left:"50%",
+        transform:"translateX(-50%) translateZ(0)",
+        width:"min(94vw,900px)", height:"min(78vw,740px)",
+        background:
+          "radial-gradient(ellipse 58% 52% at 40% 34%, hsl(345 72% 30% / 0.62) 0%, transparent 68%)," +
+          "radial-gradient(ellipse 48% 42% at 64% 22%, hsl(40 95% 52% / 0.22) 0%, transparent 65%)",
+        filter:"blur(56px)", pointerEvents:"none",
+      }}
+    />
+    <div
+      aria-hidden
+      style={{
+        position:"absolute", bottom:0, left:"50%",
+        transform:"translateX(-50%) translateZ(0)",
+        width:"min(68vw,660px)", height:"min(44vw,400px)",
+        background:"radial-gradient(ellipse at center, hsl(224 60% 36% / 0.14) 0%, transparent 68%)",
+        filter:"blur(72px)", pointerEvents:"none",
+      }}
+    />
+    <div
+      aria-hidden
+      style={{
+        position:"absolute", inset:0, pointerEvents:"none",
+        backgroundImage:
+          "linear-gradient(hsl(0 0% 100% / 0.020) 1px, transparent 1px)," +
+          "linear-gradient(90deg, hsl(0 0% 100% / 0.020) 1px, transparent 1px)",
+        backgroundSize:"72px 72px",
+      }}
+    />
+  </>
+));
+HeroBg.displayName = "HeroBg";
+
+// ── Hero ──────────────────────────────────────────────────────────────────────
 const Hero = () => {
   const navigate = useNavigate();
 
-  // ── Vowza Planner — opens the dedicated /ai-planner page ────────────────
-  const openVowzaPlanner = (query?: string) => {
-    if (query) sessionStorage.setItem("vowza_planner_prefill", query);
-    // Navigate to the dedicated full-page experience
-    navigate("/ai-planner");
-  };
+  const [tab,             setTab]          = useState<"search"|"ai">("search");
+  const [eventType,       setEventType]    = useState("");
+  const [location,        setLocation]     = useState("");
+  const [plannerQuery,    setPlannerQuery] = useState("");
+  const [showSuggestions, setShowSuggest]  = useState(false);
+  const suggestRef = useRef<HTMLDivElement>(null);
 
-  // ── Form state ─────────────────────────────────────────────────────────────
-  const [plannerQuery,    setPlannerQuery]    = useState("");
-  const [eventType,       setEventType]       = useState("");
-  const [city,            setCity]            = useState("");
-  const [isAiMode,        setIsAiMode]        = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-
-  // Close suggestions on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
+    const fn = (e: MouseEvent) => {
+      if (suggestRef.current && !suggestRef.current.contains(e.target as Node))
+        setShowSuggest(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
   }, []);
 
-  // ── Quick search handler ───────────────────────────────────────────────────
-  const handleQuickSearch = () => {
-    const params = new URLSearchParams();
-    if (eventType) params.set("event", eventType);
-    if (city)      params.set("city", city);
-    navigate(`/artists?${params.toString()}`);
+  const handleSearch = useCallback(() => {
+    const p = new URLSearchParams();
+    if (eventType)       p.set("event", eventType);
+    if (location.trim()) p.set("city",  location.trim());
+    navigate(`/artists?${p.toString()}`);
+  }, [eventType, location, navigate]);
+
+  const openPlanner = useCallback((q?: string) => {
+    if (q) sessionStorage.setItem("vowza_planner_prefill", q);
+    navigate("/ai-planner");
+  }, [navigate]);
+
+  // shared inline styles
+  const fieldWrap: React.CSSProperties = {
+    display:"flex", alignItems:"center", gap:"10px",
+    flex:1, padding:"9px 14px",
+    borderRadius:"12px", background:"hsl(220 14% 97%)",
+    minWidth:0,
+  };
+  const fieldLabel: React.CSSProperties = {
+    fontSize:"9px", fontWeight:700, color:"#9ca3af",
+    textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"1px",
+  };
+  const fieldInput: React.CSSProperties = {
+    width:"100%", background:"transparent",
+    fontSize:"13px", fontWeight:600, color:"#111",
+    border:"none", outline:"none",
   };
 
-  const handleTrendingClick = (term: string) => navigate(`/artists?search=${encodeURIComponent(term)}`);
-  const handleCityClick     = (cityName: string) => navigate(`/artists?city=${encodeURIComponent(cityName)}`);
-
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16 md:pt-20">
+    <section className="relative overflow-hidden" style={{ background:"#07060d" }}>
+      <HeroBg />
 
-      {/* ── Background ───────────────────────────────────────────────────── */}
-      <div className="absolute inset-0 bg-gradient-to-br from-maroon via-maroon-dark to-foreground">
-        <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-20" />
-        <div className="absolute inset-0 bg-gradient-hero" />
-      </div>
+      {/* ── Content ──────────────────────────────────────────────────────── */}
+      <div
+        className="relative z-10"
+        style={{
+          paddingTop:"clamp(4.5rem, 9vw, 6.5rem)",
+          paddingBottom:"clamp(3.5rem, 7vw, 5rem)",
+        }}
+      >
+        <div className="container px-4">
+          <div style={{ maxWidth:"740px", margin:"0 auto", textAlign:"center" }}>
 
-      {/* ── Decorative blobs ─────────────────────────────────────────────── */}
-      <div className="absolute top-20 left-10 w-72 h-72 bg-gold/20 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-maroon-light/20 rounded-full blur-3xl animate-float"
-        style={{ animationDelay: "1s" }} />
-
-      <div className="container relative z-10 px-4 py-16 md:py-28">
-        <div className="max-w-4xl mx-auto text-center">
-
-          {/* ── Badge ────────────────────────────────────────────────────── */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold/20 border border-gold/30 mb-6 animate-fade-in">
-            <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-            <span className="text-sm font-medium text-gold-light">1,500+ Verified Artists across India</span>
-          </div>
-
-          {/* ── Heading ──────────────────────────────────────────────────── */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-bold text-primary-foreground mb-6 animate-fade-in"
-            style={{ animationDelay: "0.2s" }}>
-            Where Talent Meets{" "}
-            <span className="text-gradient-gold">Celebration</span>
-          </h1>
-
-          {/* ── Subheading ───────────────────────────────────────────────── */}
-          <p className="text-lg md:text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto animate-fade-in"
-            style={{ animationDelay: "0.4s" }}>
-            Discover verified wedding and event professionals. Book musicians, DJs,
-            photographers, dancers, and decorators for your special moments.
-          </p>
-
-          {/* ── Mode toggle ──────────────────────────────────────────────── */}
-          <div className="flex items-center justify-center gap-3 mb-4 animate-fade-in"
-            style={{ animationDelay: "0.5s" }}>
-            <button
-              onClick={() => setIsAiMode(false)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                !isAiMode ? "bg-gold text-foreground shadow-gold" : "bg-white/10 text-primary-foreground/70 hover:bg-white/20"
-              }`}
+            {/* ── Heading ─────────────────────────────────────────────── */}
+            <h1
+              className="font-display font-bold text-white animate-fade-up"
+              style={{
+                fontSize:"clamp(2.2rem, 5.2vw, 3.75rem)",
+                lineHeight:1.09,
+                letterSpacing:"-0.025em",
+                marginBottom:"clamp(1rem, 2.2vw, 1.35rem)",
+              }}
             >
-              Quick Search
-            </button>
-            <button
-              onClick={() => setIsAiMode(true)}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                isAiMode ? "bg-gold text-foreground shadow-gold" : "bg-white/10 text-primary-foreground/70 hover:bg-white/20"
-              }`}
+              Where{" "}
+              <span style={{
+                background:"linear-gradient(135deg,hsl(40 95% 68%) 0%,hsl(40 90% 52%) 55%,hsl(36 85% 44%) 100%)",
+                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text",
+              }}>
+                Talent
+              </span>{" "}Meets{" "}
+              {/* "Celebration" ~4% smaller via font-size on the span */}
+              <span style={{
+                fontSize:"0.96em",
+                background:"linear-gradient(135deg,hsl(345 68% 60%) 0%,hsl(345 72% 42%) 100%)",
+                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text",
+              }}>
+                Celebration
+              </span>
+            </h1>
+
+            {/* ── Description ─────────────────────────────────────────── */}
+            <p
+              className="animate-fade-up delay-100"
+              style={{
+                fontSize:"clamp(0.96rem, 1.7vw, 1.075rem)",
+                lineHeight:1.72,
+                color:"hsl(0 0% 100% / 0.52)",
+                maxWidth:"580px",
+                margin:"0 auto",
+                marginBottom:"clamp(1.75rem, 3.5vw, 2.5rem)",
+              }}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              ✨ Vowza Planner
-            </button>
-          </div>
+              Find and book verified event professionals across India—from
+              photographers and decorators to DJs, caterers, bands, and
+              entertainers—all in one trusted platform.
+            </p>
 
-          {/* ── Search / Planner Box ─────────────────────────────────────── */}
-          <div className="bg-card/95 backdrop-blur-md rounded-2xl p-4 md:p-5 shadow-elevated max-w-3xl mx-auto animate-fade-in-up"
-            style={{ animationDelay: "0.6s" }}>
-
-            {isAiMode ? (
-              /* ── Vowza Planner (AI event planning assistant) ─────────── */
-              <div ref={suggestionsRef} className="relative">
-                {/* Description strip */}
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <Sparkles className="w-4 h-4 text-gold flex-shrink-0" />
-                  <p className="text-xs text-muted-foreground text-left">
-                    Describe your event and Vowza Planner will recommend vendors, estimate budget, and build a complete plan.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary border-2 border-gold/30 focus-within:border-gold transition-colors">
-                  <Sparkles className="w-5 h-5 text-gold flex-shrink-0" />
-                  <input
-                    type="text"
-                    value={plannerQuery}
-                    onChange={(e) => { setPlannerQuery(e.target.value); setShowSuggestions(true); }}
-                    onFocus={() => setShowSuggestions(true)}
-                    placeholder="Describe your dream event... e.g., Plan a wedding for 300 guests in Hyderabad under ₹10 lakh."
-                    className="flex-1 bg-transparent text-sm md:text-base font-medium text-foreground focus:outline-none placeholder:text-muted-foreground"
-                  />
-                  {plannerQuery && (
-                    <button onClick={() => setPlannerQuery("")}>
-                      <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                    </button>
-                  )}
-                  <Button
-                    onClick={() => openVowzaPlanner(plannerQuery || undefined)}
-                    className="bg-gradient-gold text-foreground font-semibold hover:opacity-90 shadow-gold flex-shrink-0"
-                  >
-                    <Sparkles className="w-4 h-4 mr-1.5" />
-                    Plan My Event
-                  </Button>
-                </div>
-
-                {/* Suggestions dropdown */}
-                {showSuggestions && plannerQuery.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-xl shadow-elevated border border-border z-50 overflow-hidden">
-                    <p className="text-xs text-muted-foreground px-4 pt-3 pb-1 font-medium uppercase tracking-wide">
-                      Start planning with
-                    </p>
-                    {plannerSuggestions.map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { openVowzaPlanner(q); setShowSuggestions(false); }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-secondary transition-colors text-sm flex items-center gap-3"
-                      >
-                        <Sparkles className="w-4 h-4 text-gold flex-shrink-0" />
-                        <span>{q}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* What Vowza Planner does */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 px-1">
-                  {[
-                    { icon: "🎯", text: "Vendor Matching" },
-                    { icon: "💰", text: "Budget Planning" },
-                    { icon: "📅", text: "Full Timeline" },
-                    { icon: "✅", text: "Smart Checklist" },
-                  ].map(item => (
-                    <div key={item.text} className="flex items-center gap-1.5 text-xs text-primary-foreground/60">
-                      <span>{item.icon}</span>
-                      <span>{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* ── Quick structured search ─────────────────────────────── */
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Event Type */}
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary relative">
-                  <Calendar className="w-5 h-5 text-maroon flex-shrink-0" />
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Event Type</p>
-                    <div className="relative">
-                      <select
-                        value={eventType}
-                        onChange={(e) => setEventType(e.target.value)}
-                        className="bg-transparent text-sm font-medium text-foreground focus:outline-none w-full appearance-none pr-4"
-                      >
-                        <option value="">Select event</option>
-                        {eventOptions.map((e) => (
-                          <option key={e} value={e}>{e}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* City */}
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary">
-                  <MapPin className="w-5 h-5 text-maroon flex-shrink-0" />
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">City</p>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="Enter city"
-                      className="bg-transparent text-sm font-medium text-foreground focus:outline-none w-full placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-
-                {/* Search Button */}
-                <Button
-                  onClick={handleQuickSearch}
-                  className="h-full min-h-[56px] bg-gradient-gold text-foreground font-semibold text-base hover:opacity-90 transition-opacity shadow-gold"
+            {/* ── Toggle ──────────────────────────────────────────────── */}
+            <div
+              className="flex justify-center animate-fade-up delay-200"
+              style={{ marginBottom:"clamp(0.9rem, 1.8vw, 1.25rem)" }}
+            >
+              <div style={{
+                display:"inline-flex", alignItems:"center", gap:"3px",
+                padding:"4px", borderRadius:"13px",
+                background:"hsl(0 0% 100% / 0.065)",
+                border:"1px solid hsl(0 0% 100% / 0.09)",
+                backdropFilter:"blur(14px)",
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setTab("search")}
+                  style={{
+                    padding:"7px 18px", borderRadius:"10px",
+                    fontSize:"12.5px", fontWeight:600,
+                    border:"none", cursor:"pointer",
+                    transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    ...(tab==="search"
+                      ? { background:"#fff", color:"#111", boxShadow:"0 1px 8px hsl(0 0% 0% / 0.13)" }
+                      : { background:"transparent", color:"hsl(0 0% 100% / 0.48)" }),
+                  }}
                 >
-                  <Search className="w-5 h-5 mr-2" />
-                  Find Artists
-                </Button>
+                  Quick Search
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("ai")}
+                  style={{
+                    display:"flex", alignItems:"center", gap:"5px",
+                    padding:"7px 18px", borderRadius:"10px",
+                    fontSize:"12.5px", fontWeight:600,
+                    border:"none", cursor:"pointer",
+                    transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    ...(tab==="ai"
+                      ? {
+                          background:"linear-gradient(135deg,hsl(40 95% 56%),hsl(36 85% 44%))",
+                          color:"#111", boxShadow:"0 3px 14px hsl(40 95% 52% / 0.30)",
+                        }
+                      : { background:"transparent", color:"hsl(0 0% 100% / 0.48)" }),
+                  }}
+                >
+                  <Sparkles style={{ width:"13px", height:"13px" }} />
+                  Vowza AI Planner
+                </button>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* ── Trending searches ─────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-5 animate-fade-in"
-            style={{ animationDelay: "0.75s" }}>
-            <span className="flex items-center gap-1 text-xs text-primary-foreground/60">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Trending:
-            </span>
-            {trendingSearches.map((term) => (
-              <button
-                key={term}
-                onClick={() => handleTrendingClick(term)}
-                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-primary-foreground/80 text-xs font-medium transition-all hover:scale-105"
-              >
-                {term}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Popular cities ────────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-3 animate-fade-in"
-            style={{ animationDelay: "0.85s" }}>
-            <span className="flex items-center gap-1 text-xs text-primary-foreground/60">
-              <MapPin className="w-3.5 h-3.5" />
-              Cities:
-            </span>
-            {popularCities.slice(0, 6).map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleCityClick(c.name)}
-                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-primary-foreground/80 text-xs font-medium transition-all hover:scale-105"
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Stats ────────────────────────────────────────────────────── */}
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-10 animate-fade-in"
-            style={{ animationDelay: "0.9s" }}>
-            {[
-              { value: "1,500+", label: "Verified Artists" },
-              { value: "10,000+", label: "Events Completed" },
-              { value: "4.8★", label: "Average Rating" },
-              { value: "50+", label: "Cities Covered" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-gold">{stat.value}</p>
-                <p className="text-sm text-primary-foreground/70">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Vowza Planner CTA strip ───────────────────────────────────── */}
-          <div className="mt-6 animate-fade-in" style={{ animationDelay: "1s" }}>
-            <button
-              onClick={() => openVowzaPlanner()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-primary-foreground/80 text-sm font-medium transition-all hover:scale-105 border border-white/20"
+            {/* ── Search box ──────────────────────────────────────────── */}
+            <div
+              className="animate-fade-up delay-300"
+              style={{ maxWidth:"680px", margin:"0 auto" }}
             >
-              <Sparkles className="w-4 h-4 text-gold" />
-              Open ✨ Vowza Planner — your personal AI event planning assistant
-            </button>
-          </div>
+              {tab === "search" ? (
+                /* ── Quick Search ── */
+                <div
+                  style={{
+                    borderRadius:"16px",
+                    padding:"5px",
+                    background:"hsl(0 0% 100% / 0.97)",
+                    boxShadow:
+                      "0 0 0 1px hsl(0 0% 0% / 0.05)," +
+                      "0 16px 50px -8px hsl(0 0% 0% / 0.42)",
+                  }}
+                >
+                  {/* DESKTOP: single row */}
+                  <div className="hidden md:flex items-center gap-0">
 
+                    {/* Event Type */}
+                    <div style={{ ...fieldWrap, borderRadius:"12px 0 0 12px", borderRight:"1px solid #e5e7eb" }}>
+                      <Sparkles style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)", flexShrink:0 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={fieldLabel}>Event Type</p>
+                        <div style={{ position:"relative" }}>
+                          <select
+                            value={eventType}
+                            onChange={e => setEventType(e.target.value)}
+                            style={{ ...fieldInput, appearance:"none", paddingRight:"14px", cursor:"pointer" }}
+                          >
+                            <option value="">Select Event Type</option>
+                            {EVENT_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+                          </select>
+                          <ChevronDown style={{
+                            position:"absolute", right:0, top:"50%",
+                            transform:"translateY(-50%)",
+                            width:"11px", height:"11px", color:"#9ca3af", pointerEvents:"none",
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div style={{ ...fieldWrap, borderRadius:0 }}>
+                      <MapPin style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)", flexShrink:0 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={fieldLabel}>Location</p>
+                        <input
+                          type="text"
+                          value={location}
+                          onChange={e => setLocation(e.target.value)}
+                          onKeyDown={e => e.key==="Enter" && handleSearch()}
+                          placeholder="Search by City, District or State"
+                          autoComplete="off"
+                          style={{ ...fieldInput, color: location ? "#111" : undefined }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Button — ~18% narrower than full-width */}
+                    <button
+                      type="button"
+                      onClick={handleSearch}
+                      style={{
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        gap:"6px",
+                        padding:"10px 18px",
+                        borderRadius:"0 12px 12px 0",
+                        background:"linear-gradient(135deg,hsl(345 72% 36%),hsl(345 78% 26%))",
+                        color:"#fff", fontWeight:700, fontSize:"12.5px",
+                        border:"none", cursor:"pointer", flexShrink:0,
+                        boxShadow:"0 5px 16px -4px hsl(345 72% 32% / 0.52)",
+                        transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                        whiteSpace:"nowrap",
+                        margin:"0",
+                        alignSelf:"stretch",
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.transform = "translateY(-1px)";
+                        el.style.boxShadow = "0 9px 22px -4px hsl(345 72% 32% / 0.60)";
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.transform = "translateY(0)";
+                        el.style.boxShadow = "0 5px 16px -4px hsl(345 72% 32% / 0.52)";
+                      }}
+                    >
+                      <Search style={{ width:"14px", height:"14px" }} />
+                      Find Verified Artists
+                    </button>
+                  </div>
+
+                  {/* MOBILE/TABLET: stacked */}
+                  <div className="flex flex-col gap-1.5 md:hidden">
+                    <div style={{ ...fieldWrap, borderRadius:"12px" }}>
+                      <Sparkles style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)", flexShrink:0 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={fieldLabel}>Event Type</p>
+                        <div style={{ position:"relative" }}>
+                          <select
+                            value={eventType}
+                            onChange={e => setEventType(e.target.value)}
+                            style={{ ...fieldInput, appearance:"none", paddingRight:"14px", cursor:"pointer" }}
+                          >
+                            <option value="">Select Event Type</option>
+                            {EVENT_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+                          </select>
+                          <ChevronDown style={{ position:"absolute", right:0, top:"50%", transform:"translateY(-50%)", width:"11px", height:"11px", color:"#9ca3af", pointerEvents:"none" }} />
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ ...fieldWrap, borderRadius:"12px" }}>
+                      <MapPin style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)", flexShrink:0 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={fieldLabel}>Location</p>
+                        <input
+                          type="text"
+                          value={location}
+                          onChange={e => setLocation(e.target.value)}
+                          onKeyDown={e => e.key==="Enter" && handleSearch()}
+                          placeholder="Search by City, District or State"
+                          autoComplete="off"
+                          style={fieldInput}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSearch}
+                      style={{
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        gap:"6px", padding:"11px 0", borderRadius:"12px",
+                        background:"linear-gradient(135deg,hsl(345 72% 36%),hsl(345 78% 26%))",
+                        color:"#fff", fontWeight:700, fontSize:"13px",
+                        border:"none", cursor:"pointer",
+                        boxShadow:"0 5px 16px -4px hsl(345 72% 32% / 0.52)",
+                      }}
+                    >
+                      <Search style={{ width:"14px", height:"14px" }} />
+                      Find Verified Artists
+                    </button>
+                  </div>
+                </div>
+
+              ) : (
+                /* ── Vowza AI Planner ── */
+                <div ref={suggestRef} style={{ position:"relative" }}>
+                  <div style={{
+                    borderRadius:"16px", padding:"5px",
+                    display:"flex", gap:"5px",
+                    background:"hsl(0 0% 100% / 0.97)",
+                    boxShadow:"0 0 0 1px hsl(0 0% 0% / 0.05),0 16px 50px -8px hsl(0 0% 0% / 0.42)",
+                  }}>
+                    <div style={{ ...fieldWrap, borderRadius:"12px" }}>
+                      <Sparkles style={{ width:"15px", height:"15px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
+                      <input
+                        type="text"
+                        value={plannerQuery}
+                        onChange={e => { setPlannerQuery(e.target.value); setShowSuggest(true); }}
+                        onFocus={() => setShowSuggest(true)}
+                        placeholder="Plan a wedding for 300 guests in Hyderabad under ₹12 lakh…"
+                        autoComplete="off"
+                        style={{ ...fieldInput, flex:1 }}
+                      />
+                      {plannerQuery && (
+                        <button type="button" onClick={() => setPlannerQuery("")}
+                          style={{ background:"none", border:"none", cursor:"pointer", padding:0, display:"flex" }}>
+                          <X style={{ width:"13px", height:"13px", color:"#9ca3af" }} />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openPlanner(plannerQuery || undefined)}
+                      style={{
+                        display:"flex", alignItems:"center", gap:"6px",
+                        padding:"10px 18px", borderRadius:"12px",
+                        background:"linear-gradient(135deg,hsl(40 95% 58%),hsl(36 85% 46%))",
+                        color:"#111", fontWeight:700, fontSize:"12.5px",
+                        border:"none", cursor:"pointer", flexShrink:0,
+                        boxShadow:"0 5px 16px -4px hsl(40 95% 52% / 0.46)",
+                        transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+                        whiteSpace:"nowrap",
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.transform = "translateY(-1px)";
+                        el.style.boxShadow = "0 9px 22px -4px hsl(40 95% 52% / 0.56)";
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.transform = "translateY(0)";
+                        el.style.boxShadow = "0 5px 16px -4px hsl(40 95% 52% / 0.46)";
+                      }}
+                    >
+                      <Sparkles style={{ width:"14px", height:"14px" }} />
+                      Plan My Event
+                    </button>
+                  </div>
+
+                  {showSuggestions && !plannerQuery && (
+                    <div
+                      className="animate-scale-in"
+                      style={{
+                        position:"absolute", top:"calc(100% + 8px)",
+                        left:0, right:0, borderRadius:"16px",
+                        overflow:"hidden", zIndex:50,
+                        background:"#fff",
+                        boxShadow:"0 18px 52px -10px hsl(0 0% 0% / 0.18),0 0 0 1px hsl(0 0% 0% / 0.05)",
+                      }}
+                    >
+                      <p style={{ fontSize:"9px", fontWeight:700, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.1em", padding:"14px 16px 4px" }}>
+                        Try asking
+                      </p>
+                      {PLANNER_SUGGESTIONS.map((q, i) => (
+                        <button
+                          key={i} type="button"
+                          onClick={() => { openPlanner(q); setShowSuggest(false); }}
+                          style={{
+                            width:"100%", textAlign:"left",
+                            display:"flex", alignItems:"center", gap:"12px",
+                            padding:"10px 16px", background:"none",
+                            border:"none", cursor:"pointer",
+                            fontSize:"13px", color:"#374151",
+                            transition:"background 0.12s",
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f9fafb"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+                        >
+                          <Sparkles style={{ width:"13px", height:"13px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Trending — 5 chips, single row, horizontal scroll on mobile ── */}
+            <div
+              className="animate-fade-up delay-400"
+              style={{
+                marginTop:"clamp(1.1rem, 2.4vw, 1.6rem)",
+                display:"flex",
+                alignItems:"center",
+                justifyContent:"center",
+                gap:"7px",
+                overflowX:"auto",
+                paddingBottom:"2px",
+                WebkitOverflowScrolling:"touch",
+                scrollbarWidth:"none",
+              }}
+            >
+              <span style={{
+                display:"flex", alignItems:"center", gap:"4px",
+                fontSize:"10.5px", fontWeight:600,
+                color:"hsl(0 0% 100% / 0.27)",
+                flexShrink:0, whiteSpace:"nowrap",
+              }}>
+                <TrendingUp style={{ width:"11px", height:"11px" }} />
+                Trending
+              </span>
+
+              {TRENDING.map(term => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => navigate(`/artists?search=${encodeURIComponent(term)}`)}
+                  style={{
+                    padding:"5.5px 13px",
+                    borderRadius:"100px",
+                    fontSize:"11px", fontWeight:500,
+                    cursor:"pointer",
+                    border:"1px solid hsl(0 0% 100% / 0.09)",
+                    background:"hsl(0 0% 100% / 0.055)",
+                    color:"hsl(0 0% 100% / 0.52)",
+                    transition:"all 0.15s ease",
+                    flexShrink:0, whiteSpace:"nowrap",
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background   = "hsl(0 0% 100% / 0.11)";
+                    el.style.borderColor  = "hsl(0 0% 100% / 0.22)";
+                    el.style.color        = "hsl(0 0% 100% / 0.88)";
+                    el.style.boxShadow    = "0 0 10px hsl(0 0% 100% / 0.06)";
+                    el.style.transform    = "translateY(-1px)";
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background   = "hsl(0 0% 100% / 0.055)";
+                    el.style.borderColor  = "hsl(0 0% 100% / 0.09)";
+                    el.style.color        = "hsl(0 0% 100% / 0.52)";
+                    el.style.boxShadow    = "none";
+                    el.style.transform    = "translateY(0)";
+                  }}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+
+          </div>
         </div>
       </div>
     </section>

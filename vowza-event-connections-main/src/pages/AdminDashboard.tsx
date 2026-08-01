@@ -32,7 +32,8 @@ import {
   Settings,
   Ban,
   Edit,
-  IndianRupee
+  IndianRupee,
+  Bell
 } from 'lucide-react';
 
 interface WorkerProfile {
@@ -101,19 +102,19 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return; // wait for auth to resolve
+
+    if (!user) {
       navigate('/auth');
       return;
     }
 
-    fetchWorkers();
+    // Admin check first — only load data once confirmed admin
+    checkAdminAccess();
     fetchCategories();
     fetchAnalytics();
     fetchCommissions();
-    if (user) {
-      checkAdminAccess();
-    }
-  }, [user, loading, navigate]);
+  }, [user, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCategories = async () => {
     try {
@@ -222,6 +223,7 @@ const AdminDashboard = () => {
         return;
       }
 
+      // Confirmed admin — now load data
       fetchWorkers();
       fetchStats();
     } catch (error: any) {
@@ -290,16 +292,16 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       const { data } = await supabase
-        .from('worker_profiles')
+        .from('provider_profiles')
         .select('verification_status');
 
       if (data) {
         const newStats: VerificationStats = {
-          total: data.length,
-          pending: data.filter(w => w.verification_status === 'pending').length,
+          total:       data.length,
+          pending:     data.filter(w => w.verification_status === 'pending').length,
           underReview: data.filter(w => w.verification_status === 'under_review').length,
-          approved: data.filter(w => w.verification_status === 'approved').length,
-          rejected: data.filter(w => w.verification_status === 'rejected').length
+          approved:    data.filter(w => w.verification_status === 'approved').length,
+          rejected:    data.filter(w => w.verification_status === 'rejected').length,
         };
         setStats(newStats);
       }
@@ -319,47 +321,32 @@ const AdminDashboard = () => {
     try {
       const now = new Date().toISOString();
 
-      // Update worker profile
+      // Update provider profile status
       const { error: updateError } = await supabase
-        .from('worker_profiles')
+        .from('provider_profiles')
         .update({
           verification_status: status,
           rejection_reason: status === 'rejected' ? rejectionReason : null,
           verified_at: status === 'approved' ? now : null,
-          verified_by: user?.id
-        })
+        } as any)
         .eq('user_id', workerId);
 
       if (updateError) throw updateError;
 
-      // If approved, assign provider role and create provider profile
+      // If approved, assign provider role and update provider profile
       if (status === 'approved') {
         await supabase
           .from('user_roles')
-          .upsert({
-            user_id: workerId,
-            role: 'provider'
-          }, {
-            onConflict: 'user_id,role'
-          });
+          .upsert({ user_id: workerId, role: 'provider' }, { onConflict: 'user_id,role' });
 
-        const worker = workers.find(w => w.user_id === workerId);
-        if (worker) {
-          await supabase
-            .from('provider_profiles')
-            .update({
-              verification_status: 'approved'
-            } as any)
-            .eq('user_id', workerId);
-        }
-      } else {
-        // Reject artist
         await supabase
           .from('provider_profiles')
-          .update({
-            verification_status: 'rejected',
-            rejection_reason: rejectionReason
-          } as any)
+          .update({ verification_status: 'approved' } as any)
+          .eq('user_id', workerId);
+      } else {
+        await supabase
+          .from('provider_profiles')
+          .update({ verification_status: 'rejected', rejection_reason: rejectionReason } as any)
           .eq('user_id', workerId);
       }
 

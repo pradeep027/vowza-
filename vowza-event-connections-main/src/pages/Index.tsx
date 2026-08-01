@@ -1,3 +1,4 @@
+// ─── Home Page — Corporate Premium Edition ───────────────────────────────────
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import TrendingCategories from "@/components/TrendingCategories";
@@ -5,37 +6,27 @@ import BrowseByEvent from "@/components/BrowseByEvent";
 import FeaturedCollections from "@/components/FeaturedCollections";
 import HowItWorks from "@/components/HowItWorks";
 import TestimonialsSection from "@/components/TestimonialsSection";
-import GallerySection from "@/components/GallerySection";
 import Footer from "@/components/Footer";
+import WhyVowza from "@/components/WhyVowza";
+import DownloadApp from "@/components/DownloadApp";
+import FAQSection from "@/components/FAQSection";
 
-const Index = () => {
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main>
-        {/* 1. Hero — primary acquisition */}
-        <Hero />
-
-        {/* 2. Trending Categories — 15-icon scrollable grid */}
-        <TrendingCategories />
-        {/* 4. Browse by Event — 12 event type cards */}
-        <BrowseByEvent />
-
-        {/* 5. Featured Collections — 5 curated artist groups */}
-        <FeaturedCollections />
-
-        {/* 6. How It Works — dual-tab customer + artist flow */}
-        <HowItWorks />
-
-        {/* 9. Testimonials — customer success stories */}
-        <TestimonialsSection />
-
-        {/* 10. Gallery — Instagram-style event photo grid */}
-        <GallerySection />
-      </main>
-      <Footer />
-    </div>
-  );
-};
+const Index = () => (
+  <div className="min-h-screen bg-background">
+    <Navbar />
+    <main>
+      <Hero />
+      <TrendingCategories />
+      <FeaturedCollections />
+      <BrowseByEvent />
+      <WhyVowza />
+      <HowItWorks />
+      <TestimonialsSection />
+      <FAQSection />
+      <DownloadApp />
+    </main>
+    <Footer />
+  </div>
+);
 
 export default Index;

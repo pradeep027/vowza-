@@ -1,308 +1,549 @@
-import { useState, useEffect } from "react";
+// ─── Navbar — Corporate Premium Edition ──────────────────────────────────────
+// Sticky, shrinks on scroll, mega menu for Browse, instant search, all actions
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, User, Sparkles, ShoppingBag, Search, ChevronDown } from "lucide-react";
+import {
+  Menu, X, Search, Sparkles, ShoppingBag, Bell, Heart,
+  ChevronDown, User, LogOut, LayoutDashboard, BookOpen,
+  Camera, Music, Disc3, Palette, Mic2, Users, Utensils,
+  Wand2, Star, Zap, MapPin, CalendarDays, ArrowRight,
+  BadgeCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useDashboardLink } from "@/hooks/useDashboardLink";
+import { cn } from "@/lib/utils";
+
+// ── Mega menu data ─────────────────────────────────────────────────────────
+const megaCategories = [
+  { label: "Photographers",    icon: Camera,   slug: "photographer",       featured: true  },
+  { label: "DJs",              icon: Disc3,    slug: "dj",                 featured: false },
+  { label: "Live Bands",       icon: Music,    slug: "music_band",         featured: true  },
+  { label: "Makeup Artists",   icon: Palette,  slug: "makeup_artist",      featured: false },
+  { label: "Singers",          icon: Mic2,     slug: "singer",             featured: false },
+  { label: "Choreographers",   icon: Users,    slug: "choreographer",      featured: false },
+  { label: "Decorators",       icon: Wand2,    slug: "wedding_decorator",  featured: true  },
+  { label: "Caterers",         icon: Utensils, slug: "catering_services",  featured: false },
+  { label: "Mehendi Artists",  icon: Star,     slug: "mehendi_artist",     featured: false },
+  { label: "Anchors / Emcees", icon: Mic2,     slug: "anchor",             featured: false },
+  { label: "Magicians",        icon: Zap,      slug: "magician",           featured: false },
+  { label: "Event Planners",   icon: CalendarDays, slug: "event_planner",  featured: false },
+];
+
+const popularCities = ["Hyderabad", "Mumbai", "Bangalore", "Delhi", "Chennai", "Pune"];
+
+// ── Search suggestions (static — enhance with DB later) ───────────────────
+const quickSuggestions = [
+  "Wedding photographer Hyderabad",
+  "DJ for birthday party",
+  "Mehendi artist Mumbai",
+  "Live band for reception",
+  "Makeup artist Bangalore",
+];
 
 const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [browseOpen, setBrowseOpen] = useState(false);
+  const [isOpen,       setIsOpen]       = useState(false);
+  const [isScrolled,   setIsScrolled]   = useState(false);
+  const [megaOpen,     setMegaOpen]     = useState(false);
+  const [searchOpen,   setSearchOpen]   = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState("");
+  const [profileOpen,  setProfileOpen]  = useState(false);
+
   const { user, signOut } = useAuth();
   const { dashboardLink } = useDashboardLink();
-  const { cart } = useCart();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { cart }          = useCart();
+  const navigate          = useNavigate();
+  const location          = useLocation();
 
-  // Shrink navbar on scroll
+  const searchRef  = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const megaRef    = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Scroll shrink ──────────────────────────────────────────────────────
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const fn = () => setIsScrolled(window.scrollY > 30);
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  // Close mobile menu on route change
+  // ── Close menus on route change ────────────────────────────────────────
   useEffect(() => {
     setIsOpen(false);
-    setBrowseOpen(false);
+    setMegaOpen(false);
+    setSearchOpen(false);
+    setProfileOpen(false);
   }, [location.pathname]);
 
-  const isActive = (path: string) =>
-    location.pathname === path
-      ? "text-gold font-semibold"
-      : "text-muted-foreground hover:text-foreground";
+  // ── Outside click handler ──────────────────────────────────────────────
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
 
-  const browseCategories = [
-    { label: "All Artists", href: "/artists" },
-    { label: "Photographers", href: "/artists?category=photographers" },
-    { label: "DJs", href: "/artists?category=dj" },
-    { label: "Live Bands", href: "/artists?category=bands" },
-    { label: "Decorators", href: "/artists?category=decorators" },
-    { label: "Dancers", href: "/artists?category=dancers" },
-    { label: "Makeup Artists", href: "/artists?category=makeup" },
-    { label: "Mehendi Artists", href: "/artists?category=mehendi" },
-  ];
+  // ── Keyboard shortcut: Ctrl/Cmd+K → open search ───────────────────────
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      }
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setMegaOpen(false);
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("keydown", fn);
+    return () => document.removeEventListener("keydown", fn);
+  }, []);
+
+  const isActive = (path: string) => location.pathname === path;
+
+  const handleSearch = useCallback((q: string) => {
+    if (!q.trim()) return;
+    setSearchOpen(false);
+    setSearchQuery("");
+    navigate(`/artists?search=${encodeURIComponent(q.trim())}`);
+  }, [navigate]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSearch(searchQuery);
+  };
+
+  const navH = isScrolled ? "h-14" : "h-16 md:h-18";
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? "bg-background/95 backdrop-blur-md shadow-md border-b border-border"
-          : "bg-background/80 backdrop-blur-md border-b border-border"
-      }`}
-    >
-      <div className="container mx-auto px-4">
-        <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? "h-14" : "h-16 md:h-20"}`}>
+    <>
+      {/* ── Main nav ──────────────────────────────────────────────────── */}
+      <nav
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          isScrolled
+            ? "bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl shadow-sm border-b border-border/60"
+            : "bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-border/40"
+        )}
+      >
+        <div className="container">
+          <div className={cn("flex items-center justify-between transition-all duration-300", navH)}>
 
-          {/* ── Logo ──────────────────────────────────────────────── */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-gold flex items-center justify-center shadow-gold">
-              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-foreground" />
-            </div>
-            <span className="text-xl md:text-2xl font-display font-bold text-foreground">
-              Vowza
-            </span>
-          </Link>
+            {/* ── Logo ────────────────────────────────────────────────── */}
+            <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group" aria-label="Vowza home">
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon group-hover:shadow-lg transition-shadow">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-xl font-display font-bold text-foreground tracking-tight">
+                Vowza
+              </span>
+            </Link>
 
-          {/* ── Desktop nav ───────────────────────────────────────── */}
-          <div className="hidden md:flex items-center gap-6">
-            {/* Browse dropdown */}
-            <div
-              className="relative"
-              onMouseEnter={() => setBrowseOpen(true)}
-              onMouseLeave={() => setBrowseOpen(false)}
-            >
-              <button
-                className={`flex items-center gap-1 text-sm font-medium transition-colors ${isActive("/artists")}`}
+            {/* ── Desktop nav links ────────────────────────────────────── */}
+            <div className="hidden lg:flex items-center gap-1" ref={megaRef}>
+
+              {/* Browse — mega menu trigger */}
+              <div
+                className="relative"
+                onMouseEnter={() => setMegaOpen(true)}
+                onMouseLeave={() => setMegaOpen(false)}
               >
-                Browse Artists
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${browseOpen ? "rotate-180" : ""}`} />
-              </button>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    megaOpen || isActive("/artists")
+                      ? "text-foreground bg-secondary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  )}
+                  aria-expanded={megaOpen}
+                  aria-haspopup="true"
+                >
+                  Browse Artists
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", megaOpen && "rotate-180")} />
+                </button>
 
-              {browseOpen && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-52 bg-card rounded-xl shadow-elevated border border-border overflow-hidden z-50 animate-fade-in">
-                  {browseCategories.map((cat) => (
-                    <Link
-                      key={cat.href}
-                      to={cat.href}
-                      className="block px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                    >
-                      {cat.label}
-                    </Link>
-                  ))}
-                </div>
+                {/* Mega menu dropdown */}
+                {megaOpen && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-[640px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border/60 overflow-hidden animate-fade-in z-50">
+                    <div className="p-5 grid grid-cols-3 gap-1">
+                      {megaCategories.map(({ label, icon: Icon, slug, featured }) => (
+                        <Link
+                          key={slug}
+                          to={`/artists?category=${slug}`}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors group",
+                            featured
+                              ? "text-foreground hover:bg-gold/8 hover:text-maroon"
+                              : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                            featured ? "bg-gold/10 group-hover:bg-gold/20" : "bg-muted group-hover:bg-secondary"
+                          )}>
+                            <Icon className={cn("w-4 h-4", featured ? "text-gold-dark" : "text-muted-foreground group-hover:text-foreground")} />
+                          </div>
+                          <span className="font-medium">{label}</span>
+                          {featured && (
+                            <BadgeCheck className="w-3.5 h-3.5 text-gold ml-auto opacity-60" />
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+
+                    {/* Footer strip */}
+                    <div className="px-5 py-3.5 bg-secondary/50 border-t border-border/40 flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground font-medium">Popular cities:</span>
+                        {popularCities.map(city => (
+                          <Link
+                            key={city}
+                            to={`/artists?city=${city}`}
+                            className="text-xs text-muted-foreground hover:text-maroon flex items-center gap-1 transition-colors"
+                          >
+                            <MapPin className="w-2.5 h-2.5" />{city}
+                          </Link>
+                        ))}
+                      </div>
+                      <Link
+                        to="/artists"
+                        className="flex items-center gap-1 text-xs font-semibold text-maroon hover:gap-1.5 transition-all"
+                      >
+                        View all <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Vowza AI Planner */}
+              <Link
+                to="/ai-planner"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive("/ai-planner")
+                    ? "text-foreground bg-secondary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-gold" />
+                Vowza AI Planner
+              </Link>
+
+              {/* How it works */}
+              <a
+                href="/#how-it-works"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+              >
+                How it works
+              </a>
+
+              {user && (
+                <Link
+                  to="/my-bookings"
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive("/my-bookings")
+                      ? "text-foreground bg-secondary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  )}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  My Bookings
+                </Link>
               )}
             </div>
 
-            <Link to="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              How It Works
-            </Link>
+            {/* ── Desktop actions ──────────────────────────────────────── */}
+            <div className="hidden lg:flex items-center gap-1">
 
-            <Link
-              to="/ai-planner"
-              className={`inline-flex items-center gap-1.5 text-sm font-semibold transition-colors ${
-                location.pathname === '/ai-planner'
-                  ? 'text-gold'
-                  : 'text-muted-foreground hover:text-gold'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Vowza Planner
-            </Link>
-
-            <Link to="/artists?collection=luxury" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Collections
-            </Link>
-
-            {user && (
-              <Link to="/my-bookings" className={`text-sm font-medium transition-colors ${isActive("/my-bookings")}`}>
-                My Bookings
-              </Link>
-            )}
-          </div>
-
-          {/* ── Desktop actions ───────────────────────────────────── */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Search shortcut */}
-            <button
-              onClick={() => navigate("/artists")}
-              className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-              aria-label="Search artists"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-
-            {user ? (
-              <>
-                {/* Cart */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate("/cart")}
-                  className="relative"
-                  aria-label="Cart"
+              {/* Search trigger */}
+              <div className="relative" ref={searchRef}>
+                <button
+                  onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-sm"
+                  aria-label="Search"
                 >
-                  <ShoppingBag className="w-5 h-5" />
-                  {cart.length > 0 && (
-                    <Badge className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center p-0 bg-gold text-foreground text-[10px] border-0">
-                      {cart.length}
-                    </Badge>
-                  )}
-                </Button>
+                  <Search className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline text-xs">Search artists…</span>
+                  <kbd className="hidden xl:inline ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-gray-800 border border-border rounded text-muted-foreground">⌘K</kbd>
+                </button>
 
-                {/* Notifications */}
-                <NotificationBell />
-
-                {/* Dashboard */}
-<Link to={dashboardLink}>
-  <Button variant="ghost" size="sm" className="text-sm">
-    Dashboard
-  </Button>
-</Link>
-                {/* Sign out */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => signOut()}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/auth">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground text-sm">
-                    <User className="w-4 h-4 mr-1.5" />
-                    Login
-                  </Button>
-                </Link>
-
-                <Link to="/provider/register">
-                  <Button
-                    size="sm"
-                    className="bg-gradient-gold text-foreground font-semibold hover:opacity-90 transition-opacity shadow-gold text-sm"
-                  >
-                    Join as Artist
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
-
-          {/* ── Mobile toggle ─────────────────────────────────────── */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-secondary transition-colors"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={isOpen}
-          >
-            {isOpen ? (
-              <X className="w-6 h-6 text-foreground" />
-            ) : (
-              <Menu className="w-6 h-6 text-foreground" />
-            )}
-          </button>
-        </div>
-
-        {/* ── Mobile menu ───────────────────────────────────────────── */}
-        {isOpen && (
-          <div className="md:hidden py-4 border-t border-border animate-fade-in">
-            <div className="flex flex-col gap-1">
-              <Link
-                to="/ai-planner"
-                className="px-3 py-2.5 rounded-lg text-sm font-semibold text-gold hover:bg-gold/10 transition-colors flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                ✨ Vowza Planner
-              </Link>
-              <Link
-                to="/artists"
-                className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              >
-                Browse Artists
-              </Link>
-              <Link
-                to="/artists?category=photographers"
-                className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors pl-6"
-              >
-                → Photographers
-              </Link>
-              <Link
-                to="/artists?category=dj"
-                className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors pl-6"
-              >
-                → DJs
-              </Link>
-              <Link
-                to="/artists?category=bands"
-                className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors pl-6"
-              >
-                → Live Bands
-              </Link>
-              <Link
-                to="/artists?category=decorators"
-                className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors pl-6"
-              >
-                → Decorators
-              </Link>
-
-              <div className="h-px bg-border my-2" />
+                {/* Search dropdown */}
+                {searchOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-[380px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border/60 overflow-hidden animate-scale-in z-50">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
+                      <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <input
+                        ref={searchInputRef}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Search artists, categories, cities…"
+                        className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                        autoComplete="off"
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs text-muted-foreground font-medium px-2 mb-2 uppercase tracking-wide">Quick searches</p>
+                      {quickSuggestions.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => handleSearch(s)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors text-left"
+                        >
+                          <Search className="w-3.5 h-3.5 flex-shrink-0" />
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2.5 border-t border-border/40">
+                      <button
+                        onClick={() => handleSearch(searchQuery || "all")}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-secondary text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                      >
+                        Browse all artists <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {user ? (
                 <>
-                  <Link
-                    to="/my-bookings"
-                    className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                  >
-                    My Bookings
-                  </Link>
-                  <Link
-                    to="/cart"
-                    className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                  >
-                    Cart {cart.length > 0 && `(${cart.length})`}
-                  </Link>
-                  <Link
-                    to={dashboardLink}
-                    className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                  >
-                    Dashboard
-                  </Link>
+                  {/* Cart */}
                   <button
-                    onClick={() => signOut()}
-                    className="px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors text-left"
+                    onClick={() => navigate("/cart")}
+                    className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    aria-label="Cart"
                   >
-                    Logout
+                    <ShoppingBag className="w-4.5 h-4.5 w-[18px] h-[18px]" />
+                    {cart.length > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-maroon text-white text-[10px] font-bold flex items-center justify-center">
+                        {cart.length}
+                      </span>
+                    )}
                   </button>
+
+                  {/* Wishlist */}
+                  <button
+                    onClick={() => navigate("/artists?saved=true")}
+                    className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    aria-label="Saved"
+                  >
+                    <Heart className="w-[18px] h-[18px]" />
+                  </button>
+
+                  {/* Notifications */}
+                  <NotificationBell />
+
+                  {/* Profile dropdown */}
+                  <div className="relative" ref={profileRef}>
+                    <button
+                      onClick={() => setProfileOpen(!profileOpen)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all",
+                        profileOpen
+                          ? "border-border bg-secondary"
+                          : "border-transparent hover:border-border hover:bg-secondary/60"
+                      )}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-gradient-maroon flex items-center justify-center">
+                        <User className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform", profileOpen && "rotate-180")} />
+                    </button>
+
+                    {profileOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border/60 overflow-hidden animate-scale-in z-50">
+                        <div className="px-4 py-3 border-b border-border/40">
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        </div>
+                        <div className="p-2">
+                          <Link to={dashboardLink} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                            <LayoutDashboard className="w-4 h-4 text-muted-foreground" /> Dashboard
+                          </Link>
+                          <Link to="/my-bookings" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                            <BookOpen className="w-4 h-4 text-muted-foreground" /> My Bookings
+                          </Link>
+                          <Link to="/artists?saved=true" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                            <Heart className="w-4 h-4 text-muted-foreground" /> Saved Artists
+                          </Link>
+                        </div>
+                        <div className="p-2 border-t border-border/40">
+                          <button
+                            onClick={() => signOut()}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                          >
+                            <LogOut className="w-4 h-4" /> Sign out
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
                   <Link to="/auth">
-                    <Button variant="ghost" size="sm" className="w-full justify-start text-sm">
-                      <User className="w-4 h-4 mr-2" />
-                      Login / Sign Up
-                    </Button>
+                    <button className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                      Sign in
+                    </button>
                   </Link>
                   <Link to="/provider/register">
-                    <Button
-                      size="sm"
-                      className="bg-gradient-gold text-foreground font-semibold w-full mt-1"
-                    >
+                    <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon hover:opacity-90 transition-all hover:-translate-y-0.5">
                       Join as Artist
-                    </Button>
+                    </button>
                   </Link>
                 </>
               )}
             </div>
+
+            {/* ── Mobile: search + hamburger ───────────────────────────── */}
+            <div className="flex items-center gap-1 lg:hidden">
+              <button
+                onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+                className="p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                aria-label="Search"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+              {user && (
+                <button
+                  onClick={() => navigate("/cart")}
+                  className="relative p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  <ShoppingBag className="w-5 h-5" />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-maroon text-white text-[10px] font-bold flex items-center justify-center">
+                      {cart.length}
+                    </span>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                aria-label="Toggle menu"
+                aria-expanded={isOpen}
+              >
+                {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Mobile search bar (slides in) ──────────────────────────── */}
+          {searchOpen && (
+            <div className="lg:hidden pb-3 animate-fade-down" ref={searchRef}>
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border/60">
+                <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search artists, categories, cities…"
+                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  autoComplete="off"
+                />
+                {searchQuery
+                  ? <button onClick={() => setSearchQuery("")}><X className="w-4 h-4 text-muted-foreground" /></button>
+                  : <button onClick={() => setSearchOpen(false)}><X className="w-4 h-4 text-muted-foreground" /></button>
+                }
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Mobile menu ───────────────────────────────────────────────── */}
+        {isOpen && (
+          <div className="lg:hidden border-t border-border/40 bg-white dark:bg-gray-950 animate-fade-down">
+            <div className="container py-4 space-y-1">
+          {/* Vowza AI Planner highlight */}
+              <Link
+                to="/ai-planner"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-gold/10 to-maroon/5 border border-gold/20 text-sm font-semibold text-foreground hover:from-gold/15 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-gold flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Vowza AI Planner</p>
+                  <p className="text-xs text-muted-foreground">Plan your full event with AI</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+              </Link>
+
+              <div className="h-px bg-border my-2" />
+
+              <p className="text-2xs text-muted-foreground font-semibold uppercase tracking-wider px-4 py-1">Categories</p>
+              {megaCategories.slice(0, 8).map(({ label, icon: Icon, slug }) => (
+                <Link
+                  key={slug}
+                  to={`/artists?category=${slug}`}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  {label}
+                </Link>
+              ))}
+              <Link to="/artists" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-maroon hover:bg-secondary rounded-xl transition-colors">
+                <ArrowRight className="w-4 h-4" /> View all categories
+              </Link>
+
+              <div className="h-px bg-border my-2" />
+
+              <a href="/#how-it-works" className="block px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                How it works
+              </a>
+
+              {user ? (
+                <>
+                  <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
+                  <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
+                  <div className="h-px bg-border my-2" />
+                  <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/5 transition-colors">
+                    <LogOut className="w-4 h-4" /> Sign out
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 pt-2">
+                  <Link to="/auth">
+                    <button className="w-full px-4 py-3 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-secondary transition-colors">
+                      Sign in
+                    </button>
+                  </Link>
+                  <Link to="/provider/register">
+                    <button className="w-full px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon">
+                      Join as Artist — Free
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </div>
-    </nav>
+      </nav>
+
+      {/* ── Backdrop for mega/search on mobile ────────────────────────────── */}
+      {(megaOpen || searchOpen || isOpen) && (
+        <div
+          className="fixed inset-0 z-40 bg-foreground/10 backdrop-blur-sm lg:hidden"
+          onClick={() => { setMegaOpen(false); setSearchOpen(false); setIsOpen(false); }}
+        />
+      )}
+    </>
   );
 };
 
