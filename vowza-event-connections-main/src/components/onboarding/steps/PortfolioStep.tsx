@@ -18,11 +18,14 @@ interface PortfolioStepProps {
   onChange: (items: PortfolioItem[]) => void;
   onUpload: (files: File[]) => Promise<void>;
   isUploading: boolean;
+  onGalleryFiles?: (files: File[]) => void;
 }
 
-export const PortfolioStep = ({ items, onChange, onUpload, isUploading }: PortfolioStepProps) => {
+export const PortfolioStep = ({ items, onChange, onUpload, isUploading, onGalleryFiles }: PortfolioStepProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
@@ -73,6 +76,22 @@ export const PortfolioStep = ({ items, onChange, onUpload, isUploading }: Portfo
 
   const updateTitle = (id: string, title: string) => {
     onChange(items.map((i) => (i.id === id ? { ...i, title } : i)));
+  };
+
+  const handleGallerySelect = (files: FileList | null) => {
+    if (!files || !onGalleryFiles) return;
+    const fileArr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    onGalleryFiles(fileArr);
+    const previews = fileArr.map(f => URL.createObjectURL(f));
+    setGalleryPreviews(prev => [...prev, ...previews]);
+  };
+
+  const removeGalleryPreview = (idx: number) => {
+    setGalleryPreviews(prev => {
+      URL.revokeObjectURL(prev[idx]);
+      const next = prev.filter((_, i) => i !== idx);
+      return next;
+    });
   };
 
   const getIcon = (type: string) => {
@@ -204,6 +223,50 @@ export const PortfolioStep = ({ items, onChange, onUpload, isUploading }: Portfo
             <Plus className="w-8 h-8" />
             <span className="text-xs">Add More</span>
           </button>
+        </div>
+      )}
+
+      {/* Gallery Images (optional extra photos shown on profile) */}
+      {onGalleryFiles && (
+        <div className="space-y-3">
+          <div>
+            <Label className="text-base font-semibold">Gallery Images</Label>
+            <p className="text-sm text-muted-foreground mt-1">
+              Additional photos shown in your profile gallery (separate from portfolio).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => galleryInputRef.current?.click()}
+            className="w-full border-2 border-dashed border-border hover:border-primary/50 rounded-xl py-6 flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ImageIcon className="w-8 h-8" />
+            <span className="text-sm">Click to add gallery images</span>
+          </button>
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => handleGallerySelect(e.target.files)}
+            className="hidden"
+          />
+          {galleryPreviews.length > 0 && (
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+              {galleryPreviews.map((src, idx) => (
+                <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeGalleryPreview(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

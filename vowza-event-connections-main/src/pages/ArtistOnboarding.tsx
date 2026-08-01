@@ -13,6 +13,7 @@ import { PricingStep } from '@/components/onboarding/steps/PricingStep';
 import { PortfolioStep } from '@/components/onboarding/steps/PortfolioStep';
 import { ReviewStep } from '@/components/onboarding/steps/ReviewStep';
 import { resolveDashboard } from '@/hooks/useDashboardLink';
+import { useImageUpload } from '@/hooks/useImageUpload';
 import type { ProfessionType } from '@/data/artistCategories';
 
 const steps = [
@@ -40,6 +41,7 @@ const ArtistOnboarding = () => {
   const { uploadImage, isUploading: isUploadingAvatar } = useImageUpload({ bucket: 'provider-media', folder: 'avatars' });
   const { uploadImage: uploadCover, isUploading: isUploadingCover } = useImageUpload({ bucket: 'provider-media', folder: 'covers' });
   const { uploadMultiple, isUploading: isUploadingPortfolio } = useImageUpload({ bucket: 'provider-media', folder: 'portfolio' });
+  const { uploadMultiple: uploadGallery, isUploading: isUploadingGallery } = useImageUpload({ bucket: 'provider-media', folder: 'gallery' });
 
   // Form state
   const [basicInfo, setBasicInfo] = useState({
@@ -65,9 +67,14 @@ const ArtistOnboarding = () => {
     priceMax: '',
     specialties: [] as string[],
     isAvailable: true,
+    whatsapp: '',
+    serviceRadius: 50,
+    instantBooking: false,
   });
 
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [pendingGalleryFiles, setPendingGalleryFiles] = useState<File[]>([]);
   const [enableNotifications, setEnableNotifications] = useState(true);
 
   // Pending file uploads
@@ -173,6 +180,13 @@ const ArtistOnboarding = () => {
 
       if (profileError) throw profileError;
 
+      // Upload gallery images
+      let uploadedGalleryUrls: string[] = [...galleryUrls];
+      if (pendingGalleryFiles.length > 0) {
+        const results = await uploadGallery(pendingGalleryFiles, user.id);
+        uploadedGalleryUrls = [...uploadedGalleryUrls, ...results.map(r => r.url)];
+      }
+
       // Create provider profile
       const { data: providerData, error: providerError } = await supabase
         .from('provider_profiles')
@@ -191,7 +205,12 @@ const ArtistOnboarding = () => {
           is_available: pricingInfo.isAvailable,
           category_details: categoryDetails,
           onboarding_completed: true,
-        })
+          // New fields
+          whatsapp: pricingInfo.whatsapp || null,
+          service_radius: pricingInfo.serviceRadius || 50,
+          instant_booking: pricingInfo.instantBooking,
+          gallery_urls: uploadedGalleryUrls.length > 0 ? uploadedGalleryUrls : null,
+        } as any)
         .select()
         .single();
 
@@ -305,6 +324,7 @@ const ArtistOnboarding = () => {
                 onChange={setPortfolioItems}
                 onUpload={async () => {}}
                 isUploading={isUploadingPortfolio}
+                onGalleryFiles={setPendingGalleryFiles}
               />
             )}
             {currentStep === 4 && (
@@ -314,6 +334,7 @@ const ArtistOnboarding = () => {
                   profession: selectedCategory,
                   ...pricingInfo,
                   portfolioCount: portfolioItems.length,
+                  galleryCount: pendingGalleryFiles.length + galleryUrls.length,
                   enableNotifications,
                 }}
                 onNotificationChange={setEnableNotifications}

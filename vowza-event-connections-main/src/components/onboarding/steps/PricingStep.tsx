@@ -1,10 +1,9 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { X, IndianRupee, Tag, Clock, CheckCircle } from 'lucide-react';
+import { X, IndianRupee, Tag, Clock, CheckCircle, Zap, MapPin, MessageCircle } from 'lucide-react';
 import { pricingTypeOptions } from '@/data/artistCategories';
 
 interface PricingStepProps {
@@ -14,6 +13,9 @@ interface PricingStepProps {
     priceMax: string;
     specialties: string[];
     isAvailable: boolean;
+    whatsapp: string;
+    serviceRadius: number;
+    instantBooking: boolean;
   };
   onChange: (data: Partial<PricingStepProps['data']>) => void;
 }
@@ -108,6 +110,40 @@ export const PricingStep = ({ data, onChange }: PricingStepProps) => {
         </div>
       </div>
 
+      {/* WhatsApp */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-5 h-5 text-primary" />
+          <Label className="text-base font-semibold">WhatsApp Number</Label>
+        </div>
+        <Input
+          type="tel"
+          placeholder="+91 9876543210"
+          value={data.whatsapp}
+          onChange={(e) => onChange({ whatsapp: e.target.value })}
+          className="border-border focus:border-primary"
+        />
+        <p className="text-xs text-muted-foreground">Customers can contact you directly on WhatsApp for quick queries</p>
+      </div>
+
+      {/* Service Radius */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-primary" />
+          <Label className="text-base font-semibold">Service Radius (km)</Label>
+        </div>
+        <Input
+          type="number"
+          min="5"
+          max="500"
+          placeholder="50"
+          value={data.serviceRadius}
+          onChange={(e) => onChange({ serviceRadius: parseInt(e.target.value) || 50 })}
+          className="border-border focus:border-primary"
+        />
+        <p className="text-xs text-muted-foreground">Maximum distance you are willing to travel from your city</p>
+      </div>
+
       {/* Specialties / Event Types */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -134,6 +170,29 @@ export const PricingStep = ({ data, onChange }: PricingStepProps) => {
               </Badge>
             );
           })}
+        </div>
+      </div>
+
+      {/* Instant Booking */}
+      <div className="p-6 bg-secondary/30 rounded-xl border border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${data.instantBooking ? 'bg-emerald-100' : 'bg-secondary'}`}>
+              <Zap className={`w-5 h-5 ${data.instantBooking ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <Label className="text-base font-semibold">Instant Booking</Label>
+              <p className="text-sm text-muted-foreground">
+                {data.instantBooking
+                  ? 'Customers can book you without waiting for approval'
+                  : 'You manually approve each booking request'}
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={data.instantBooking}
+            onCheckedChange={(checked) => onChange({ instantBooking: checked })}
+          />
         </div>
       </div>
 
