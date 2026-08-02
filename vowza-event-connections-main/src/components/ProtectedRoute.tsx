@@ -21,7 +21,12 @@ interface ProtectedRouteProps {
 }
 
 // Cache roles in memory for the session so every route doesn't re-query
-const roleCache = new Map<string, string[]>();
+// Export so approval service can invalidate it
+export const roleCache = new Map<string, string[]>();
+export function invalidateRoleCache(userId?: string) {
+  if (userId) roleCache.delete(userId);
+  else roleCache.clear();
+}
 
 const ProtectedRoute = ({
   children,

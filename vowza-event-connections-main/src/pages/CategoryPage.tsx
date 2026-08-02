@@ -161,11 +161,11 @@ export default function CategoryPage() {
     if (!category) return;
     setLoading(true);
     try {
-      let q = supabase
-        .from("provider_profiles")
-        .select("*", { count: "exact" })
+      let q = supabase.from("provider_profiles").select("*", { count: "exact" })
         .in("profession", category.professionTypes)
         .eq("verification_status", "approved")
+        .eq("is_published", true)
+        .order("average_rating", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (subcat !== "all") q = q.eq("subcategory", subcat);

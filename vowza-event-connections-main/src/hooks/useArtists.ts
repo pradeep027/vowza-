@@ -75,7 +75,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       let query = supabase
         .from('provider_profiles')
         .select('*')
-        .in('verification_status', ['approved', 'verified']);
+        .in('verification_status', ['approved', 'verified'])
+        .eq('is_published' as any, true);
 
       if (filters.category)  query = query.eq('profession', filters.category as any);
       if (filters.budgetMin !== undefined) query = query.gte('price_min', filters.budgetMin);

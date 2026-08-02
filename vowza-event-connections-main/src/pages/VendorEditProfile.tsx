@@ -199,6 +199,59 @@ export default function VendorEditProfile() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container px-4 py-8 mt-14">
+
+        {/* ── Approval status banner ── */}
+        {provider && provider.verification_status !== 'approved' && (
+          <div className={`mb-6 rounded-2xl border p-4 flex items-start gap-3 ${
+            provider.verification_status === 'pending'
+              ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200'
+              : 'bg-red-50 dark:bg-red-950/20 border-red-200'
+          }`}>
+            <div className="flex-1">
+              <p className={`text-sm font-bold mb-1 ${provider.verification_status === 'pending' ? 'text-amber-700' : 'text-red-700'}`}>
+                {provider.verification_status === 'pending'
+                  ? '⏳ Profile Under Review'
+                  : '❌ Profile Not Approved'}
+              </p>
+              {provider.rejection_reason && (
+                <p className="text-xs text-red-600 mb-2">
+                  Reason: <strong>{provider.rejection_reason}</strong>
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {provider.verification_status === 'pending'
+                  ? 'Our team is reviewing your profile. You will be notified within 24–48 hours. You can update your profile below while you wait.'
+                  : 'Please fix the issue above and click "Resubmit for Review" to send your profile back to the admin for approval.'}
+              </p>
+            </div>
+            {provider.verification_status === 'rejected' && (
+              <button
+                onClick={async () => {
+                  await supabase.from("provider_profiles").update({ verification_status: "pending", rejection_reason: null } as any).eq("id", provider.id);
+                  toast.success("Profile resubmitted for review! Our team will review within 24–48 hours.");
+                  loadAll();
+                }}
+                className="flex-shrink-0 px-4 py-2 rounded-xl bg-maroon text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
+                Resubmit for Review
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Approved badge */}
+        {provider && provider.verification_status === 'approved' && (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 p-3 flex items-center gap-2.5">
+            <span className="text-emerald-500 text-base">✅</span>
+            <p className="text-sm font-semibold text-emerald-700">
+              Profile is Live on Vowza — customers can discover and book you.
+            </p>
+            <a href={`/artist/${provider.id}`} target="_blank" rel="noopener noreferrer"
+              className="ml-auto text-xs font-semibold text-emerald-700 underline flex-shrink-0">
+              View public profile →
+            </a>
+          </div>
+        )}
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => navigate("/provider/dashboard")} className="p-2 rounded-lg hover:bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
           <div>

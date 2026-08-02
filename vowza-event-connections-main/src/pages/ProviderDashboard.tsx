@@ -321,6 +321,40 @@ const ProviderDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream via-background to-blush/20">
+
+      {/* ── Approval Status Banner ── */}
+      {providerProfile && providerProfile.verification_status !== 'approved' && (
+        <div className={`w-full px-4 py-3 text-center text-sm font-semibold ${
+          providerProfile.verification_status === 'pending'
+            ? 'bg-amber-50 border-b border-amber-200 text-amber-700'
+            : 'bg-red-50 border-b border-red-200 text-red-700'
+        }`}>
+          {providerProfile.verification_status === 'pending' ? (
+            <>⏳ Your profile is under review. Our team will verify and notify you within 24–48 hours.</>
+          ) : (
+            <>
+              ❌ Your profile was not approved.
+              {(providerProfile as any).rejection_reason && (
+                <> Reason: <strong>{(providerProfile as any).rejection_reason}</strong>.</>
+              )}
+              {' '}
+              <a href="/vendor/edit" className="underline font-bold ml-1">
+                Update your profile and resubmit →
+              </a>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Approved: show live badge */}
+      {providerProfile && providerProfile.verification_status === 'approved' && (
+        <div className="w-full px-4 py-2 text-center text-xs font-semibold bg-emerald-50 border-b border-emerald-200 text-emerald-700">
+          ✅ Your profile is <strong>Live on Vowza</strong> — customers can discover and book you.
+          <a href={`/artist/${providerProfile.id}`} target="_blank" rel="noopener noreferrer" className="underline ml-2">
+            View public profile →
+          </a>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-gold/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
