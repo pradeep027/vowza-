@@ -562,7 +562,7 @@ function answerQ(msg: string, ctx: PlannerContext): string {
     return `**Hidden wedding costs that surprise most couples:**\n\n1. **GST 18%** on venue + catering — adds ₹40K-₹1.5L\n2. **Overtime** if event overruns — ₹5K-₹20K/hr\n3. **Generator backup** — ₹10K-₹25K\n4. **Parking management** — ₹5K-₹12K\n5. **Security** — ₹3K-₹8K/guard/day\n6. **Last-minute changes** — always ₹15K-₹50K extra\n7. **Gratuity** — 2-3% of total\n8. **Alterations & dry cleaning** — ₹5K-₹15K\n\nAlways keep a **10-15% emergency buffer** in your budget.`;
   if (/reduce.*cost|save.*money|cut.*budget/.test(l))
     return `**Top 8 ways to cut costs without compromising quality:**\n\n1. Book 4-6 months ahead — save 15-20%\n2. Weekday events — venue costs 25-35% less\n3. Limit live food counters to 2-3 (₹8K-₹15K each)\n4. Digital invitations — save ₹15K-₹40K\n5. Seasonal flowers — 25-40% cheaper\n6. Bundle photographer + videographer — 15% off\n7. Trim guest list — each guest = ₹1.5K-₹3K in food alone\n8. Offer upfront payment — vendors give 10-15% off`;
-  return `Great question about your ${eventType}. To give you the most precise answer — ${!budget ? "could you share your budget? " : ""}${!guestCount ? "and your expected guest count? " : ""}${!city ? "and which city? " : ""}With those details I can give you an exact, data-backed answer.`;
+  return `Great question about your ${eventType}. To give you the most precise answer — ${!budget ? "could you share your budget? " : ""}${!guestCount ? "and your expected guest count? " : ""}With those details I can give you an exact, data-backed answer.`;
 }
 
 // ─── Missing Fields Checker ───────────────────────────────────────────────────
@@ -603,7 +603,26 @@ export async function processMessage(
   const userName = ctx.userName ? ` ${ctx.userName}` : "";
 
   switch (action) {
-    case "greeting": return { response: { type: "text", text: `Namaste${userName}! 🙏 Welcome to **✨ Vowza Planner** — your personal AI event planning assistant.\n\nTell me about your event and I'll build a complete plan including:\n- 💰 **Detailed budget breakdown** — down to the last rupee\n- 📅 **Full planning timeline** — from today to event day\n- 🎯 **Vendor recommendations** — photographers, decorators, DJs, caterers & more\n- 🌤️ **Weather & season advice** with backup plans\n- ✅ **Priority checklists** with ownership & deadlines\n- 📊 **Event Success Score** — out of 100\n- 🤝 **Negotiation scripts** to reduce vendor costs\n- ⚠️ **Risk analysis** and mitigation strategies\n\nJust tell me: **what event are you planning, which city, your budget, and guest count?**\n\nFor example: *"Planning a wedding in Hyderabad for 300 guests with a ₹12 lakh budget in December."*` }, updatedContext: ctx };
+    case "greeting": {
+      // Only show full welcome on a truly fresh session with no context
+      const hasCtx = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
+      if (hasCtx) {
+        // Mid-conversation greeting — just acknowledge and continue
+        const known: string[] = [];
+        if (ctx.eventType)  known.push(`**${ctx.eventType}**`);
+        if (ctx.city)       known.push(`in **${ctx.city}**`);
+        if (ctx.budget)     known.push(`budget **${fmt(ctx.budget)}**`);
+        if (ctx.guestCount) known.push(`**${ctx.guestCount} guests**`);
+        return {
+          response: {
+            type: "text",
+            text: `Hello again${userName}! 👋 I still have your event details: ${known.join(', ')}.\n\nWhat would you like to work on next? I can generate your **budget breakdown**, **vendor recommendations**, **planning timeline**, or the **complete event plan**.`,
+          },
+          updatedContext: ctx,
+        };
+      }
+      return { response: { type: "text", text: `Namaste${userName}! 🙏 Welcome to **✨ Vowza Planner** — your personal AI event planning assistant.\n\nTell me about your event and I'll build a complete plan including:\n- 💰 **Detailed budget breakdown** — down to the last rupee\n- 📅 **Full planning timeline** — from today to event day\n- 🎯 **Vendor recommendations** — photographers, decorators, DJs, caterers & more\n- 🌤️ **Weather & season advice** with backup plans\n- ✅ **Priority checklists** with ownership & deadlines\n- 📊 **Event Success Score** — out of 100\n- 🤝 **Negotiation scripts** to reduce vendor costs\n- ⚠️ **Risk analysis** and mitigation strategies\n\nJust tell me: **what event are you planning, which city, your budget, and guest count?**\n\nFor example: *"Planning a wedding in Hyderabad for 300 guests with a ₹12 lakh budget in December."*` }, updatedContext: ctx };
+    }
 
     case "budget":     return { response: { type: "budget_plan",          text: `Here is your complete budget breakdown for a **${ctx.eventType ?? "event"}** in **${ctx.city ?? "your city"}** for **${ctx.guestCount ?? 200} guests** with a budget of **${fmt(ctx.budget ?? 500000)}**.`, data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
     case "timeline":   return { response: { type: "timeline",             text: `Here is your complete planning timeline for your **${ctx.eventType ?? "event"}**${ctx.durationDays && ctx.durationDays > 1 ? `, spanning ${ctx.durationDays} days` : ""}.`, data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
@@ -653,11 +672,61 @@ export async function processMessage(
     case "search":    return { response: { type: "vendor_recommendations", text: `Let me find the right vendors for you${ctx.city ? ` in ${ctx.city}` : ""}. Here are my top picks from Vowza's verified network — you can book any of them instantly.`, data: { vendors: recommendVendors(ctx).slice(0, 4) } }, updatedContext: ctx };
     case "question":  return { response: { type: "text", text: answerQ(message, ctx) }, updatedContext: ctx };
 
-    default:
+    default: {
+      // ── "followup" — the user has provided partial info (e.g. just a city name,
+      // or a guest count). Acknowledge what we received and ask the single most
+      // important missing field to build a complete plan.
+      // NEVER show the welcome message again once context has any data.
+      const hasAnyContext = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
+
+      if (!hasAnyContext) {
+        // Truly the first message with no useful info extracted
+        return {
+          response: {
+            type: "question",
+            text: `Thanks for reaching out! 🙏 To build your perfect event plan, I need a few details:\n\n- **What type of event** are you planning?\n- **Which city** will it be in?\n- **Total budget** (e.g., ₹8 lakh, ₹15 lakh)\n- **Guest count**\n\nYou can share all at once — for example:\n*"Planning a wedding in Hyderabad for 300 guests with a ₹12 lakh budget in December."*`,
+          },
+          updatedContext: ctx,
+        };
+      }
+
+      // We have partial context — acknowledge what we know and ask ONE missing field
+      const known: string[] = [];
+      if (ctx.eventType)  known.push(`**Event:** ${ctx.eventType}`);
+      if (ctx.city)       known.push(`**City:** ${ctx.city}`);
+      if (ctx.budget)     known.push(`**Budget:** ${fmt(ctx.budget)}`);
+      if (ctx.guestCount) known.push(`**Guests:** ${ctx.guestCount}`);
+      if (ctx.eventDate)  known.push(`**Date:** ${ctx.eventDate}`);
+
+      const needNext = !ctx.eventType ? "eventType" :
+                       !ctx.city      ? "city"       :
+                       !ctx.budget    ? "budget"     :
+                       !ctx.guestCount? "guestCount" : null;
+
+      if (needNext) {
+        const summary = known.length ? `Got it! Here's what I have so far:\n${known.join(' · ')}\n\n` : '';
+        return {
+          response: {
+            type: "question",
+            text: `${summary}${FIELD_QS[needNext]}`,
+          },
+          updatedContext: ctx,
+        };
+      }
+
+      // All core fields are filled — generate the full plan automatically
+      const plan = generateWeddingPlan(ctx);
+      const eventLabel = ctx.eventType ?? "event";
+      const daysLabel  = (ctx.durationDays ?? 1) > 1 ? `${ctx.durationDays}-day ` : "";
       return {
-        response: { type: "question", text: `Welcome to **✨ Vowza Planner** — your personal AI event planning assistant${userName ? `, ${userName}` : ""}!\n\nI'll build your complete event plan including vendors, budget, timeline, checklist, and more.\n\nTo get started, just tell me:\n\n- **What type of event** are you planning?\n- **Which city** will it be in?\n- **Total budget** (e.g., ₹8 lakh)\n- **Guest count**\n\nYou can share all at once — for example:\n*"Planning a wedding in Hyderabad for 350 guests with a ₹15 lakh budget in December."*` },
+        response: {
+          type: "wedding_plan",
+          text: `Here is your complete **${daysLabel}${eventLabel} plan** for **${ctx.guestCount} guests** in **${ctx.city}** with a budget of **${fmt(ctx.budget ?? 800000)}**.`,
+          data: { weddingPlan: plan },
+        },
         updatedContext: ctx,
       };
+    }
   }
 }
 
