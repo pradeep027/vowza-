@@ -8,6 +8,7 @@
 // The interface is identical in all three modes — UI code never branches.
 
 import { processMessage } from './aiPlanner';
+import { retrieveVendors, buildRAGContext } from './ragRetriever';
 import type { PlannerContext, AIResponse, ChatMessage } from './aiPlannerTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -86,8 +87,11 @@ RULES:
 10. Always explain WHY each recommendation is made`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function buildMessages(history: ChatMessage[], userMsg: string): LLMMessage[] {
-  const messages: LLMMessage[] = [{ role: 'system', content: SYSTEM_PROMPT }];
+function buildMessages(history: ChatMessage[], userMsg: string, ragContext = ''): LLMMessage[] {
+  const systemWithRAG = ragContext
+    ? SYSTEM_PROMPT + ragContext
+    : SYSTEM_PROMPT;
+  const messages: LLMMessage[] = [{ role: 'system', content: systemWithRAG }];
   // Keep last 20 turns to stay within context window
   history.slice(-20).forEach(m =>
     messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })
@@ -202,7 +206,22 @@ async function streamDeterministic(text: string, onChunk: StreamCallback): Promi
   onChunk({ delta: '', done: true });
 }
 
-// ─── Main sendMessage ─────────────────────────────────────────────────────────
+// ─── RAG injection for VEDA (deterministic) mode ─────────────────────────────
+// When OpenAI is not configured, we still inject real vendor data at the end
+// of the deterministic response so users see actual Vowza vendors.
+function injectRAGIntoVEDA(veDAText: string, ragResult: import('./ragRetriever').RAGResult): string {
+  if (!ragResult.vendors.length) return veDAText;
+
+  const vendorLines: string[] = ['\n\n---\n### 🔍 Real Vendors Found on Vowza\n'];
+  for (const v of ragResult.vendors.slice(0, 5)) {
+    const name  = v.stage_name || v.full_name || 'Vendor';
+    const prof  = v.profession.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const price = v.price_min ? (v.price_min >= 100000 ? `₹${(v.price_min/100000).toFixed(1)}L` : `₹${(v.price_min/1000).toFixed(0)}K`) : 'On Request';
+    vendorLines.push(`- **${name}** (${prof}, ${v.city ?? 'India'}) — Starting ${price} | ${v.average_rating > 0 ? `${v.average_rating.toFixed(1)}⭐` : 'New'} | ${v.is_verified ? '✅ Verified' : ''} — [View Profile](/artist/${v.provider_id})`);
+  }
+  vendorLines.push('\n_Powered by live Vowza marketplace data_');
+  return veDAText + vendorLines.join('\n');
+}
 export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   const { message, history, context, onChunk } = opts;
 
@@ -214,10 +233,15 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   // regardless of which LLM mode we use.
   const { updatedContext } = await processMessage(message, context);
 
+  // ── RAG: Retrieve real vendor data BEFORE calling the LLM ─────────────────
+  // This runs in parallel with context extraction for performance.
+  const ragResult = await retrieveVendors(message, updatedContext, 8);
+  const ragContext = buildRAGContext(ragResult);
+
   // ── Mode 1: Edge Function proxy ────────────────────────────────────────────
   if (useEdge && supabaseUrl) {
     try {
-      const messages = buildMessages(history, message);
+      const messages = buildMessages(history, message, ragContext);
       const fullText = await callViaEdgeFunction(messages, supabaseUrl, onChunk);
       return { fullText, aiResponse: { type: 'text', text: fullText }, updatedContext };
     } catch (err) {
@@ -229,7 +253,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   // ── Mode 2: Direct OpenAI ──────────────────────────────────────────────────
   if (directKey && directKey.startsWith('sk-') && directKey !== 'sk-your-key-here') {
     try {
-      const messages = buildMessages(history, message);
+      const messages = buildMessages(history, message, ragContext);
       const fullText = await callDirectOpenAI(messages, directKey, onChunk);
       return { fullText, aiResponse: { type: 'text', text: fullText }, updatedContext };
     } catch (err) {
@@ -239,7 +263,11 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   }
 
   // ── Mode 3: Deterministic VEDA engine ─────────────────────────────────────
+  // Inject RAG vendor data into the deterministic response if vendors were found
   const { response } = await processMessage(message, context);
-  await streamDeterministic(response.text, onChunk);
-  return { fullText: response.text, aiResponse: response, updatedContext };
+  const finalText = ragResult.vendors.length > 0
+    ? injectRAGIntoVEDA(response.text, ragResult)
+    : response.text;
+  await streamDeterministic(finalText, onChunk);
+  return { fullText: finalText, aiResponse: { ...response, text: finalText }, updatedContext };
 }

@@ -53,6 +53,8 @@ export interface Artist {
   verification_status: string;
   whatsapp:           string;
   service_radius:     number;
+  subcategory:        string;
+  vendor_details:     Record<string, any>;
 }
 
 // ─── Category label/icon from local definition (no extra DB call) ──────────────
@@ -129,6 +131,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
           verification_status: p.verification_status ?? 'pending',
           whatsapp:           (p as any).whatsapp ?? '',
           service_radius:     (p as any).service_radius ?? 50,
+          subcategory:        (p as any).subcategory ?? '',
+          vendor_details:     (p as any).vendor_details ?? (p as any).category_details ?? {},
         };
       });
 
@@ -145,8 +149,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
         );
       }
 
-      if (filters.city)     artists = artists.filter(a => a.city.toLowerCase()  === filters.city!.toLowerCase());
-      if (filters.state)    artists = artists.filter(a => a.state.toLowerCase() === filters.state!.toLowerCase());
+      if (filters.city)     artists = artists.filter(a => a.city.toLowerCase().includes(filters.city!.toLowerCase()));
+      if (filters.state)    artists = artists.filter(a => a.state.toLowerCase().includes(filters.state!.toLowerCase()));
       if (filters.rating)   artists = artists.filter(a => a.average_rating   >= filters.rating!);
       if (filters.experience) artists = artists.filter(a => a.experience_years >= filters.experience!);
       if (filters.language)   artists = artists.filter(a =>
@@ -320,6 +324,8 @@ async function enrichProviders(providers: any[]): Promise<Artist[]> {
       verification_status: p.verification_status ?? 'pending',
       whatsapp:        (p as any).whatsapp ?? '',
       service_radius:  (p as any).service_radius ?? 50,
+      subcategory:     (p as any).subcategory ?? '',
+      vendor_details:  (p as any).vendor_details ?? (p as any).category_details ?? {},
     };
   });
 }

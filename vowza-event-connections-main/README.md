@@ -1,73 +1,87 @@
-# Welcome to your Lovable project
+# Vowza — India's Premier Event Marketplace
 
-## Project info
+**Where Talent Meets Celebration**
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Vowza connects customers with verified event professionals — photographers, DJs, bands, makeup artists, decorators, caterers, pandits, banquet halls, and 50+ more categories — all from one trusted platform.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+| Layer       | Technology                         |
+|-------------|-------------------------------------|
+| Frontend    | React 18, TypeScript, Vite          |
+| Styling     | Tailwind CSS, shadcn/ui             |
+| Backend     | Supabase (PostgreSQL + Auth + Storage) |
+| State       | TanStack React Query                |
+| Animations  | Framer Motion                       |
+| Charts      | Recharts                            |
+| Icons       | Lucide React                        |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## Local Development
 
-**Use your preferred IDE**
+```bash
+# Install dependencies
+npm install
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start dev server
 npm run dev
+# → http://localhost:8080
+
+# Build for production
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Environment Variables
 
-**Use GitHub Codespaces**
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## Database Setup
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Run the SQL migrations in order in the Supabase SQL Editor:
 
-## How can I deploy this project?
+1. `supabase/migrations/20260728000000_notifications_rls.sql`
+2. `supabase/migrations/20260801000000_dynamic_marketplace_v2.sql`
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## Key Features
 
-Yes, you can!
+- **Dynamic Category Marketplace** — 20 categories, each with subcategories, filters, and verified vendor listings
+- **Vendor Profiles** — Cover image, portfolio gallery, pricing packages, FAQs, availability calendar
+- **Category-Aware Vendor Dashboard** — Edit only the fields relevant to your profession
+- **AI Event Planner** — Describe your event, get a full vendor list + budget breakdown
+- **Admin Panel** — Approve/reject vendors, manage categories, view analytics
+- **Secure Payments** — Escrow model via Razorpay (integration ready)
+- **Real-time Notifications** — Booking updates, admin approvals, announcements
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Admin Setup
+
+To promote a user to admin, run in the Supabase SQL Editor:
+
+```sql
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('<your-user-uuid>', 'admin')
+ON CONFLICT DO NOTHING;
+```
+
+Then navigate to `/admin/dashboard`.
+
+---
+
+## License
+
+© Vowza Technologies Pvt. Ltd. All rights reserved.

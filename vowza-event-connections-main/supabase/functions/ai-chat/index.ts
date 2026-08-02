@@ -1,127 +1,97 @@
 // ─── Supabase Edge Function: ai-chat ─────────────────────────────────────────
-// Secure server-side proxy for OpenAI.
-// The OPENAI_API_KEY lives only in Supabase secrets — never in the browser.
-//
-// Deploy:
-//   supabase secrets set OPENAI_API_KEY=sk-...
-//   supabase functions deploy ai-chat
-//
-// Then in .env set:  VITE_USE_AI_PROXY=true
+// Proxies OpenAI requests server-side so the API key never reaches the browser.
+// Deploy: supabase functions deploy ai-chat
+// Env:    supabase secrets set OPENAI_API_KEY=sk-...
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const MODEL          = "gpt-4o-mini";
+const CORS = {
+  "Access-Control-Allow-Origin":  "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-const SYSTEM_PROMPT = `You are VEDA (Vowza Event Digital Assistant) — the AI Event Director for Vowza, India's premier event marketplace.
-
-You are NOT a chatbot. You are a professional AI Event Director who thinks, analyses, plans, and optimises every event like a top-tier event management company.
-
-PERSONALITY: Warm, confident, professional, highly intelligent. Sound like a premium personal consultant — never robotic.
-
-SUPPORTED EVENTS: Wedding, Reception, Engagement, Haldi, Mehendi, Sangeet, Birthday, Baby Shower, House Warming, Anniversary, Corporate, Conference, Product Launch, College Fest, DJ Night, Concert, Fashion Show, Sports Event, Temple Event, Charity, Private Party, Festival.
-
-PRICING RULES (realistic Indian market 2025):
-- City: Mumbai 1.55x | Delhi 1.45x | Bangalore 1.35x | Chennai 1.15x | Hyderabad 1.0x | Pune 1.12x
-- Season: Peak Nov-Feb 1.3x | Off-peak summer 0.88x | Monsoon 0.82x
-- Style: Luxury 2.6x | Premium 1.65x | Standard 1.0x | Budget 0.58x
-
-RULES:
-1. Think before every response
-2. Use markdown formatting: **bold**, tables, bullet lists
-3. Never hallucinate prices
-4. Always show cost reasoning
-5. End every complete plan with a Success Score (0-100)`;
-
-interface Message {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-interface RequestBody {
-  messages: Message[];
-}
-
-Deno.serve(async (req: Request) => {
-  // ── CORS preflight ──────────────────────────────────────────────────────────
+serve(async (req) => {
+  // ── CORS preflight ────────────────────────────────────────────────────────
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
+    return new Response("ok", { headers: CORS });
+  }
+
+  try {
+    // ── Auth check ─────────────────────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing auth" }), {
+        status: 401, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify Supabase JWT (optional but recommended for production)
+    const supabaseUrl  = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey  = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase     = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Parse request ──────────────────────────────────────────────────────
+    const { messages } = await req.json();
+    if (!messages?.length) {
+      return new Response(JSON.stringify({ error: "No messages" }), {
+        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
+        status: 503, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Forward to OpenAI with streaming ──────────────────────────────────
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:  "POST",
       headers: {
-        "Access-Control-Allow-Origin":  "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model:       "gpt-4o-mini",
+        messages,
+        stream:      true,
+        temperature: 0.7,
+        max_tokens:  2500,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      return new Response(JSON.stringify({ error: errText }), {
+        status: openaiRes.status,
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Stream the SSE response straight through ──────────────────────────
+    return new Response(openaiRes.body, {
+      headers: {
+        ...CORS,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
       },
     });
-  }
 
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
-
-  // ── Validate API key ────────────────────────────────────────────────────────
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "OPENAI_API_KEY not configured. Run: supabase secrets set OPENAI_API_KEY=sk-..." }),
-      { status: 503, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // ── Parse request ───────────────────────────────────────────────────────────
-  let body: RequestBody;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const { messages = [] } = body;
-
-  // Always prepend the VEDA system prompt
-  const fullMessages: Message[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...messages.filter((m: Message) => m.role !== "system").slice(-20), // keep last 20
-  ];
-
-  // ── Forward to OpenAI with streaming ───────────────────────────────────────
-  const openaiRes = await fetch(OPENAI_API_URL, {
-    method:  "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model:       MODEL,
-      messages:    fullMessages,
-      stream:      true,
-      temperature: 0.7,
-      max_tokens:  2048,
-    }),
-  });
-
-  if (!openaiRes.ok) {
-    const errText = await openaiRes.text().catch(() => "");
-    return new Response(
-      JSON.stringify({ error: `OpenAI API error ${openaiRes.status}: ${errText}` }),
-      { status: openaiRes.status, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // ── Stream OpenAI response directly back to client ─────────────────────────
-  return new Response(openaiRes.body, {
-    status:  200,
-    headers: {
-      "Content-Type":                "text/event-stream; charset=utf-8",
-      "Cache-Control":               "no-cache",
-      "Connection":                  "keep-alive",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
 });

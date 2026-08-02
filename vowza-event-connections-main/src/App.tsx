@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import InactivityWarning from "@/components/InactivityWarning";
@@ -32,6 +33,8 @@ const CustomerEventDashboard = lazy(() => import("./pages/CustomerEventDashboard
 const Contact              = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy        = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService       = lazy(() => import("./pages/TermsOfService"));
+const CategoryPage         = lazy(() => import("./pages/CategoryPage"));
+const VendorEditProfile    = lazy(() => import("./pages/VendorEditProfile"));
 
 // ─── Admin (new enterprise layout) ───────────────────────────────────────────
 const AdminLayout          = lazy(() => import("./pages/admin/AdminLayout"));
@@ -100,40 +103,22 @@ const AppContent = () => {
           <Route path="/contact"    element={<Contact />} />
           <Route path="/privacy"    element={<PrivacyPolicy />} />
           <Route path="/terms"      element={<TermsOfService />} />
+          <Route path="/category/:slug" element={<CategoryPage />} />
           <Route path="/provider/:id" element={<ProviderProfile />} />
-          <Route path="/artist/:id" element={<ProviderProfile />} />
+          <Route path="/artist/:id"   element={<ProviderProfile />} />
 
           {/* Protected routes */}
-          <Route path="/select-account-type" element={
-            <ProtectedRoute><AccountTypeSelection /></ProtectedRoute>
-          } />
-          <Route path="/browse" element={
-            <ProtectedRoute><CustomerDashboard /></ProtectedRoute>
-          } />
-          <Route path="/my-bookings" element={
-            <ProtectedRoute><MyBookings /></ProtectedRoute>
-          } />
-          <Route path="/event-dashboard" element={
-            <ProtectedRoute><CustomerEventDashboard /></ProtectedRoute>
-          } />
-          <Route path="/chat/:bookingId" element={
-            <ProtectedRoute><BookingChat /></ProtectedRoute>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute><Checkout /></ProtectedRoute>
-          } />
-          <Route path="/cart" element={
-            <ProtectedRoute><Cart /></ProtectedRoute>
-          } />
-          <Route path="/provider/register" element={
-            <ProtectedRoute><ProviderRegistration /></ProtectedRoute>
-          } />
-          <Route path="/artist/onboarding" element={
-            <ProtectedRoute><ArtistOnboarding /></ProtectedRoute>
-          } />
-          <Route path="/provider/dashboard" element={
-            <ProtectedRoute allowedRoles={['provider']}><ProviderDashboard /></ProtectedRoute>
-          } />
+          <Route path="/select-account-type" element={<ProtectedRoute><AccountTypeSelection /></ProtectedRoute>} />
+          <Route path="/browse" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
+          <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
+          <Route path="/event-dashboard" element={<ProtectedRoute><CustomerEventDashboard /></ProtectedRoute>} />
+          <Route path="/chat/:bookingId" element={<ProtectedRoute><BookingChat /></ProtectedRoute>} />
+          <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+          <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+          <Route path="/provider/register" element={<ProtectedRoute><ProviderRegistration /></ProtectedRoute>} />
+          <Route path="/artist/onboarding" element={<ProtectedRoute><ArtistOnboarding /></ProtectedRoute>} />
+          <Route path="/vendor/edit" element={<ProtectedRoute allowedRoles={['provider']}><VendorEditProfile /></ProtectedRoute>} />
+          <Route path="/provider/dashboard" element={<ProtectedRoute allowedRoles={['provider']}><ProviderDashboard /></ProtectedRoute>} />
 
           {/* ── Admin — nested layout with sidebar ───────────────────────── */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -179,7 +164,9 @@ const App = () => (
           <Toaster />
           <Sonner position="top-right" richColors />
           <BrowserRouter>
-            <AppContent />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>

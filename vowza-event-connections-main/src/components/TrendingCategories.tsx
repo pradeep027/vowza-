@@ -1,5 +1,5 @@
-// ─── TrendingCategories — Premium Merged Categories ──────────────────────────
-// 19 consolidated categories with unique icons, brand colours, hover animations.
+// ─── TrendingCategories — Premium Categories ─────────────────────────────────
+// 20 categories with unique icons, brand colours, hover animations.
 // Fully responsive: 3 cols mobile → 4 tablet → 5 desktop → 7 wide.
 // Uses live DB counts when available; gracefully shows static list as fallback.
 
@@ -7,26 +7,25 @@ import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
-  Camera,           // Photographers
-  Video,            // Videographers
-  Drone,            // Drone Photography  — not in lucide, use Move3d as proxy
-  Music2,           // Bands
-  Disc3,            // DJs
-  Mic,              // Singers
-  PersonStanding,   // Dancers
-  Users,            // Choreographers
-  Paintbrush,       // Decorators
-  Sparkles,         // Makeup Artists
-  Hand,             // Mehendi Artists
-  Wand2,            // Magicians
-  PresentationIcon, // not available — use MonitorPlay as proxy
-  Theater,          // Performers
-  CalendarCheck,    // Event Planners
-  Utensils,         // Catering Services
-  Lightbulb,        // Lighting Services
-  Volume2,          // Sound Services
-  Wrench,           // Event Support
-  MonitorPlay,      // Anchors & Hosts proxy
+  Camera,          // Photographers
+  Video,           // Videographers
+  Music2,          // Bands
+  Disc3,           // DJs
+  Mic,             // Singers
+  PersonStanding,  // Dancers
+  Users,           // Choreographers
+  Paintbrush,      // Decorators
+  Sparkles,        // Makeup Artists
+  Hand,            // Mehendi Artists
+  Wand2,           // Magicians
+  MonitorPlay,     // Anchors & Hosts + Drone
+  Utensils,        // Catering Services
+  Lightbulb,       // Lighting Services
+  Volume2,         // Sound Services
+  Building2,       // Banquet Halls
+  Package,         // Rentals
+  Landmark,        // Pandits / Priests
+  Droplets,        // Drinking Water
 } from "lucide-react";
 import { useCategories } from "@/hooks/useArtists";
 
@@ -161,24 +160,6 @@ const CATEGORIES: CategoryDef[] = [
     types: ["anchor","host"],
   },
   {
-    id:    "celebrity_artist",
-    name:  "Performers",
-    icon:  Theater,
-    color: "bg-red-50 dark:bg-red-950/40",
-    text:  "text-red-600 dark:text-red-400",
-    ring:  "ring-red-200 dark:ring-red-800",
-    types: ["celebrity_artist","live_performer","folk_artist","stand_up_comedian"],
-  },
-  {
-    id:    "event_planner",
-    name:  "Event Planners",
-    icon:  CalendarCheck,
-    color: "bg-teal-50 dark:bg-teal-950/40",
-    text:  "text-teal-600 dark:text-teal-400",
-    ring:  "ring-teal-200 dark:ring-teal-800",
-    types: ["event_planner","wedding_planner"],
-  },
-  {
     id:    "catering_services",
     name:  "Catering Services",
     icon:  Utensils,
@@ -205,14 +186,42 @@ const CATEGORIES: CategoryDef[] = [
     ring:  "ring-blue-200 dark:ring-blue-800",
     types: ["sound_services"],
   },
+  // ── NEW CATEGORIES ─────────────────────────────────────────────────────────
   {
-    id:    "event_support",
-    name:  "Event Support",
-    icon:  Wrench,
-    color: "bg-stone-50 dark:bg-stone-950/40",
-    text:  "text-stone-600 dark:text-stone-400",
-    ring:  "ring-stone-200 dark:ring-stone-800",
-    types: ["event_support","event_support_staff"],
+    id:    "banquet_hall",
+    name:  "Banquet Halls",
+    icon:  Building2,
+    color: "bg-emerald-50 dark:bg-emerald-950/40",
+    text:  "text-emerald-600 dark:text-emerald-400",
+    ring:  "ring-emerald-200 dark:ring-emerald-800",
+    types: ["banquet_hall","wedding_venue","event_venue"],
+  },
+  {
+    id:    "rentals",
+    name:  "Rentals",
+    icon:  Package,
+    color: "bg-orange-50 dark:bg-orange-950/40",
+    text:  "text-orange-600 dark:text-orange-400",
+    ring:  "ring-orange-200 dark:ring-orange-800",
+    types: ["rentals","tent_shamiana","stage_rental","furniture_rental","generator_rental","ac_cooler","led_wall"],
+  },
+  {
+    id:    "pandit",
+    name:  "Pandits / Priests",
+    icon:  Landmark,
+    color: "bg-yellow-50 dark:bg-yellow-950/40",
+    text:  "text-yellow-700 dark:text-yellow-400",
+    ring:  "ring-yellow-200 dark:ring-yellow-800",
+    types: ["pandit","priest","religious_services"],
+  },
+  {
+    id:    "water_supplier",
+    name:  "Drinking Water",
+    icon:  Droplets,
+    color: "bg-sky-50 dark:bg-sky-950/40",
+    text:  "text-sky-600 dark:text-sky-400",
+    ring:  "ring-sky-200 dark:ring-sky-800",
+    types: ["water_supplier","drinking_water","water_tanker"],
   },
 ];
 
@@ -314,7 +323,7 @@ const TrendingCategories = () => {
         {/* ── Grid ── */}
         {isLoading ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-            {Array.from({ length: 19 }).map((_, i) => <SkeletonCard key={i} />)}
+            {Array.from({ length: 20 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
@@ -324,7 +333,7 @@ const TrendingCategories = () => {
                 cat={cat}
                 count={getCategoryCount(cat)}
                 idx={i}
-                onClick={() => navigate(`/artists?category=${cat.id}`)}
+                onClick={() => navigate(`/category/${cat.id}`)}
               />
             ))}
           </div>

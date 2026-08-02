@@ -3,9 +3,8 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
-// Prefer the standard anon key; fall back to the legacy Lovable publishable key
-// if VITE_SUPABASE_ANON_KEY has not been set yet.
-// ACTION REQUIRED: Replace VITE_SUPABASE_PUBLISHABLE_KEY with your real anon key.
+// Prefer VITE_SUPABASE_ANON_KEY; fall back to VITE_SUPABASE_PUBLISHABLE_KEY for backwards compatibility.
+// ACTION REQUIRED: Set VITE_SUPABASE_ANON_KEY in your .env file.
 // Get it from: Supabase Dashboard → Project Settings → API → anon public
 const SUPABASE_ANON_KEY: string =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||

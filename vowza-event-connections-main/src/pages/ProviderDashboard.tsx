@@ -341,6 +341,11 @@ const ProviderDashboard = () => {
             <Button variant="ghost" size="icon">
               <Bell className="w-5 h-5" />
             </Button>
+            <Link to="/vendor/edit">
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                <Edit className="w-3.5 h-3.5" /> Edit Full Profile
+              </Button>
+            </Link>
             <Dialog open={showEditProfile} onOpenChange={setShowEditProfile}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon">
