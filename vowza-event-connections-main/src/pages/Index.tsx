@@ -5,7 +5,6 @@ import TrendingCategories from "@/components/TrendingCategories";
 import BrowseByEvent from "@/components/BrowseByEvent";
 import FeaturedCollections from "@/components/FeaturedCollections";
 import HowItWorks from "@/components/HowItWorks";
-import TestimonialsSection from "@/components/TestimonialsSection";
 import Footer from "@/components/Footer";
 import WhyVowza from "@/components/WhyVowza";
 import DownloadApp from "@/components/DownloadApp";
@@ -21,7 +20,6 @@ const Index = () => (
       <BrowseByEvent />
       <WhyVowza />
       <HowItWorks />
-      <TestimonialsSection />
       <FAQSection />
       <DownloadApp />
     </main>
