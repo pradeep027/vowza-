@@ -579,155 +579,136 @@ const FIELD_QS: Record<string, string> = {
 };
 
 // ─── processMessage — main entry point (exported, used by llm.ts) ─────────────
+// Now uses the orchestrator for intent detection instead of hardcoded switch/case.
+// The orchestrator decides what to do; VEDA engine only runs for structured data.
 export async function processMessage(
   message: string,
-  context: PlannerContext
+  context: PlannerContext,
+  history?: import('./aiPlannerTypes').ChatMessage[]
 ): Promise<{ response: AIResponse; updatedContext: PlannerContext }> {
-  const updates = extractCtx(message);
+  const { orchestrate, extractContextUpdates } = await import('./aiOrchestrator');
+
+  // Merge context updates from the current message
+  const updates = extractContextUpdates(message, context);
   const ctx: PlannerContext = { ...context, ...updates };
+
+  // Orchestrate — decide intent and strategy
+  const result = orchestrate(message, ctx, history ?? []);
   const l = message.toLowerCase();
-  const action = detectAction(l, ctx);
 
-  const needsForPlan = (a: Action) => ["budget","full_plan","food","wedding_plan"].includes(a);
-  const missing: (keyof PlannerContext)[] = [];
-  if (!ctx.eventType) missing.push("eventType");
-  if (!ctx.city && ["budget","vendors","weather","full_plan","wedding_plan"].includes(action)) missing.push("city");
-  if (!ctx.budget && ["budget","full_plan","wedding_plan"].includes(action)) missing.push("budget");
-  if (!ctx.guestCount && ["budget","food","full_plan","wedding_plan"].includes(action)) missing.push("guestCount");
-
-  if (missing.length && needsForPlan(action)) {
-    const field = missing[0];
-    return { response: { type: "question", text: FIELD_QS[field as string] ?? "Could you provide more details?", data: { missingFields: missing } }, updatedContext: ctx };
+  // ── If we need to ask the next question, do that ─────────────────────────
+  if (result.shouldAskNext) {
+    const known: string[] = [];
+    if (ctx.eventType)  known.push(`**${ctx.eventType}**`);
+    if (ctx.city)       known.push(`in **${ctx.city}**`);
+    if (ctx.budget)     known.push(`budget **${fmt(ctx.budget)}**`);
+    if (ctx.guestCount) known.push(`**${ctx.guestCount} guests**`);
+    const prefix = known.length > 0 ? `Got it — ${known.join(', ')}. ` : '';
+    return {
+      response: { type: 'question', text: `${prefix}${result.shouldAskNext}` },
+      updatedContext: ctx,
+    };
   }
 
-  const userName = ctx.userName ? ` ${ctx.userName}` : "";
-
-  switch (action) {
-    case "greeting": {
-      // Only show full welcome on a truly fresh session with no context
-      const hasCtx = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
-      if (hasCtx) {
-        // Mid-conversation greeting — just acknowledge and continue
-        const known: string[] = [];
-        if (ctx.eventType)  known.push(`**${ctx.eventType}**`);
-        if (ctx.city)       known.push(`in **${ctx.city}**`);
-        if (ctx.budget)     known.push(`budget **${fmt(ctx.budget)}**`);
-        if (ctx.guestCount) known.push(`**${ctx.guestCount} guests**`);
-        return {
-          response: {
-            type: "text",
-            text: `Hello again${userName}! 👋 I still have your event details: ${known.join(', ')}.\n\nWhat would you like to work on next? I can generate your **budget breakdown**, **vendor recommendations**, **planning timeline**, or the **complete event plan**.`,
-          },
-          updatedContext: ctx,
-        };
-      }
-      return { response: { type: "text", text: `Namaste${userName}! 🙏 Welcome to **✨ Vowza Planner** — your personal AI event planning assistant.\n\nTell me about your event and I'll build a complete plan including:\n- 💰 **Detailed budget breakdown** — down to the last rupee\n- 📅 **Full planning timeline** — from today to event day\n- 🎯 **Vendor recommendations** — photographers, decorators, DJs, caterers & more\n- 🌤️ **Weather & season advice** with backup plans\n- ✅ **Priority checklists** with ownership & deadlines\n- 📊 **Event Success Score** — out of 100\n- 🤝 **Negotiation scripts** to reduce vendor costs\n- ⚠️ **Risk analysis** and mitigation strategies\n\nJust tell me: **what event are you planning, which city, your budget, and guest count?**\n\nFor example: *"Planning a wedding in Hyderabad for 300 guests with a ₹12 lakh budget in December."*` }, updatedContext: ctx };
-    }
-
-    case "budget":     return { response: { type: "budget_plan",          text: `Here is your complete budget breakdown for a **${ctx.eventType ?? "event"}** in **${ctx.city ?? "your city"}** for **${ctx.guestCount ?? 200} guests** with a budget of **${fmt(ctx.budget ?? 500000)}**.`, data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
-    case "timeline":   return { response: { type: "timeline",             text: `Here is your complete planning timeline for your **${ctx.eventType ?? "event"}**${ctx.durationDays && ctx.durationDays > 1 ? `, spanning ${ctx.durationDays} days` : ""}.`, data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
-    case "vendors":    return { response: { type: "vendor_recommendations",text: `Here are my recommended vendors for your **${ctx.eventType ?? "event"}** in **${ctx.city ?? "your city"}**. All price ranges reflect current ${new Date().getFullYear()} market rates.`, data: { vendors: recommendVendors(ctx) } }, updatedContext: ctx };
-    case "weather":    return { response: { type: "weather_advice",        text: `Here is my weather and season analysis for your **${ctx.eventType ?? "event"}**${ctx.eventDate ? ` in ${ctx.eventDate}` : ""}.`, data: { weather: getWeatherAdvice(ctx) } }, updatedContext: ctx };
-    case "checklist":  return { response: { type: "checklist",             text: `Here is your complete planning checklist for your **${ctx.eventType ?? "event"}**. Every task is prioritised and assigned.`, data: { checklist: generateChecklist(ctx) } }, updatedContext: ctx };
-    case "food":       return { response: { type: "food_plan",             text: `Here is your food and catering plan for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? "your city"}**.`, data: { foodPlan: generateFoodPlan(ctx) } }, updatedContext: ctx };
-    case "score":      return { response: { type: "success_score",         text: `Here is your **Event Success Score** based on everything you've shared with me so far.`, data: { score: calculateSuccessScore(ctx) } }, updatedContext: ctx };
-    case "risks":      return { response: { type: "risk_analysis",         text: `Here is my risk analysis for your **${ctx.eventType ?? "event"}**. I've identified key risks and backup strategies for each.`, data: { risks: analyseRisks(ctx) } }, updatedContext: ctx };
-
-    case "negotiation": {
-      const neg = l.match(/reduce.*?(\d[\d,]+).*?to.*?(\d[\d,]+)|negotiate.*?(\d[\d,]+).*?(\d[\d,]+)/i);
-      if (!neg) return { response: { type: "question", text: "Please share the vendor type, current price, and your target price.\n\nExample: *\"Help me negotiate with the photographer from ₹60,000 to ₹45,000\"*" }, updatedContext: ctx };
-      const current = parseInt((neg[1] || neg[3] || "0").replace(/,/g, ""));
-      const target  = parseInt((neg[2] || neg[4] || "0").replace(/,/g, ""));
-      const vType   = l.includes("photographer") ? "Photographer" : l.includes("decorator") ? "Decorator" : l.includes("caterer") ? "Caterer" : l.includes("dj") ? "DJ" : "Vendor";
-      return { response: { type: "negotiation", text: `Here is a professional negotiation message for your **${vType}**. Copy, personalise, and send.`, data: { negotiation: generateNegotiationMessage(vType, current, target) } }, updatedContext: ctx };
-    }
-
-    case "wedding_plan": {
-      // Always generate the itinerary-first plan for weddings
-      const plan = generateWeddingPlan(ctx);
-      const eventLabel = ctx.eventType ?? "wedding";
-      const daysLabel  = (ctx.durationDays ?? 3) > 1 ? `${ctx.durationDays ?? 3}-day ` : "";
-      return {
-        response: {
-          type: "wedding_plan",
-          text: `Here is your complete **${daysLabel}${eventLabel} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? "your city"}** with a budget of **${fmt(ctx.budget ?? 800000)}**.\n\nI've organised it day-by-day with a full itinerary, time-based schedule, per-day budget, vendor recommendations, and daily checklist — just like a professional wedding planner.`,
-          data: { weddingPlan: plan },
-        },
-        updatedContext: ctx,
-      };
-    }
-
-    case "full_plan": {
-      const budget   = generateBudgetPlan(ctx);
-      const timeline = generateTimeline(ctx);
-      const vendors  = recommendVendors(ctx);
-      const checklist = generateChecklist(ctx);
-      const weather  = getWeatherAdvice(ctx);
-      const risks    = analyseRisks(ctx);
-      const score    = calculateSuccessScore(ctx);
-      const fullPlan = { budget, timeline, vendors, checklist, weather, risks, score, executiveSummary: `Complete ${ctx.durationDays ?? 1}-day ${ctx.eventType ?? "event"} plan for ${ctx.guestCount ?? 200} guests in ${ctx.city ?? "your city"} — budget ${fmt(ctx.budget ?? 500000)}.`, nearbyServices: [{ type: "Hospital", note: "Always note the nearest hospital address before event day" }, { type: "ATM", note: "Carry emergency cash — some vendors prefer cash for extras" }, { type: "Generator rental", note: "Keep a 24hr generator rental contact in your emergency list" }], improvements: score.improvements };
-      return { response: { type: "full_plan", text: `Here is your **complete ${ctx.eventType ?? "event"} plan** — executive summary, budget, timeline, vendors, checklist, weather, risks, and success score all in one place.`, data: { fullPlan } }, updatedContext: ctx };
-    }
-
-    case "search":    return { response: { type: "vendor_recommendations", text: `Let me find the right vendors for you${ctx.city ? ` in ${ctx.city}` : ""}. Here are my top picks from Vowza's verified network — you can book any of them instantly.`, data: { vendors: recommendVendors(ctx).slice(0, 4) } }, updatedContext: ctx };
-    case "question":  return { response: { type: "text", text: answerQ(message, ctx) }, updatedContext: ctx };
-
-    default: {
-      // ── "followup" — the user has provided partial info (e.g. just a city name,
-      // or a guest count). Acknowledge what we received and ask the single most
-      // important missing field to build a complete plan.
-      // NEVER show the welcome message again once context has any data.
-      const hasAnyContext = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
-
-      if (!hasAnyContext) {
-        // Truly the first message with no useful info extracted
-        return {
-          response: {
-            type: "question",
-            text: `Thanks for reaching out! 🙏 To build your perfect event plan, I need a few details:\n\n- **What type of event** are you planning?\n- **Which city** will it be in?\n- **Total budget** (e.g., ₹8 lakh, ₹15 lakh)\n- **Guest count**\n\nYou can share all at once — for example:\n*"Planning a wedding in Hyderabad for 300 guests with a ₹12 lakh budget in December."*`,
-          },
-          updatedContext: ctx,
-        };
-      }
-
-      // We have partial context — acknowledge what we know and ask ONE missing field
+  // ── Greeting (only on fresh sessions) ───────────────────────────────────
+  if (result.intent === 'greeting') {
+    const hasCtx = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
+    if (hasCtx) {
       const known: string[] = [];
-      if (ctx.eventType)  known.push(`**Event:** ${ctx.eventType}`);
-      if (ctx.city)       known.push(`**City:** ${ctx.city}`);
-      if (ctx.budget)     known.push(`**Budget:** ${fmt(ctx.budget)}`);
-      if (ctx.guestCount) known.push(`**Guests:** ${ctx.guestCount}`);
-      if (ctx.eventDate)  known.push(`**Date:** ${ctx.eventDate}`);
+      if (ctx.eventType)  known.push(`${ctx.eventType}`);
+      if (ctx.city)       known.push(`in ${ctx.city}`);
+      if (ctx.budget)     known.push(`budget ${fmt(ctx.budget)}`);
+      if (ctx.guestCount) known.push(`${ctx.guestCount} guests`);
+      return {
+        response: { type: 'text', text: `Hey! I still have your event details: ${known.join(' · ')}. What would you like to work on next?` },
+        updatedContext: ctx,
+      };
+    }
+    return {
+      response: {
+        type: 'text',
+        text: `Hello! 👋 I'm your **Vowza AI Planner** — here to help you plan any event from start to finish.\n\nJust tell me what you're planning and I'll help with budgets, vendors, timelines, and more. What's your event?`,
+      },
+      updatedContext: ctx,
+    };
+  }
 
-      const needNext = !ctx.eventType ? "eventType" :
-                       !ctx.city      ? "city"       :
-                       !ctx.budget    ? "budget"     :
-                       !ctx.guestCount? "guestCount" : null;
+  // ── Context update acknowledgement ───────────────────────────────────────
+  if (result.intent === 'context_update') {
+    const changed: string[] = [];
+    const up = extractContextUpdates(message, context);
+    if (up.city)       changed.push(`city → **${up.city}**`);
+    if (up.budget)     changed.push(`budget → **${fmt(up.budget!)}**`);
+    if (up.guestCount) changed.push(`guests → **${up.guestCount}**`);
+    if (up.eventType)  changed.push(`event → **${up.eventType}**`);
+    const summary = changed.length
+      ? `Got it — updated: ${changed.join(', ')}. `
+      : `Noted. `;
+    const canGenerate = ctx.eventType && ctx.city && ctx.budget && ctx.guestCount;
+    return {
+      response: {
+        type: 'text',
+        text: `${summary}${canGenerate ? `I'll update the plan for ${ctx.guestCount} guests in **${ctx.city}** with a budget of **${fmt(ctx.budget!)}**. Want me to regenerate the full plan?` : `What else should I know?`}`,
+      },
+      updatedContext: ctx,
+    };
+  }
 
-      if (needNext) {
-        const summary = known.length ? `Got it! Here's what I have so far:\n${known.join(' · ')}\n\n` : '';
-        return {
-          response: {
-            type: "question",
-            text: `${summary}${FIELD_QS[needNext]}`,
-          },
-          updatedContext: ctx,
-        };
-      }
+  // ── VEDA structured responses (only when all context is available) ───────
+  switch (result.intent) {
+    case 'budget_breakdown':
+      return { response: { type: 'budget_plan', text: `Here's the budget breakdown for your **${ctx.eventType ?? 'event'}** in **${ctx.city ?? 'your city'}** for **${ctx.guestCount ?? 200} guests** — budget **${fmt(ctx.budget ?? 500000)}**.`, data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
 
-      // All core fields are filled — generate the full plan automatically
+    case 'timeline':
+      return { response: { type: 'timeline', text: `Here's your complete planning timeline for the **${ctx.eventType ?? 'event'}**.`, data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
+
+    case 'checklist':
+      return { response: { type: 'checklist', text: `Here's your full checklist for the **${ctx.eventType ?? 'event'}** — every task prioritised and assigned.`, data: { checklist: generateChecklist(ctx) } }, updatedContext: ctx };
+
+    case 'food_plan':
+      return { response: { type: 'food_plan', text: `Here's the food & catering plan for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}**.`, data: { foodPlan: generateFoodPlan(ctx) } }, updatedContext: ctx };
+
+    case 'weather_advice':
+      return { response: { type: 'weather_advice', text: `Here's the weather and season analysis for your **${ctx.eventType ?? 'event'}**${ctx.eventDate ? ` in ${ctx.eventDate}` : ''}.`, data: { weather: getWeatherAdvice(ctx) } }, updatedContext: ctx };
+
+    case 'risk_analysis':
+      return { response: { type: 'risk_analysis', text: `Here's the risk analysis for your **${ctx.eventType ?? 'event'}** — with mitigation strategies for each risk.`, data: { risks: analyseRisks(ctx) } }, updatedContext: ctx };
+
+    case 'success_score':
+      return { response: { type: 'success_score', text: `Here's your **Event Success Score** based on everything shared so far.`, data: { score: calculateSuccessScore(ctx) } }, updatedContext: ctx };
+
+    case 'plan_event': {
       const plan = generateWeddingPlan(ctx);
-      const eventLabel = ctx.eventType ?? "event";
-      const daysLabel  = (ctx.durationDays ?? 1) > 1 ? `${ctx.durationDays}-day ` : "";
       return {
         response: {
-          type: "wedding_plan",
-          text: `Here is your complete **${daysLabel}${eventLabel} plan** for **${ctx.guestCount} guests** in **${ctx.city}** with a budget of **${fmt(ctx.budget ?? 800000)}**.`,
+          type: 'wedding_plan',
+          text: `Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`,
           data: { weddingPlan: plan },
         },
         updatedContext: ctx,
       };
     }
+
+    case 'negotiation': {
+      const neg = l.match(/(\d[\d,]+).*?to.*?(\d[\d,]+)|from.*?(\d[\d,]+).*?to.*?(\d[\d,]+)/i);
+      if (!neg) {
+        return { response: { type: 'question', text: `Sure! Share the vendor type, current price, and your target price — e.g. *"Negotiate with photographer from ₹60K to ₹45K"*` }, updatedContext: ctx };
+      }
+      const cur = parseInt((neg[1] || neg[3] || '0').replace(/,/g, ''));
+      const tgt = parseInt((neg[2] || neg[4] || '0').replace(/,/g, ''));
+      const vt = /photographer/i.test(l) ? 'Photographer' : /decorator/i.test(l) ? 'Decorator' : /caterer/i.test(l) ? 'Caterer' : /dj/i.test(l) ? 'DJ' : 'Vendor';
+      return { response: { type: 'negotiation', text: `Here's a professional negotiation message for your **${vt}**.`, data: { negotiation: generateNegotiationMessage(vt, cur, tgt) } }, updatedContext: ctx };
+    }
   }
+
+  // ── Anything else — let the LLM handle it with context ───────────────────
+  // This covers: general_question, find_vendors (when no retrieval triggered),
+  // comparison, follow_up, clarification, etc.
+  // The LLM in llm.ts will receive the orchestration result + RAG context.
+  return {
+    response: { type: 'text', text: '' }, // placeholder — LLM will fill this
+    updatedContext: ctx,
+  };
 }
 
 // ─── Wedding Planner Engine ───────────────────────────────────────────────────

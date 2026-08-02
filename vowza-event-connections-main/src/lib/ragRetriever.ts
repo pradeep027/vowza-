@@ -278,32 +278,36 @@ async function enrichVendors(vendors: RetrievedVendor[]): Promise<RetrievedVendo
 export async function retrieveVendors(
   message: string,
   ctx: PlannerContext,
-  maxVendors = 8
+  maxVendors = 8,
+  hints?: { professions?: string[]; city?: string | null; priceMax?: number | null; minRating?: number }
 ): Promise<RAGResult> {
   const intent = extractVendorIntent(message, ctx);
 
-  // Nothing to retrieve if no vendor intent detected and no context
-  if (!intent.professions.length && !ctx.city && !ctx.budget) {
+  // Merge orchestrator hints with extracted intent (hints take priority)
+  const professions = (hints?.professions?.length ? hints.professions : intent.professions);
+  const city        = hints?.city     ?? intent.city;
+  const priceMax    = hints?.priceMax ?? intent.priceMax;
+  const minRating   = hints?.minRating ?? intent.minRating;
+
+  // Nothing to retrieve if no vendor intent and no city/budget context
+  if (!professions.length && !city && !priceMax) {
     return { vendors: [], totalFound: 0, searchMode: 'none', queryUsed: message, retrievedAt: new Date().toISOString() };
   }
 
   try {
-    // If multiple professions detected, retrieve for each (capped at 3 each)
     let allVendors: RetrievedVendor[] = [];
 
-    if (intent.professions.length > 0) {
+    if (professions.length > 0) {
       const results = await Promise.all(
-        intent.professions.slice(0, 3).map(prof =>
-          sqlSearch(prof, intent.city, intent.priceMax, intent.minRating, Math.ceil(maxVendors / intent.professions.length))
+        professions.slice(0, 3).map(prof =>
+          sqlSearch(prof, city ?? undefined, priceMax ?? undefined, minRating, Math.ceil(maxVendors / Math.max(professions.length, 1)))
         )
       );
       allVendors = results.flat();
     } else {
-      // No profession specified — general search by city/budget
-      allVendors = await sqlSearch(undefined, intent.city, intent.priceMax, intent.minRating, maxVendors);
+      allVendors = await sqlSearch(undefined, city ?? undefined, priceMax ?? undefined, minRating, maxVendors);
     }
 
-    // Enrich top vendors with packages, menus, FAQs
     const enriched = await enrichVendors(allVendors.slice(0, maxVendors));
 
     return {
