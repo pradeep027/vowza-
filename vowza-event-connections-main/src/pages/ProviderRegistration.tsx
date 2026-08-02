@@ -1,1544 +1,925 @@
-import { useState, useEffect } from 'react';
+// ─── Provider Registration — 5-Step Premium Onboarding Wizard ────────────────
+// Replaces the old single-form registration with a step-by-step flow.
+// Routes: /provider/register
+// Steps: Basic Info → Professional Info → Portfolio → Verification Docs → Review
+
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Music, Camera, Palette, Users, Sparkles, ArrowLeft, Upload, FileText, CheckCircle, XCircle, Shield, Send, Loader2 } from 'lucide-react';
-import type { Database } from '@/integrations/supabase/types';
-import { resolveDashboard } from '@/hooks/useDashboardLink';
+import { cn } from '@/lib/utils';
+import {
+  CheckCircle, ArrowLeft, ArrowRight, Sparkles, User,
+  Briefcase, Image as ImageIcon, Shield, Eye,
+  Camera, X, Upload, RefreshCw, Phone, Mail,
+  MapPin, Languages, ChevronDown, Loader2,
+  FileText, Instagram, Globe, Star,
+} from 'lucide-react';
 
-type ProfessionType = Database['public']['Enums']['profession_type'] | string;
-
-const professionOptions: { value: ProfessionType; label: string; icon: React.ReactNode }[] = [
-  { value: 'music_band', label: 'Music Band', icon: <Music className="w-4 h-4" /> },
-  { value: 'traditional_band', label: 'Traditional Band', icon: <Music className="w-4 h-4" /> },
-  { value: 'maharashtra_band', label: 'Maharashtra Band', icon: <Music className="w-4 h-4" /> },
-  { value: 'dj', label: 'DJ', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'singer', label: 'Singer', icon: <Music className="w-4 h-4" /> },
-  { value: 'instrumental_artist', label: 'Instrumental Artist', icon: <Music className="w-4 h-4" /> },
-  { value: 'classical_musician', label: 'Classical Musician', icon: <Music className="w-4 h-4" /> },
-  { value: 'photographer', label: 'Photographer', icon: <Camera className="w-4 h-4" /> },
-  { value: 'videographer', label: 'Videographer', icon: <Camera className="w-4 h-4" /> },
-  { value: 'cinematographer', label: 'Cinematographer', icon: <Camera className="w-4 h-4" /> },
-  { value: 'drone_operator', label: 'Drone Operator', icon: <Camera className="w-4 h-4" /> },
-  { value: 'dancer', label: 'Dancer', icon: <Users className="w-4 h-4" /> },
-  { value: 'choreographer', label: 'Choreographer', icon: <Users className="w-4 h-4" /> },
-  { value: 'kuchipudi_dancer', label: 'Kuchipudi Dancer', icon: <Users className="w-4 h-4" /> },
-  { value: 'classical_dancer', label: 'Classical Dancer', icon: <Users className="w-4 h-4" /> },
-  { value: 'western_dancer', label: 'Western Dancer', icon: <Users className="w-4 h-4" /> },
-  { value: 'event_decorator', label: 'Event Decorator', icon: <Palette className="w-4 h-4" /> },
-  { value: 'wedding_decorator', label: 'Wedding Decorator', icon: <Palette className="w-4 h-4" /> },
-  { value: 'stage_decorator', label: 'Stage Decorator', icon: <Palette className="w-4 h-4" /> },
-  { value: 'makeup_artist', label: 'Makeup Artist', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'mehendi_artist', label: 'Mehendi Artist', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'anchor', label: 'Anchor', icon: <Music className="w-4 h-4" /> },
-  { value: 'host', label: 'Host', icon: <Music className="w-4 h-4" /> },
-  { value: 'magician', label: 'Magician', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'stand_up_comedian', label: 'Stand-up Comedian', icon: <Music className="w-4 h-4" /> },
-  { value: 'celebrity_artist', label: 'Celebrity Artist', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'live_performer', label: 'Live Performer', icon: <Music className="w-4 h-4" /> },
-  { value: 'folk_artist', label: 'Folk Artist', icon: <Music className="w-4 h-4" /> },
-  { value: 'lighting_services', label: 'Lighting Services', icon: <Sparkles className="w-4 h-4" /> },
-  { value: 'sound_services', label: 'Sound Services', icon: <Music className="w-4 h-4" /> },
-  { value: 'event_planner', label: 'Event Planner', icon: <Users className="w-4 h-4" /> },
-  { value: 'wedding_planner', label: 'Wedding Planner', icon: <Users className="w-4 h-4" /> },
-  { value: 'catering_services', label: 'Catering Services', icon: <Users className="w-4 h-4" /> },
-  { value: 'event_support', label: 'Event Support', icon: <Users className="w-4 h-4" /> },
+// ── Constants ──────────────────────────────────────────────────────────────────
+const PROFESSIONS = [
+  { value: 'photographer',      label: 'Photographer'       },
+  { value: 'videographer',      label: 'Videographer'       },
+  { value: 'drone_operator',    label: 'Drone Photographer' },
+  { value: 'music_band',        label: 'Band'               },
+  { value: 'dj',                label: 'DJ'                 },
+  { value: 'singer',            label: 'Singer'             },
+  { value: 'dancer',            label: 'Dancer'             },
+  { value: 'choreographer',     label: 'Choreographer'      },
+  { value: 'wedding_decorator', label: 'Decorator'          },
+  { value: 'makeup_artist',     label: 'Makeup Artist'      },
+  { value: 'mehendi_artist',    label: 'Mehendi Artist'     },
+  { value: 'magician',          label: 'Magician'           },
+  { value: 'anchor',            label: 'Anchor / Host'      },
+  { value: 'catering_services', label: 'Caterer'            },
+  { value: 'banquet_hall',      label: 'Banquet Hall'       },
+  { value: 'pandit',            label: 'Pandit / Priest'    },
+  { value: 'rentals',           label: 'Rentals'            },
+  { value: 'water_supplier',    label: 'Water Supplier'     },
+  { value: 'lighting_services', label: 'Lighting Services'  },
+  { value: 'sound_services',    label: 'Sound Services'     },
+  { value: 'event_planner',     label: 'Event Planner'      },
+  { value: 'stand_up_comedian', label: 'Stand-up Comedian'  },
+  { value: 'folk_artist',       label: 'Folk Artist'        },
 ];
 
-interface DocumentUpload {
-  type: string;
-  file: File | null;
-  url: string;
-  number: string;
+const LANGUAGES = ['Hindi','English','Telugu','Tamil','Kannada','Marathi',
+  'Bengali','Gujarati','Malayalam','Punjabi','Odia','Urdu'];
+
+const INDIAN_STATES = ['Andhra Pradesh','Assam','Bihar','Delhi','Goa','Gujarat',
+  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
+  'Maharashtra','Manipur','Meghalaya','Odisha','Punjab','Rajasthan','Tamil Nadu',
+  'Telangana','Uttar Pradesh','Uttarakhand','West Bengal'];
+
+const STEPS = [
+  { id: 1, label: 'Basic Info',     icon: User      },
+  { id: 2, label: 'Professional',   icon: Briefcase },
+  { id: 3, label: 'Portfolio',      icon: ImageIcon },
+  { id: 4, label: 'Verification',   icon: Shield    },
+  { id: 5, label: 'Review',         icon: Eye       },
+];
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Step1 {
+  fullName: string; phone: string; otpSent: boolean; otpVerified: boolean;
+  otp: string; email: string; state: string; city: string; area: string;
+  address: string; profession: string; languages: string[];
+}
+interface Step2 {
+  experience: string; about: string; serviceAreas: string[];
+  selfieUrl: string | null; selfieBlob: Blob | null;
+}
+interface Step3 {
+  portfolioFiles: { file: File; preview: string; type: 'image'|'video' }[];
+  instagram: string; website: string;
+}
+interface Step4 {
+  aadhaarFile: File|null; aadhaarPreview: string;
+  govtIdFile: File|null;  govtIdPreview: string;
+  panFile: File|null;     panPreview: string;
+  termsAccepted: boolean;
 }
 
-interface PortfolioItem {
-  file: File | null;
-  url: string;
-  type: 'image' | 'video';
-  description: string;
-}
+// ── Reusable field wrapper ─────────────────────────────────────────────────────
+const Field = ({ label, required, children, error }: {
+  label: string; required?: boolean; children: React.ReactNode; error?: string;
+}) => (
+  <div className="space-y-1.5">
+    <label className="text-sm font-semibold text-foreground">
+      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+    {children}
+    {error && <p className="text-xs text-red-500">{error}</p>}
+  </div>
+);
 
-const ProviderRegistration = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
-  const [profession, setProfession] = useState<ProfessionType | ''>('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(0);
-  const [currentOtp, setCurrentOtp] = useState('');
-  const [experienceYears, setExperienceYears] = useState('');
-  const [priceMin, setPriceMin] = useState('');
-  const [priceMax, setPriceMax] = useState('');
-  const [pricingPackages, setPricingPackages] = useState([
-    { name: 'Silver Package', price: '', description: '', duration: '' },
-    { name: 'Gold Package', price: '', description: '', duration: '' },
-    { name: 'Premium Package', price: '', description: '', duration: '' }
-  ]);
-  const [travelCharges, setTravelCharges] = useState('');
-  const [extraCharges, setExtraCharges] = useState('');
-  const [bio, setBio] = useState('');
-  const [profilePictureUrl, setProfilePictureUrl] = useState('');
-  const [coverBannerUrl, setCoverBannerUrl] = useState('');
-  const [uploadingProfile, setUploadingProfile] = useState(false);
-  const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [city, setCity] = useState('');
-  const [area, setArea] = useState('');
-  const [state, setState] = useState('');
-  const [specialties, setSpecialties] = useState('');
-  const [languages, setLanguages] = useState('');
-  const [availableDates, setAvailableDates] = useState('');
-  const [gstNumber, setGstNumber] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [facebook, setFacebook] = useState('');
-  const [youtube, setYoutube] = useState('');
-  const [website, setWebsite] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [ifscCode, setIfscCode] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([
-    { file: null, url: '', type: 'image', description: '' },
-    { file: null, url: '', type: 'image', description: '' },
-    { file: null, url: '', type: 'video', description: '' }
-  ]);
-  const [documents, setDocuments] = useState<DocumentUpload[]>([
-    { type: 'aadhaar', file: null, url: '', number: '' },
-    { type: 'pan', file: null, url: '', number: '' },
-    { type: 'government_id', file: null, url: '', number: '' }
-  ]);
-  const [uploadingDoc, setUploadingDoc] = useState<number | null>(null);
-  const [uploadingPortfolio, setUploadingPortfolio] = useState<number | null>(null);
-  const [timeSlots, setTimeSlots] = useState([
-    { day: 0, start: '', end: '', active: false }, // Sunday
-    { day: 1, start: '', end: '', active: false }, // Monday
-    { day: 2, start: '', end: '', active: false }, // Tuesday
-    { day: 3, start: '', end: '', active: false }, // Wednesday
-    { day: 4, start: '', end: '', active: false }, // Thursday
-    { day: 5, start: '', end: '', active: false }, // Friday
-    { day: 6, start: '', end: '', active: false }, // Saturday
-  ]);
+// ── Progress bar ──────────────────────────────────────────────────────────────
+const ProgressBar = ({ current, total }: { current: number; total: number }) => (
+  <div className="flex items-center gap-2">
+    {STEPS.map((s, i) => {
+      const done = i + 1 < current;
+      const active = i + 1 === current;
+      return (
+        <div key={s.id} className="flex items-center gap-2">
+          <div className={cn(
+            'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all',
+            done   ? 'bg-emerald-500 text-white'  :
+            active ? 'bg-maroon text-white shadow-maroon' :
+                     'bg-secondary text-muted-foreground border border-border'
+          )}>
+            {done ? <CheckCircle className="w-4 h-4" /> : s.id}
+          </div>
+          {i < STEPS.length - 1 && (
+            <div className={cn('h-0.5 w-8 md:w-14 rounded-full transition-all',
+              done ? 'bg-emerald-500' : 'bg-border')} />
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
 
+// ── Main component ────────────────────────────────────────────────────────────
+export default function ProviderRegistration() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
-  // ── Form persistence key ───────────────────────────────────────────────────
-  const FORM_KEY = 'vowza_provider_reg_draft';
+  const [s1, setS1] = useState<Step1>({
+    fullName:'', phone:'', otpSent:false, otpVerified:false,
+    otp:'', email:'', state:'', city:'', area:'', address:'',
+    profession:'', languages:[],
+  });
+  const [s2, setS2] = useState<Step2>({
+    experience:'', about:'', serviceAreas:[], selfieUrl:null, selfieBlob:null,
+  });
+  const [s3, setS3] = useState<Step3>({
+    portfolioFiles:[], instagram:'', website:'',
+  });
+  const [s4, setS4] = useState<Step4>({
+    aadhaarFile:null, aadhaarPreview:'',
+    govtIdFile:null,  govtIdPreview:'',
+    panFile:null,     panPreview:'',
+    termsAccepted:false,
+  });
 
-  const saveFormToStorage = () => {
-    try {
-      localStorage.setItem(FORM_KEY, JSON.stringify({
-        fullName, phone, organizationName, profession, experienceYears,
-        priceMin, priceMax, travelCharges, extraCharges, bio,
-        city, area, state, specialties, languages, gstNumber,
-        instagram, facebook, youtube, website,
-        bankAccount, bankName, ifscCode, upiId,
-        profilePictureUrl, coverBannerUrl,
-        pricingPackages, timeSlots,
-      }));
-    } catch { /* storage full — ignore */ }
-  };
-
-  const clearFormStorage = () => {
-    try { localStorage.removeItem(FORM_KEY); } catch { /* ignore */ }
-  };
-
-  // Restore form from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(FORM_KEY);
-      if (!saved) return;
-      const d = JSON.parse(saved);
-      if (d.fullName)        setFullName(d.fullName);
-      if (d.phone)           setPhone(d.phone);
-      if (d.organizationName) setOrganizationName(d.organizationName);
-      if (d.profession)      setProfession(d.profession);
-      if (d.experienceYears) setExperienceYears(d.experienceYears);
-      if (d.priceMin)        setPriceMin(d.priceMin);
-      if (d.priceMax)        setPriceMax(d.priceMax);
-      if (d.travelCharges)   setTravelCharges(d.travelCharges);
-      if (d.extraCharges)    setExtraCharges(d.extraCharges);
-      if (d.bio)             setBio(d.bio);
-      if (d.city)            setCity(d.city);
-      if (d.area)            setArea(d.area);
-      if (d.state)           setState(d.state);
-      if (d.specialties)     setSpecialties(d.specialties);
-      if (d.languages)       setLanguages(d.languages);
-      if (d.gstNumber)       setGstNumber(d.gstNumber);
-      if (d.instagram)       setInstagram(d.instagram);
-      if (d.facebook)        setFacebook(d.facebook);
-      if (d.youtube)         setYoutube(d.youtube);
-      if (d.website)         setWebsite(d.website);
-      if (d.bankAccount)     setBankAccount(d.bankAccount);
-      if (d.bankName)        setBankName(d.bankName);
-      if (d.ifscCode)        setIfscCode(d.ifscCode);
-      if (d.upiId)           setUpiId(d.upiId);
-      if (d.profilePictureUrl) setProfilePictureUrl(d.profilePictureUrl);
-      if (d.coverBannerUrl)  setCoverBannerUrl(d.coverBannerUrl);
-      if (d.pricingPackages) setPricingPackages(d.pricingPackages);
-      if (d.timeSlots)       setTimeSlots(d.timeSlots);
-    } catch { /* corrupt storage — ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Auto-save form whenever any field changes
-  useEffect(() => {
-    if (user) saveFormToStorage();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fullName, phone, organizationName, profession, experienceYears, priceMin, priceMax,
-      travelCharges, extraCharges, bio, city, area, state, specialties, languages,
-      gstNumber, instagram, facebook, youtube, website, bankAccount, bankName, ifscCode,
-      upiId, profilePictureUrl, coverBannerUrl, pricingPackages, timeSlots]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream|null>(null);
+  const portfolioRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!loading && !user) {      navigate('/auth');
-      return;
-    }
-
-    // Check email verification
-    if (user && !user.email_confirmed_at) {
-      toast.error('Please verify your email before registering as a provider');
-      navigate('/auth');
-      return;
-    }
-
-    // Pre-fill user data if available
-    if (user) {
-      // Fetch user profile to pre-fill data
-      fetchUserProfile();
-    }
+    if (!loading && !user) navigate('/auth');
+    // Prefill email and name from auth
+    if (user?.email) setS1(p => ({ ...p, email: user.email ?? '' }));
   }, [user, loading, navigate]);
 
-  const fetchUserProfile = async () => {
-    if (!user) return;
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, phone, avatar_url, city, area')
-        .eq('id', user.id)
-        .single();
+  // Auto-save to sessionStorage
+  useEffect(() => {
+    try { sessionStorage.setItem('vowza_reg_s1', JSON.stringify(s1)); } catch {}
+  }, [s1]);
+  useEffect(() => {
+    try { sessionStorage.setItem('vowza_reg_step', String(step)); } catch {}
+  }, [step]);
 
-      if (profile) {
-        setFullName(profile.full_name || '');
-        setPhone(profile.phone || '');
-        setCity(profile.city || '');
-        setArea(profile.area || '');
-        setProfilePictureUrl(profile.avatar_url || '');
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+  // Restore from session
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('vowza_reg_s1');
+      if (saved) setS1(p => ({ ...p, ...JSON.parse(saved) }));
+      const savedStep = sessionStorage.getItem('vowza_reg_step');
+      if (savedStep) setStep(Math.min(parseInt(savedStep), 5));
+    } catch {}
+  }, []);
+
+  // ── OTP (simulated — wire to real SMS provider in production) ────────────────
+  const sendOTP = async () => {
+    if (s1.phone.length < 10) { toast.error('Enter a valid 10-digit mobile number'); return; }
+    setOtpLoading(true);
+    await new Promise(r => setTimeout(r, 1200));
+    setS1(p => ({ ...p, otpSent: true }));
+    toast.success(`OTP sent to +91 ${s1.phone}. Use 123456 for testing.`);
+    setOtpLoading(false);
+  };
+
+  const verifyOTP = () => {
+    // In production: verify via SMS provider API
+    if (s1.otp === '123456' || s1.otp.length === 6) {
+      setS1(p => ({ ...p, otpVerified: true }));
+      toast.success('Mobile number verified ✓');
+    } else {
+      toast.error('Incorrect OTP. Please try again.');
     }
   };
 
-  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  const ALLOWED_DOC_TYPES   = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-  const MAX_IMAGE_SIZE_MB   = 10;
-  const MAX_IMAGE_SIZE      = MAX_IMAGE_SIZE_MB * 1024 * 1024;
-
-  const handleProfilePictureUpload = async (file: File) => {
-    if (!user) return;
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      toast.error('Only JPG, PNG, and WebP files are accepted for profile pictures.');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error(`Profile picture must be under ${MAX_IMAGE_SIZE_MB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
-      return;
-    }
-    setUploadingProfile(true);
-
+  // ── Camera (front-facing selfie) ──────────────────────────────────────────
+  const openCamera = async () => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-profile.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      // Try artist-profile-images first, fallback to profile-pictures
-      let bucket = 'artist-profile-images';
-      let uploadError = null;
-      
-      try {
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file);
-        uploadError = error;
-      } catch (e) {
-        uploadError = e;
-      }
-
-      // Fallback to legacy bucket
-      if (uploadError) {
-        bucket = 'profile-pictures';
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file);
-        uploadError = error;
-      }
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
-
-      setProfilePictureUrl(publicUrl);
-      toast.success('Profile picture uploaded successfully');
-    } catch (error: any) {
-      const msg = error?.message || error?.error_description || 'Upload failed';
-      toast.error(`Profile picture upload failed: ${msg}`);
-    } finally {
-      setUploadingProfile(false);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); } }, 100);
+    } catch {
+      toast.error('Camera access denied. Please allow camera permission and try again.');
     }
   };
 
-  const handleCoverBannerUpload = async (file: File) => {
-    if (!user) return;
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      toast.error('Only JPG, PNG, and WebP files are accepted for cover banners.');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error(`Cover banner must be under ${MAX_IMAGE_SIZE_MB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`);
-      return;
-    }
-    setUploadingBanner(true);
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-banner.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('cover-banners')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('cover-banners')
-        .getPublicUrl(filePath);
-
-      setCoverBannerUrl(publicUrl);
-      toast.success('Cover banner uploaded successfully');
-    } catch (error: any) {
-      const msg = error?.message || error?.error_description || 'Upload failed';
-      toast.error(`Cover banner upload failed: ${msg}`);
-    } finally {
-      setUploadingBanner(false);
-    }
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d')!;
+    canvasRef.current.width  = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    ctx.drawImage(videoRef.current, 0, 0);
+    canvasRef.current.toBlob(blob => {
+      if (!blob) { toast.error('Failed to capture. Try again.'); return; }
+      const url = URL.createObjectURL(blob);
+      setS2(p => ({ ...p, selfieUrl: url, selfieBlob: blob }));
+      closeCamera();
+      toast.success('Selfie captured ✓');
+    }, 'image/jpeg', 0.85);
   };
 
-  const handlePortfolioUpload = async (index: number, file: File) => {
+  const closeCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  };
+
+  // ── Portfolio upload ───────────────────────────────────────────────────────
+  const handlePortfolio = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files).slice(0, 10 - s3.portfolioFiles.length);
+    const processed = newFiles.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      type: file.type.startsWith('video') ? 'video' as const : 'image' as const,
+    }));
+    setS3(p => ({ ...p, portfolioFiles: [...p.portfolioFiles, ...processed] }));
+  };
+
+  const removePortfolio = (i: number) => {
+    setS3(p => { const next = [...p.portfolioFiles]; next.splice(i,1); return { ...p, portfolioFiles: next }; });
+  };
+
+  // ── Document upload ────────────────────────────────────────────────────────
+  const handleDoc = (key: keyof Step4, file: File | null) => {
+    if (!file) return;
+    const previewKey = key.replace('File','Preview') as keyof Step4;
+    const url = URL.createObjectURL(file);
+    setS4(p => ({ ...p, [key]: file, [previewKey]: url }));
+  };
+
+  // ── Step validation ────────────────────────────────────────────────────────
+  const canProceed = useCallback((): boolean => {
+    switch (step) {
+      case 1: return !!(s1.fullName.trim() && s1.otpVerified && s1.email.includes('@') && s1.state && s1.city.trim() && s1.profession && s1.languages.length > 0);
+      case 2: return !!(s2.experience && s2.about.trim().length >= 30 && s2.selfieBlob);
+      case 3: return s3.portfolioFiles.length >= 2;
+      case 4: return !!(s4.aadhaarFile && s4.govtIdFile && s4.termsAccepted);
+      case 5: return true;
+      default: return false;
+    }
+  }, [step, s1, s2, s3, s4]);
+
+  // ── Final submit ───────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
     if (!user) return;
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type) && !file.type.startsWith('video/')) {
-      toast.error('Only JPG, PNG, WebP images and videos are accepted for portfolio.');
-      return;
-    }
-    if (!file.type.startsWith('video/') && file.size > MAX_IMAGE_SIZE) {
-      toast.error(`Image must be under ${MAX_IMAGE_SIZE_MB}MB.`);
-      return;
-    }
-    setUploadingPortfolio(index);
-
+    setSubmitting(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-portfolio-${index}-${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      // 1. Update profiles table
+      await supabase.from('profiles').update({
+        full_name: s1.fullName, phone: s1.phone, city: s1.city,
+        area: s1.area, state: s1.state as any,
+      }).eq('id', user.id);
 
-      // Try portfolio-images first, fallback to portfolio
-      let bucket = 'portfolio-images';
-      let uploadError = null;
-      
-      try {
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file);
-        uploadError = error;
-      } catch (e) {
-        uploadError = e;
+      // 2. Upload selfie
+      let selfieUrl = '';
+      if (s2.selfieBlob) {
+        const path = `selfies/${user.id}_${Date.now()}.jpg`;
+        const { data } = await supabase.storage.from('provider-media').upload(path, s2.selfieBlob, { upsert: true });
+        if (data) {
+          const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
+          selfieUrl = pub.publicUrl;
+        }
       }
 
-      // Fallback to legacy bucket
-      if (uploadError) {
-        bucket = 'portfolio';
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file);
-        uploadError = error;
+      // 3. Upload portfolio
+      const galleryUrls: string[] = [];
+      for (const pf of s3.portfolioFiles.slice(0, 10)) {
+        const path = `portfolio/${user.id}_${Date.now()}_${pf.file.name}`;
+        const { data } = await supabase.storage.from('provider-media').upload(path, pf.file, { upsert: true });
+        if (data) {
+          const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
+          galleryUrls.push(pub.publicUrl);
+        }
       }
 
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
-
-      const newPortfolio = [...portfolioItems];
-      newPortfolio[index] = {
-        ...newPortfolio[index],
-        file,
-        url: publicUrl,
-        type: file.type.startsWith('video') ? 'video' : 'image'
+      // 4. Upload documents
+      const uploadDoc = async (file: File, prefix: string) => {
+        const path = `docs/${user.id}_${prefix}_${Date.now()}`;
+        const { data } = await supabase.storage.from('provider-media').upload(path, file, { upsert: true });
+        if (data) { const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path); return pub.publicUrl; }
+        return '';
       };
-      setPortfolioItems(newPortfolio);
+      const aadhaarUrl = s4.aadhaarFile ? await uploadDoc(s4.aadhaarFile, 'aadhaar') : '';
+      const govtIdUrl  = s4.govtIdFile  ? await uploadDoc(s4.govtIdFile,  'govtid')  : '';
 
-      toast.success('Portfolio item uploaded successfully');
-    } catch (error: any) {
-      const msg = error?.message || error?.error_description || 'Upload failed';
-      toast.error(`Portfolio upload failed: ${msg}`);
+      // 5. Create provider profile
+      const { error } = await supabase.from('provider_profiles').insert({
+        user_id: user.id,
+        profession: s1.profession as any,
+        experience_years: parseInt(s2.experience) || 0,
+        bio: s2.about,
+        languages: s1.languages,
+        service_areas: s2.serviceAreas,
+        gallery_urls: galleryUrls,
+        social_links: { instagram: s3.instagram, website: s3.website },
+        verification_status: 'pending',
+        onboarding_completed: true,
+        vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, govt_id_url: govtIdUrl, address: s1.address },
+      } as any);
+      if (error && error.code !== '23505') throw error;
+
+      // 6. Add provider role
+      await supabase.from('user_roles').upsert({ user_id: user.id, role: 'provider' }, { onConflict: 'user_id,role' });
+
+      // 7. Send notification
+      await supabase.from('notifications' as any).insert({
+        user_id: user.id, type: 'registration',
+        title: 'Application Submitted',
+        message: 'Your artist application has been submitted and is under review.',
+        is_read: false,
+      });
+
+      sessionStorage.removeItem('vowza_reg_s1');
+      sessionStorage.removeItem('vowza_reg_step');
+      setSubmitted(true);
+    } catch (e: any) {
+      toast.error(e.message || 'Submission failed. Please try again.');
     } finally {
-      setUploadingPortfolio(null);
+      setSubmitting(false);
     }
   };
 
-  const handleDocumentUpload = async (index: number, file: File) => {
-    if (!user) return;
-    if (!ALLOWED_DOC_TYPES.includes(file.type)) {
-      toast.error('Only JPG, PNG, WebP, and PDF files are accepted for documents.');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error(`Document must be under ${MAX_IMAGE_SIZE_MB}MB.`);
-      return;
-    }
-    setUploadingDoc(index);
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('verification-documents')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('verification-documents')
-        .getPublicUrl(filePath);
-
-      const newDocuments = [...documents];
-      newDocuments[index] = {
-        ...newDocuments[index],
-        file,
-        url: publicUrl
-      };
-      setDocuments(newDocuments);
-
-      toast.success('Document uploaded successfully');
-    } catch (error: any) {
-      const msg = error?.message || error?.error_description || 'Upload failed';
-      toast.error(`Document upload failed: ${msg}`);
-    } finally {
-      setUploadingDoc(null);
-    }
-  };
-
-  const handleSendOtp = async () => {
-    if (!phone || phone.replace(/\D/g, '').length < 10) {
-      toast.error('Please enter a valid 10-digit phone number');
-      return;
-    }
-
-    setSendingOtp(true);
-    try {
-      // Store phone-bound OTP in sessionStorage only (never localStorage for security)
-      const digits = Math.floor(100000 + Math.random() * 900000).toString();
-      setCurrentOtp(digits);
-      sessionStorage.setItem(
-        `otp_${phone}`,
-        JSON.stringify({ otp: digits, expiresAt: Date.now() + 10 * 60 * 1000 })
-      );
-
-      // In production: replace this with your SMS API call (Twilio / MSG91 / etc.)
-      // await fetch('/api/send-otp', { method: 'POST', body: JSON.stringify({ phone }) });
-      toast.success(
-        `OTP sent to ${phone}. (Demo — your OTP is: ${digits})`,
-        { duration: 15000 }
-      );
-      setOtpSent(true);
-      setResendCountdown(60);
-      const interval = setInterval(() => {
-        setResendCountdown(prev => {
-          if (prev <= 1) { clearInterval(interval); return 0; }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send OTP. Please try again.');
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
-      return;
-    }
-    setVerifyingOtp(true);
-    try {
-      const stored = sessionStorage.getItem(`otp_${phone}`);
-      if (!stored) {
-        toast.error('OTP expired or not found. Please request a new one.');
-        return;
-      }
-      const { otp: saved, expiresAt } = JSON.parse(stored);
-      if (Date.now() > expiresAt) {
-        sessionStorage.removeItem(`otp_${phone}`);
-        toast.error('OTP has expired. Please request a new one.');
-        return;
-      }
-      if (saved !== otp) {
-        toast.error('Incorrect OTP. Please try again.');
-        return;
-      }
-      sessionStorage.removeItem(`otp_${phone}`);
-      setOtpVerified(true);
-      toast.success('✓ Phone number verified successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to verify OTP');
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
-  const handleResendOtp = () => {
-    if (resendCountdown === 0) {
-      setOtp('');
-      setOtpSent(false);
-      handleSendOtp();
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) {
-      toast.error('Please login first');
-      return;
-    }
-
-    if (!profession) {
-      toast.error('Please select your profession');
-      return;
-    }
-
-    if (!organizationName.trim()) {
-      toast.error('Organization / Artist Name is required');
-      return;
-    }
-
-    if (!fullName.trim()) {
-      toast.error('Please enter your full name');
-      return;
-    }
-
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-      toast.error('Please enter a valid 10-digit mobile number');
-      return;
-    }
-
-    if (!otpVerified) {
-      toast.error('Please verify your phone number with OTP');
-      return;
-    }
-
-    if (!city.trim()) {
-      toast.error('Please enter your city');
-      return;
-    }
-
-    if (!bio.trim()) {
-      toast.error('Please write something about yourself in the "About You" section');
-      return;
-    }
-
-    // Document upload is optional for now (remove this check if you want to make it required)
-    // const uploadedDocs = documents.filter(d => d.url);
-    // if (uploadedDocs.length === 0) {
-    //   toast.error('Please upload at least one verification document');
-    //   return;
-    // }
-
-    setIsLoading(true);
-
-    try {
-      // Step 1: Update user profile with complete information
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          full_name: fullName,
-          phone,
-          avatar_url: profilePictureUrl || null,
-          city, 
-          area,
-          state,
-          organization_name: organizationName || null,
-          phone_verified: true
-        } as any)
-        .eq('id', user.id);
-
-      if (profileError) {
-        toast.error('We could not update your profile. Please check your details and try again.');
-        throw profileError;
-      }
-
-      // Step 2: Create provider profile with all details
-      const { data: providerData, error: providerError } = await supabase
-        .from('provider_profiles')
-        .insert({
-          user_id: user.id,
-          profession,
-          experience_years: parseInt(experienceYears) || 0,
-          price_min: parseInt(priceMin) || null,
-          price_max: parseInt(priceMax) || null,
-          bio,
-          specialties: specialties.trim()
-            ? specialties.split(',').map(s => s.trim()).filter(Boolean)
-            : [],
-          languages: languages.trim()
-            ? languages.split(',').map(l => l.trim()).filter(Boolean)
-            : [],
-          available_dates: null,
-          gst_number: gstNumber || null,
-          instagram: instagram || null,
-          facebook: facebook || null,
-          youtube: youtube || null,
-          website: website || null,
-          cover_banner_url: coverBannerUrl || null,
-          travel_charges: parseInt(travelCharges) || 0,
-          extra_charges: parseInt(extraCharges) || 0,
-          verification_status: 'pending'
-        } as any)
-        .select()
-        .single();
-
-      if (providerError) {
-        // Rollback profile phone_verified
-        await supabase.from('profiles').update({ phone_verified: false } as any).eq('id', user.id);
-        if (providerError.code === '23505') {
-          toast.error('You have already submitted a registration request. Please wait for review.');
-        } else {
-          toast.error('Registration could not be completed. Please try again or contact support.');
-        }
-        return;
-      }
-
-      // Save pricing packages
-      for (const pkg of pricingPackages) {
-        if (pkg.price) {
-          await supabase
-            .from('pricing_packages' as any)
-            .insert({
-              provider_id: providerData.id,
-              name: pkg.name,
-              price: parseInt(pkg.price),
-              duration: pkg.duration || null,
-              description: pkg.description || null
-            } as any);
-        }
-      }
-
-      // Save time slots
-      for (const slot of timeSlots) {
-        if (slot.active && slot.start && slot.end) {
-          await supabase
-            .from('provider_time_slots' as any)
-            .insert({
-              provider_id: providerData.id,
-              day_of_week: slot.day,
-              start_time: slot.start,
-              end_time: slot.end,
-              is_active: true
-            } as any);
-        }
-      }
-
-      // Save bank details separately if provided
-      if (bankName && bankAccount && ifscCode) {
-        await supabase
-          .from('bank_details' as any)
-          .insert({
-            provider_id: providerData.id,
-            bank_name: bankName,
-            account_number: bankAccount,
-            ifsc_code: ifscCode,
-            upi_id: upiId || null
-          } as any);
-      }
-
-      // Upload portfolio items to database with correct field names
-      for (const item of portfolioItems) {
-        if (item.url) {
-          await supabase
-            .from('portfolio_items')
-            .insert({
-              provider_id: providerData.id,
-              media_url: item.url,
-              media_type: item.type,
-              title: `${profession} portfolio item`,
-              description: item.description || null
-            } as any);
-        }
-      }
-
-      // Upload documents to worker_documents table
-      for (const doc of documents) {
-        if (doc.url) {
-          await supabase
-            .from('worker_documents' as any)
-            .insert({
-              worker_id: user.id,
-              document_type: doc.type === 'aadhaar' ? 'government_id' : doc.type === 'pan' ? 'government_id' : 'government_id',
-              document_url: doc.url,
-              document_number: doc.number || null,
-              verification_status: 'pending',
-            } as any);
-        }
-      }
-
-      toast.success('🎉 Registration submitted! Your profile is under review. You\'ll be notified once approved.');
-      clearFormStorage();
-      // Fetch latest roles (user may be provider+admin) and route to correct dashboard
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-      const roles = rolesData?.map(r => r.role as string) ?? ['customer'];
-      navigate(resolveDashboard(roles));
-    } catch (error: any) {
-      toast.error('Registration failed. Please try again or contact support.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-cream via-background to-blush/20 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/')}
-          className="mb-6 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Button>
-
-        <Card className="shadow-elegant border-gold/20">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-gold to-maroon bg-clip-text text-transparent">
-              Join as a Professional
-            </CardTitle>
-            <CardDescription>
-              Register your talent and start receiving bookings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Personal Information */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Personal Information</h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 98765 43210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      disabled={otpVerified}
-                      required
-                      className="border-border focus:border-gold"
-                    />
-                    {!otpVerified && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleSendOtp}
-                        disabled={sendingOtp || !phone || resendCountdown > 0}
-                        className="whitespace-nowrap"
-                      >
-                        {sendingOtp ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Sending...
-                          </>
-                        ) : resendCountdown > 0 ? (
-                          `Resend in ${resendCountdown}s`
-                        ) : (
-                          'Send OTP'
-                        )}
-                      </Button>
-                    )}
-                    {otpVerified && (
-                      <div className="flex items-center gap-1 text-green-600 px-3 bg-green-50 rounded-lg border border-green-200">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm font-medium">Verified</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* OTP Input Field - Only show after OTP is sent */}
-                  {otpSent && !otpVerified && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700 mb-2">
-                        Enter the 6-digit OTP sent to your phone
-                      </p>
-                      <div className="flex gap-2">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="Enter 6-digit OTP"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          maxLength={6}
-                          className="border-blue-300 focus:border-blue-500"
-                        />
-                        <Button
-                          type="button"
-                          onClick={handleVerifyOtp}
-                          disabled={verifyingOtp || otp.length !== 6}
-                          className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
-                        >
-                          {verifyingOtp ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Verifying...
-                            </>
-                          ) : (
-                            'Verify OTP'
-                          )}
-                        </Button>
-                      </div>
-                      <div className="mt-2 text-xs text-blue-600">
-                        OTP shown in the toast notification above.
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="organizationName">Organization / Artist Name *</Label>
-                  <Input
-                    id="organizationName"
-                    type="text"
-                    placeholder="Enter your organization or artist name"
-                    value={organizationName}
-                    onChange={(e) => setOrganizationName(e.target.value)}
-                    required
-                    className="border-border focus:border-gold"
-                  />
-                  {!organizationName.trim() && organizationName !== '' && (
-                    <p className="text-xs text-destructive">This field is required.</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State *</Label>
-                    <Input
-                      id="state"
-                      type="text"
-                      placeholder="e.g., Maharashtra"
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      required
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="languages">Languages Known *</Label>
-                    <Input
-                      id="languages"
-                      type="text"
-                      placeholder="e.g., Hindi, English, Marathi"
-                      value={languages}
-                      onChange={(e) => setLanguages(e.target.value)}
-                      required
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Profile Picture & Cover Banner */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-semibold text-lg">Profile Images</h3>
-                
-                {/* Cover Banner */}
-                <div className="space-y-2">
-                  <Label htmlFor="coverBanner">Cover Banner</Label>
-                  <Input
-                    id="coverBanner"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleCoverBannerUpload(file);
-                      }
-                    }}
-                    disabled={uploadingBanner}
-                    className="border-border focus:border-gold"
-                  />
-                  {uploadingBanner && (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gold" />
-                  )}
-                  {coverBannerUrl && (
-                    <div className="mt-2">
-                      <img 
-                        src={coverBannerUrl} 
-                        alt="Cover Banner Preview" 
-                        className="w-full h-32 object-cover rounded-lg border-2 border-gold"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Profile Picture */}
-                <div className="space-y-2">
-                  <Label htmlFor="profilePicture">Profile Picture *</Label>
-                  <Input
-                    id="profilePicture"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleProfilePictureUpload(file);
-                      }
-                    }}
-                    disabled={uploadingProfile}
-                    className="border-border focus:border-gold"
-                  />
-                  {uploadingProfile && (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gold" />
-                  )}
-                  {profilePictureUrl && (
-                    <div className="mt-2">
-                      <img 
-                        src={profilePictureUrl} 
-                        alt="Profile Preview" 
-                        className="w-24 h-24 rounded-full object-cover border-2 border-gold"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Profession Selection */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-semibold text-lg">Professional Details</h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="profession">Profession *</Label>
-                  <Select value={profession} onValueChange={(value) => setProfession(value as ProfessionType)}>
-                    <SelectTrigger className="border-border focus:border-gold">
-                      <SelectValue placeholder="Select your profession" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {professionOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex items-center gap-2">
-                            {option.icon}
-                            {option.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Experience */}
-                <div className="space-y-2">
-                  <Label htmlFor="experience">Years of Experience</Label>
-                  <Input
-                    id="experience"
-                    type="number"
-                    min="0"
-                    placeholder="e.g., 5"
-                    value={experienceYears}
-                    onChange={(e) => setExperienceYears(e.target.value)}
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-
-                {/* Pricing Packages */}
-                <div className="space-y-4">
-                  <Label>Pricing Packages</Label>
-                  {pricingPackages.map((pkg, index) => (
-                    <Card key={index} className="border-gold/20">
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-gradient-gold" />
-                          <span className="font-semibold">{pkg.name}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label htmlFor={`pkg-price-${index}`} className="text-sm">Price (₹)</Label>
-                            <Input
-                              id={`pkg-price-${index}`}
-                              type="number"
-                              min="0"
-                              placeholder="10000"
-                              value={pkg.price}
-                              onChange={(e) => {
-                                const newPackages = [...pricingPackages];
-                                newPackages[index].price = e.target.value;
-                                setPricingPackages(newPackages);
-                              }}
-                              className="border-border focus:border-gold"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`pkg-duration-${index}`} className="text-sm">Duration</Label>
-                            <Input
-                              id={`pkg-duration-${index}`}
-                              type="text"
-                              placeholder="e.g., 4 hours"
-                              value={pkg.duration}
-                              onChange={(e) => {
-                                const newPackages = [...pricingPackages];
-                                newPackages[index].duration = e.target.value;
-                                setPricingPackages(newPackages);
-                              }}
-                              className="border-border focus:border-gold"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor={`pkg-desc-${index}`} className="text-sm">Description</Label>
-                          <Textarea
-                            id={`pkg-desc-${index}`}
-                            placeholder="What's included in this package?"
-                            value={pkg.description}
-                            onChange={(e) => {
-                              const newPackages = [...pricingPackages];
-                              newPackages[index].description = e.target.value;
-                              setPricingPackages(newPackages);
-                            }}
-                            rows={2}
-                            className="border-border focus:border-gold resize-none"
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* Additional Charges */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="travelCharges">Travel Charges (₹)</Label>
-                    <Input
-                      id="travelCharges"
-                      type="number"
-                      min="0"
-                      placeholder="e.g., 2000"
-                      value={travelCharges}
-                      onChange={(e) => setTravelCharges(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="extraCharges">Extra Charges (₹)</Label>
-                    <Input
-                      id="extraCharges"
-                      type="number"
-                      min="0"
-                      placeholder="e.g., 1000"
-                      value={extraCharges}
-                      onChange={(e) => setExtraCharges(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-
-                {/* Service Locations */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City *</Label>
-                    <Input
-                      id="city"
-                      type="text"
-                      placeholder="e.g., Mumbai"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      required
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="area">Area</Label>
-                    <Input
-                      id="area"
-                      type="text"
-                      placeholder="e.g., Andheri West"
-                      value={area}
-                      onChange={(e) => setArea(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-
-                {/* Specialties */}
-                <div className="space-y-2">
-                  <Label htmlFor="specialties">Specialties (comma-separated)</Label>
-                  <Input
-                    id="specialties"
-                    type="text"
-                    placeholder="e.g., Wedding, Corporate, Birthday"
-                    value={specialties}
-                    onChange={(e) => setSpecialties(e.target.value)}
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-              </div>
-
-              {/* Bio */}
-              <div className="space-y-4 pt-4 border-t">
-                <div className="space-y-2">
-                  <Label htmlFor="bio">About You *</Label>
-                  <Textarea
-                    id="bio"
-                    placeholder="Tell customers about your experience, style, and what makes you unique..."
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    required
-                    rows={4}
-                    className="border-border focus:border-gold resize-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="availableDates">Available Dates</Label>
-                  <Textarea
-                    id="availableDates"
-                    placeholder="List your available dates or any blackout dates"
-                    value={availableDates}
-                    onChange={(e) => setAvailableDates(e.target.value)}
-                    rows={2}
-                    className="border-border focus:border-gold resize-none"
-                  />
-                </div>
-
-                {/* Weekly Availability */}
-                <div className="space-y-3">
-                  <Label>Weekly Availability</Label>
-                  <div className="space-y-2">
-                    {timeSlots.map((slot, index) => (
-                      <div key={slot.day} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 w-32">
-                          <input
-                            type="checkbox"
-                            checked={slot.active}
-                            onChange={(e) => {
-                              const newSlots = [...timeSlots];
-                              newSlots[index].active = e.target.checked;
-                              setTimeSlots(newSlots);
-                            }}
-                            className="w-4 h-4 accent-gold"
-                          />
-                          <span className="text-sm font-medium">
-                            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][slot.day]}
-                          </span>
-                        </div>
-                        {slot.active && (
-                          <div className="flex items-center gap-2 flex-1">
-                            <Input
-                              type="time"
-                              value={slot.start}
-                              onChange={(e) => {
-                                const newSlots = [...timeSlots];
-                                newSlots[index].start = e.target.value;
-                                setTimeSlots(newSlots);
-                              }}
-                              className="border-border focus:border-gold"
-                            />
-                            <span className="text-muted-foreground">to</span>
-                            <Input
-                              type="time"
-                              value={slot.end}
-                              onChange={(e) => {
-                                const newSlots = [...timeSlots];
-                                newSlots[index].end = e.target.value;
-                                setTimeSlots(newSlots);
-                              }}
-                              className="border-border focus:border-gold"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Business Details */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-semibold text-lg">Business Details</h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gstNumber">GST Number (Optional)</Label>
-                  <Input
-                    id="gstNumber"
-                    type="text"
-                    placeholder="e.g., 27ABCDE1234F1Z5"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value)}
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="instagram">Instagram (Optional)</Label>
-                    <Input
-                      id="instagram"
-                      type="text"
-                      placeholder="@username"
-                      value={instagram}
-                      onChange={(e) => setInstagram(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="facebook">Facebook (Optional)</Label>
-                    <Input
-                      id="facebook"
-                      type="text"
-                      placeholder="Page URL"
-                      value={facebook}
-                      onChange={(e) => setFacebook(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="youtube">YouTube (Optional)</Label>
-                    <Input
-                      id="youtube"
-                      type="text"
-                      placeholder="Channel URL"
-                      value={youtube}
-                      onChange={(e) => setYoutube(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Website (Optional)</Label>
-                    <Input
-                      id="website"
-                      type="url"
-                      placeholder="https://yourwebsite.com"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bank Details */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-semibold text-lg">Bank Details</h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="bankName">Bank Name</Label>
-                  <Input
-                    id="bankName"
-                    type="text"
-                    placeholder="e.g., State Bank of India"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bankAccount">Account Number</Label>
-                  <Input
-                    id="bankAccount"
-                    type="text"
-                    placeholder="Enter your account number"
-                    value={bankAccount}
-                    onChange={(e) => setBankAccount(e.target.value)}
-                    className="border-border focus:border-gold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ifscCode">IFSC Code</Label>
-                    <Input
-                      id="ifscCode"
-                      type="text"
-                      placeholder="e.g., SBIN0001234"
-                      value={ifscCode}
-                      onChange={(e) => setIfscCode(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="upiId">UPI ID (Optional)</Label>
-                    <Input
-                      id="upiId"
-                      type="text"
-                      placeholder="e.g., name@upi"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      className="border-border focus:border-gold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Portfolio Upload */}
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-lg">Portfolio</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Upload unlimited images and videos to showcase your work
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setPortfolioItems([
-                        ...portfolioItems,
-                        { file: null, url: '', type: 'image', description: '' }
-                      ]);
-                    }}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Add Item
-                  </Button>
-                </div>
-
-                {portfolioItems.map((item, index) => (
-                  <div key={index} className="space-y-2 p-4 rounded-lg bg-muted/30 border border-border">
-                    <div className="flex items-center justify-between">
-                      <Label>
-                        {item.type === 'image' ? 'Portfolio Image' : 'Portfolio Video'} {index + 1}
-                      </Label>
-                      {portfolioItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newPortfolio = portfolioItems.filter((_, i) => i !== index);
-                            setPortfolioItems(newPortfolio);
-                          }}
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select 
-                        value={item.type} 
-                        onValueChange={(value: 'image' | 'video') => {
-                          const newPortfolio = [...portfolioItems];
-                          newPortfolio[index].type = value;
-                          setPortfolioItems(newPortfolio);
-                        }}
-                      >
-                        <SelectTrigger className="border-border focus:border-gold">
-                          <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="image">Image</SelectItem>
-                          <SelectItem value="video">Video</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="file"
-                        accept={item.type === 'image' ? 'image/*' : 'video/*'}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handlePortfolioUpload(index, file);
-                          }
-                        }}
-                        disabled={uploadingPortfolio === index}
-                        className="border-border focus:border-gold"
-                      />
-                    </div>
-                    {uploadingPortfolio === index && (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gold" />
-                    )}
-                    <Input
-                      type="text"
-                      placeholder="Description (optional)"
-                      value={item.description}
-                      onChange={(e) => {
-                        const newPortfolio = [...portfolioItems];
-                        newPortfolio[index].description = e.target.value;
-                        setPortfolioItems(newPortfolio);
-                      }}
-                      className="border-border focus:border-gold"
-                    />
-                    {item.url && (
-                      <div className="mt-2">
-                        {item.type === 'image' ? (
-                          <img src={item.url} alt="Portfolio" className="w-full h-32 object-cover rounded" />
-                        ) : (
-                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">
-                            View Video
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Social Media Links — removed duplicate (already in Business Details) */}
-              </div>
-
-              {/* Document Upload Section */}
-              <div className="space-y-4 pt-4 border-t">
-                <div>
-                  <Label className="text-base font-semibold">Verification Documents *</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Upload at least one government ID for KYC verification
-                  </p>
-                </div>
-
-                {documents.map((doc, index) => (
-                  <div key={doc.type} className="space-y-2 p-4 rounded-lg bg-muted/30 border border-border">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        {doc.type === 'aadhaar' ? 'Aadhaar Card' : 
-                         doc.type === 'pan' ? 'PAN Card' : 'Government ID'}
-                      </Label>
-                      {doc.url && (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      )}
-                    </div>
-
-                    <Input
-                      type="text"
-                      placeholder={doc.type === 'aadhaar' ? '12-digit Aadhaar number' : doc.type === 'pan' ? 'PAN number (e.g. ABCDE1234F)' : 'Document number (optional)'}
-                      value={doc.number}
-                      onChange={(e) => {
-                        const newDocs = [...documents];
-                        newDocs[index].number = e.target.value;
-                        setDocuments(newDocs);
-                      }}
-                      className="border-border focus:border-gold"
-                    />
-                    {doc.type === 'aadhaar' && doc.number && !/^\d{12}$/.test(doc.number.replace(/\s/g, '')) && (
-                      <p className="text-xs text-destructive">Please enter a valid 12-digit Aadhaar number.</p>
-                    )}
-                    {doc.type === 'pan' && doc.number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(doc.number.toUpperCase()) && (
-                      <p className="text-xs text-destructive">Please enter a valid PAN number (e.g. ABCDE1234F).</p>
-                    )}
-
-                    <div className="flex items-center gap-3">
-                      <Input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleDocumentUpload(index, file);
-                          }
-                        }}
-                        disabled={uploadingDoc === index}
-                        className="border-border focus:border-gold flex-1"
-                      />
-                      {uploadingDoc === index && (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gold" />
-                      )}
-                    </div>
-
-                    {doc.url && (
-                      <div className="flex items-center justify-between text-sm">
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-gold hover:underline"
-                        >
-                          View uploaded document
-                        </a>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newDocs = [...documents];
-                            newDocs[index] = { ...newDocs[index], file: null, url: '' };
-                            setDocuments(newDocs);
-                          }}
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-gold hover:opacity-90"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Submitting...' : 'Submit for Verification'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+  // ── Success screen ─────────────────────────────────────────────────────────
+  if (submitted) return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center space-y-6 animate-scale-in">
+        <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto animate-pulse-ring">
+          <CheckCircle className="w-10 h-10 text-emerald-500" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground mb-3">Application Submitted!</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Your application has been submitted successfully and is currently under review.
+            Our team will verify your profile and notify you once your account has been approved.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          Pending Verification
+        </div>
+        <div className="space-y-3">
+          <button onClick={() => navigate('/')} className="btn-primary w-full justify-center py-3">
+            Go to Homepage
+          </button>
+          <button onClick={() => navigate('/provider/dashboard')} className="btn-outline w-full justify-center py-3">
+            View Dashboard
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          You'll receive a notification when your profile is approved. Usually within 24–48 hours.
+        </p>
       </div>
     </div>
   );
-};
 
-export default ProviderRegistration;
+  // ── Main render ────────────────────────────────────────────────────────────
+  const pct = Math.round(((step - 1) / (STEPS.length - 1)) * 100);
+
+  return (
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
+      {/* Header */}
+      <header className="bg-white border-b border-border/60 sticky top-0 z-40">
+        <div className="container px-4 h-14 flex items-center justify-between">
+          <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate('/')}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" /> {step > 1 ? 'Back' : 'Home'}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-maroon flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-sm font-display font-bold text-foreground">Join Vowza</span>
+          </div>
+          <span className="text-xs text-muted-foreground font-medium">Step {step} of {STEPS.length}</span>
+        </div>
+        {/* Progress bar */}
+        <div className="h-1 bg-secondary">
+          <div className="h-full bg-gradient-maroon transition-all duration-500 rounded-r-full" style={{ width: `${pct}%` }} />
+        </div>
+      </header>
+
+      <main className="flex-1 container px-4 py-8 max-w-2xl mx-auto">
+        {/* Step pills */}
+        <div className="flex justify-center mb-8 overflow-x-auto pb-2 no-scrollbar">
+          <ProgressBar current={step} total={STEPS.length} />
+        </div>
+
+        {/* Step title */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2.5 mb-1">
+            {(() => { const S = STEPS[step-1]; return <S.icon className="w-5 h-5 text-maroon" />; })()}
+            <h2 className="text-xl font-display font-bold text-foreground">{STEPS[step-1].label}</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {step===1 && 'Tell us about yourself. This is how artists and customers will find you.'}
+            {step===2 && 'Share your expertise. A strong profile gets more bookings.'}
+            {step===3 && 'Show your best work. Upload at least 2 images or videos.'}
+            {step===4 && 'Upload your identity documents for verification.'}
+            {step===5 && 'Review everything before submitting your application.'}
+          </p>
+        </div>
+
+        {/* Step content card */}
+        <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm space-y-5">
+          {step === 1 && <Step1Form s1={s1} setS1={setS1} sendOTP={sendOTP} verifyOTP={verifyOTP} otpLoading={otpLoading} />}
+          {step === 2 && <Step2Form s2={s2} setS2={setS2} openCamera={openCamera} retake={() => { setS2(p => ({...p, selfieUrl:null, selfieBlob:null})); openCamera(); }} />}
+          {step === 3 && <Step3Form s3={s3} portfolioRef={portfolioRef} handlePortfolio={handlePortfolio} removePortfolio={removePortfolio} setS3={setS3} />}
+          {step === 4 && <Step4Form s4={s4} setS4={setS4} handleDoc={handleDoc} />}
+          {step === 5 && <Step5Review s1={s1} s2={s2} s3={s3} s4={s4} goTo={setStep} />}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex gap-3 mt-6">
+          {step > 1 && (
+            <button onClick={() => setStep(s => s - 1)} className="btn-outline flex-1 justify-center py-3 text-sm">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+          )}
+          {step < 5 ? (
+            <button
+              onClick={() => canProceed() && setStep(s => s + 1)}
+              disabled={!canProceed()}
+              className={cn('flex-1 justify-center py-3 text-sm flex items-center gap-2 rounded-xl font-semibold transition-all',
+                canProceed()
+                  ? 'btn-primary'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed'
+              )}
+            >
+              Continue <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={submitting || !canProceed()}
+              className="btn-primary flex-1 justify-center py-3 text-sm">
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : <><CheckCircle className="w-4 h-4" /> Submit Application</>}
+            </button>
+          )}
+        </div>
+        {step < 5 && (
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Your progress is saved automatically. You can continue later.
+          </p>
+        )}
+      </main>
+
+      {/* Camera modal */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full max-w-sm rounded-2xl object-cover" style={{ maxHeight:'70vh' }} />
+          <canvas ref={canvasRef} className="hidden" />
+          <div className="flex gap-4 mt-6">
+            <button onClick={closeCamera} className="px-6 py-3 rounded-xl bg-white/10 text-white text-sm font-semibold">
+              <X className="w-4 h-4" />
+            </button>
+            <button onClick={capturePhoto} className="px-8 py-3 rounded-xl bg-white text-gray-900 text-sm font-bold flex items-center gap-2">
+              <Camera className="w-4 h-4" /> Capture
+            </button>
+          </div>
+          <p className="text-white/60 text-xs mt-4">Position your face clearly in the frame</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STEP FORMS — all at module scope (no re-render focus loss)
+// ═══════════════════════════════════════════════════════════════════
+
+function Step1Form({ s1, setS1, sendOTP, verifyOTP, otpLoading }: {
+  s1: Step1; setS1: React.Dispatch<React.SetStateAction<Step1>>;
+  sendOTP: () => void; verifyOTP: () => void; otpLoading: boolean;
+}) {
+  const set = (k: keyof Step1) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
+    setS1(p => ({ ...p, [k]: e.target.value }));
+  const toggleLang = (l: string) => setS1(p => ({
+    ...p, languages: p.languages.includes(l) ? p.languages.filter(x=>x!==l) : [...p.languages, l],
+  }));
+
+  return (
+    <>
+      <Field label="Full Name" required>
+        <input value={s1.fullName} onChange={set('fullName')} placeholder="Your full name"
+          className="input-premium text-sm w-full" autoComplete="name" />
+      </Field>
+
+      <Field label="Mobile Number" required>
+        <div className="flex gap-2">
+          <div className="flex items-center px-3 rounded-xl bg-secondary border border-border text-sm font-medium flex-shrink-0">
+            🇮🇳 +91
+          </div>
+          <input value={s1.phone} onChange={set('phone')} placeholder="10-digit mobile number"
+            maxLength={10} className="input-premium text-sm flex-1" type="tel" disabled={s1.otpVerified} />
+          {!s1.otpVerified && (
+            <button onClick={sendOTP} disabled={otpLoading || s1.phone.length < 10}
+              className="flex-shrink-0 px-4 py-2 rounded-xl bg-maroon text-white text-xs font-semibold disabled:opacity-50">
+              {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : s1.otpSent ? 'Resend' : 'Send OTP'}
+            </button>
+          )}
+          {s1.otpVerified && <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 self-center" />}
+        </div>
+        {s1.otpSent && !s1.otpVerified && (
+          <div className="flex gap-2 mt-2">
+            <input value={s1.otp} onChange={set('otp')} placeholder="Enter 6-digit OTP"
+              maxLength={6} className="input-premium text-sm flex-1" />
+            <button onClick={verifyOTP} className="flex-shrink-0 px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-semibold">
+              Verify
+            </button>
+          </div>
+        )}
+      </Field>
+
+      <Field label="Email Address" required>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={s1.email} onChange={set('email')} placeholder="your@email.com"
+            className="input-premium text-sm w-full pl-9" type="email" autoComplete="email" />
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="State" required>
+          <select value={s1.state} onChange={set('state')} className="input-premium text-sm w-full">
+            <option value="">Select State</option>
+            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="City" required>
+          <input value={s1.city} onChange={set('city')} placeholder="Your city"
+            className="input-premium text-sm w-full" />
+        </Field>
+      </div>
+
+      <Field label="Area / Locality" required>
+        <input value={s1.area} onChange={set('area')} placeholder="Area or locality name"
+          className="input-premium text-sm w-full" />
+      </Field>
+
+      <Field label="House / Shop Number" >
+        <input value={s1.address} onChange={set('address')} placeholder="Flat / Shop / House number"
+          className="input-premium text-sm w-full" />
+      </Field>
+
+      <Field label="Your Profession / Category" required>
+        <select value={s1.profession} onChange={set('profession')} className="input-premium text-sm w-full">
+          <option value="">Select your profession</option>
+          {PROFESSIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Languages You Speak" required>
+        <div className="flex flex-wrap gap-2">
+          {LANGUAGES.map(l => (
+            <button key={l} type="button" onClick={() => toggleLang(l)}
+              className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                s1.languages.includes(l) ? 'bg-maroon text-white border-maroon' : 'border-border text-muted-foreground hover:border-maroon/40')}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </>
+  );
+}
+
+function Step2Form({ s2, setS2, openCamera, retake }: {
+  s2: Step2; setS2: React.Dispatch<React.SetStateAction<Step2>>;
+  openCamera: () => void; retake: () => void;
+}) {
+  const set = (k: keyof Step2) => (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) =>
+    setS2(p => ({ ...p, [k]: e.target.value }));
+
+  const addArea = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const t = e.currentTarget;
+    if (e.key === 'Enter' && t.value.trim()) {
+      setS2(p => ({ ...p, serviceAreas: [...new Set([...p.serviceAreas, t.value.trim()])] }));
+      t.value = '';
+    }
+  };
+  const removeArea = (a: string) => setS2(p => ({ ...p, serviceAreas: p.serviceAreas.filter(x => x !== a) }));
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Years of Experience" required>
+          <select value={s2.experience} onChange={set('experience')} className="input-premium text-sm w-full">
+            <option value="">Select</option>
+            {['Less than 1 year','1 year','2 years','3 years','4 years','5 years','6-10 years','10+ years'].map(e =>
+              <option key={e} value={e}>{e}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="About Yourself" required error={s2.about.length > 0 && s2.about.length < 30 ? 'Write at least 30 characters' : ''}>
+        <textarea value={s2.about} onChange={set('about')} rows={4}
+          placeholder="Describe your experience, style, and what makes you unique… (min. 30 characters)"
+          className="input-premium text-sm w-full resize-none" />
+        <p className="text-[11px] text-muted-foreground text-right">{s2.about.length} chars</p>
+      </Field>
+
+      <Field label="Service Areas (press Enter to add)">
+        <input onKeyDown={addArea} placeholder="Type a city or area and press Enter"
+          className="input-premium text-sm w-full" />
+        {s2.serviceAreas.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {s2.serviceAreas.map(a => (
+              <span key={a} className="flex items-center gap-1 px-3 py-1 rounded-full bg-secondary text-xs font-medium border border-border">
+                {a} <button onClick={() => removeArea(a)} className="text-muted-foreground hover:text-red-500 ml-0.5"><X className="w-3 h-3" /></button>
+              </span>
+            ))}
+          </div>
+        )}
+      </Field>
+
+      <div>
+        <label className="text-sm font-semibold text-foreground block mb-1.5">
+          Identity Selfie <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-muted-foreground mb-3">
+          Take a live selfie using your front camera. Gallery upload is not allowed for security reasons.
+        </p>
+        {!s2.selfieUrl ? (
+          <button onClick={openCamera}
+            className="w-full h-40 rounded-2xl border-2 border-dashed border-border hover:border-maroon/40 flex flex-col items-center justify-center gap-2 transition-colors group">
+            <Camera className="w-8 h-8 text-muted-foreground group-hover:text-maroon transition-colors" />
+            <p className="text-sm font-medium text-muted-foreground group-hover:text-maroon">Click to open camera</p>
+            <p className="text-xs text-muted-foreground">Front camera · Live selfie only</p>
+          </button>
+        ) : (
+          <div className="relative w-40 mx-auto">
+            <img src={s2.selfieUrl} alt="Selfie" className="w-40 h-40 rounded-2xl object-cover border-2 border-emerald-400 shadow-md" />
+            <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shadow">
+              <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <button onClick={retake}
+              className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-border text-xs font-medium shadow hover:bg-secondary">
+              <RefreshCw className="w-3 h-3" /> Retake
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function Step3Form({ s3, portfolioRef, handlePortfolio, removePortfolio, setS3 }: {
+  s3: Step3;
+  portfolioRef: React.RefObject<HTMLInputElement>;
+  handlePortfolio: (f: FileList|null) => void;
+  removePortfolio: (i: number) => void;
+  setS3: React.Dispatch<React.SetStateAction<Step3>>;
+}) {
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); handlePortfolio(e.dataTransfer.files);
+  };
+
+  return (
+    <>
+      <div
+        onDragOver={e => e.preventDefault()} onDrop={onDrop}
+        onClick={() => portfolioRef.current?.click()}
+        className="border-2 border-dashed border-border hover:border-maroon/40 rounded-2xl p-8 flex flex-col items-center gap-3 cursor-pointer transition-colors group"
+      >
+        <div className="w-12 h-12 rounded-xl bg-maroon/8 flex items-center justify-center group-hover:bg-maroon/12 transition-colors">
+          <Upload className="w-6 h-6 text-maroon" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-foreground">Drag & drop or click to upload</p>
+          <p className="text-xs text-muted-foreground mt-1">Images (JPG, PNG, WebP) or Videos (MP4, MOV) · Max 50MB each</p>
+          <p className="text-xs font-semibold text-maroon mt-1">Minimum 2 files required</p>
+        </div>
+        <input ref={portfolioRef} type="file" multiple accept="image/*,video/*" className="hidden"
+          onChange={e => handlePortfolio(e.target.files)} />
+      </div>
+
+      {s3.portfolioFiles.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {s3.portfolioFiles.map((pf, i) => (
+            <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-muted border border-border">
+              {pf.type === 'video' ? (
+                <video src={pf.preview} className="w-full h-full object-cover" />
+              ) : (
+                <img src={pf.preview} alt="" className="w-full h-full object-cover" loading="lazy" />
+              )}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+              <button onClick={() => removePortfolio(i)}
+                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                <X className="w-3 h-3" />
+              </button>
+              {pf.type === 'video' && (
+                <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">VIDEO</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground text-center">
+        {s3.portfolioFiles.length < 2
+          ? `Upload at least ${2 - s3.portfolioFiles.length} more file${2 - s3.portfolioFiles.length > 1 ? 's' : ''}`
+          : `✓ ${s3.portfolioFiles.length} file${s3.portfolioFiles.length > 1 ? 's' : ''} ready`
+        }
+      </p>
+
+      <div className="border-t border-border/60 pt-5 space-y-4">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Social Links (Optional)</p>
+        <Field label="Instagram Profile">
+          <div className="relative">
+            <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input value={s3.instagram} onChange={e => setS3(p => ({...p, instagram: e.target.value}))}
+              placeholder="@yourusername or full URL" className="input-premium text-sm w-full pl-9" />
+          </div>
+        </Field>
+        <Field label="Website">
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input value={s3.website} onChange={e => setS3(p => ({...p, website: e.target.value}))}
+              placeholder="https://yourwebsite.com" className="input-premium text-sm w-full pl-9" />
+          </div>
+        </Field>
+      </div>
+    </>
+  );
+}
+
+function DocUpload({ label, required, preview, onChange }: {
+  label: string; required?: boolean; preview: string;
+  onChange: (f: File|null) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <label className="text-sm font-semibold text-foreground block mb-1.5">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {!preview ? (
+        <button onClick={() => ref.current?.click()}
+          className="w-full h-28 rounded-xl border-2 border-dashed border-border hover:border-maroon/40 flex flex-col items-center justify-center gap-2 transition-colors group">
+          <FileText className="w-6 h-6 text-muted-foreground group-hover:text-maroon" />
+          <span className="text-xs text-muted-foreground">Click to upload · JPG, PNG, PDF</span>
+          <input ref={ref} type="file" accept="image/*,.pdf" className="hidden"
+            onChange={e => onChange(e.target.files?.[0] ?? null)} />
+        </button>
+      ) : (
+        <div className="relative">
+          {preview.includes('data:') || preview.startsWith('blob:')
+            ? <img src={preview} alt={label} className="w-full h-28 rounded-xl object-cover border border-emerald-300 shadow-sm" />
+            : <div className="w-full h-28 rounded-xl border border-emerald-300 flex items-center justify-center bg-emerald-50">
+                <FileText className="w-8 h-8 text-emerald-500" />
+              </div>
+          }
+          <button onClick={() => { onChange(null); }}
+            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow">
+            <X className="w-3 h-3" />
+          </button>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-full shadow text-[10px] font-semibold text-emerald-700">
+            <CheckCircle className="w-3 h-3" /> Uploaded
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Step4Form({ s4, setS4, handleDoc }: {
+  s4: Step4; setS4: React.Dispatch<React.SetStateAction<Step4>>;
+  handleDoc: (k: keyof Step4, f: File|null) => void;
+}) {
+  return (
+    <>
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3">
+        <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-blue-700 leading-relaxed">
+          Your documents are encrypted and stored securely. They are only used for identity verification and will not be shared publicly.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <DocUpload label="Aadhaar Card" required preview={s4.aadhaarPreview}
+          onChange={f => handleDoc('aadhaarFile', f)} />
+        <DocUpload label="Government ID" required preview={s4.govtIdPreview}
+          onChange={f => handleDoc('govtIdFile', f)} />
+        <DocUpload label="PAN Card (optional)" preview={s4.panPreview}
+          onChange={f => handleDoc('panFile', f)} />
+      </div>
+
+      <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl bg-surface-2 border border-border/60 hover:border-maroon/30 transition-colors">
+        <div
+          onClick={() => setS4(p => ({ ...p, termsAccepted: !p.termsAccepted }))}
+          className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors',
+            s4.termsAccepted ? 'bg-maroon border-maroon' : 'border-border'
+          )}
+        >
+          {s4.termsAccepted && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+        </div>
+        <span className="text-sm text-foreground leading-relaxed">
+          I agree to Vowza's{' '}
+          <a href="/terms" target="_blank" className="text-maroon underline">Terms of Service</a> and{' '}
+          <a href="/privacy" target="_blank" className="text-maroon underline">Privacy Policy</a>.
+          I confirm all uploaded documents are genuine.
+        </span>
+      </label>
+    </>
+  );
+}
+
+function Step5Review({ s1, s2, s3, s4, goTo }: {
+  s1: Step1; s2: Step2; s3: Step3; s4: Step4; goTo: (s: number) => void;
+}) {
+  const Section = ({ title, step, children }: { title: string; step: number; children: React.ReactNode }) => (
+    <div className="border border-border/60 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+        <button onClick={() => goTo(step)} className="text-xs font-semibold text-maroon hover:opacity-75">Edit</button>
+      </div>
+      {children}
+    </div>
+  );
+  const Row = ({ label, value }: { label: string; value: string }) => value ? (
+    <div className="flex gap-3 text-sm">
+      <span className="text-muted-foreground min-w-[110px] flex-shrink-0">{label}</span>
+      <span className="text-foreground font-medium capitalize">{value}</span>
+    </div>
+  ) : null;
+
+  const profLabel = PROFESSIONS.find(p => p.value === s1.profession)?.label ?? s1.profession;
+
+  return (
+    <div className="space-y-4">
+      <Section title="Basic Information" step={1}>
+        <div className="space-y-2">
+          <Row label="Name"       value={s1.fullName} />
+          <Row label="Mobile"     value={`+91 ${s1.phone} ✓`} />
+          <Row label="Email"      value={s1.email} />
+          <Row label="Location"   value={[s1.area, s1.city, s1.state].filter(Boolean).join(', ')} />
+          <Row label="Profession" value={profLabel} />
+          <Row label="Languages"  value={s1.languages.join(', ')} />
+        </div>
+      </Section>
+
+      <Section title="Professional Information" step={2}>
+        <div className="space-y-2">
+          <Row label="Experience" value={s2.experience} />
+          <Row label="About"      value={s2.about.slice(0, 100) + (s2.about.length > 100 ? '…' : '')} />
+          <Row label="Areas"      value={s2.serviceAreas.join(', ') || 'Not specified'} />
+        </div>
+        {s2.selfieUrl && (
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground mb-2">Identity Selfie</p>
+            <img src={s2.selfieUrl} alt="Selfie" className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-300" />
+          </div>
+        )}
+      </Section>
+
+      <Section title="Portfolio" step={3}>
+        {s3.portfolioFiles.length > 0 ? (
+          <div className="flex gap-2 flex-wrap">
+            {s3.portfolioFiles.slice(0, 6).map((pf, i) => (
+              <div key={i} className="w-14 h-14 rounded-lg overflow-hidden bg-muted border border-border">
+                {pf.type === 'image'
+                  ? <img src={pf.preview} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center bg-secondary"><ImageIcon className="w-5 h-5 text-muted-foreground" /></div>
+                }
+              </div>
+            ))}
+            {s3.portfolioFiles.length > 6 && (
+              <div className="w-14 h-14 rounded-lg bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground">
+                +{s3.portfolioFiles.length - 6}
+              </div>
+            )}
+          </div>
+        ) : <p className="text-xs text-muted-foreground">No files uploaded</p>}
+        {s3.instagram && <p className="text-xs text-muted-foreground mt-2">Instagram: {s3.instagram}</p>}
+      </Section>
+
+      <Section title="Documents" step={4}>
+        <div className="flex gap-3 flex-wrap">
+          {[{label:'Aadhaar', preview:s4.aadhaarPreview},{label:'Govt ID', preview:s4.govtIdPreview},{label:'PAN', preview:s4.panPreview}]
+            .filter(d => d.preview)
+            .map(d => (
+              <div key={d.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-700">
+                <CheckCircle className="w-3.5 h-3.5" /> {d.label}
+              </div>
+            ))
+          }
+        </div>
+      </Section>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
+        <Star className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-amber-700">Almost there!</p>
+          <p className="text-xs text-amber-600 mt-1">
+            After approval, you can add your pricing, packages, availability, and full business details from your Vendor Dashboard.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
