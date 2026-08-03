@@ -94,24 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('user_id', uid);
 
       if (error) {
-        console.error('[AuthContext] fetchRoles error:', error.message, error.code, error.details);
-        // RLS might be blocking — try reading all own roles without a filter as fallback
-        const { data: fallbackData } = await supabase
-          .from('user_roles')
-          .select('role, user_id');
-        if (fallbackData) {
-          const ownRoles = fallbackData
-            .filter((r: any) => r.user_id === uid)
-            .map((r: any) => r.role as string);
-          if (ownRoles.length > 0) {
-            console.log('[AuthContext] fallback roles:', ownRoles);
-            _roleCache.set(uid, ownRoles);
-            setRoles(ownRoles);
-            setRolesLoaded(true);
-            return ownRoles;
-          }
-        }
-        // Complete failure — default to customer, but don't seed admin
+        console.error('[AuthContext] fetchRoles error:', error.message, error.code);
+        // Do NOT retry — avoids making the recursion loop worse
+        // The fix is in the database: run FIX_INFINITE_RECURSION.sql
         const fallback = ['customer'];
         _roleCache.set(uid, fallback);
         setRoles(fallback);
