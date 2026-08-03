@@ -1,64 +1,222 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+// ─── AuthContext — Single source of truth for auth, roles, and profile ────────
+// • Roles are fetched from public.user_roles (NEVER hardcoded)
+// • Exposes: user, session, profile, roles, isAdmin, isProvider, isCustomer
+// • Real-time subscription: role changes take effect without logout
+// • Session is persisted by Supabase — restored on page refresh
+// • All consuming components use useAuth() — no duplication
+
+import React, {
+  createContext, useContext, useEffect, useState,
+  useCallback, useRef, useMemo,
+} from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+// ── Types ──────────────────────────────────────────────────────────────────────
+export interface UserProfile {
+  id:         string;
+  full_name:  string | null;
+  email:      string | null;
+  phone:      string | null;
+  avatar_url: string | null;
+  city:       string | null;
+}
+
+export interface AuthContextType {
+  // Auth state
+  user:         User | null;
+  session:      Session | null;
+  profile:      UserProfile | null;
+  loading:      boolean;
+  authenticated: boolean;
+
+  // Role state — derived from public.user_roles, never hardcoded
+  roles:        string[];
+  isAdmin:      boolean;
+  isProvider:   boolean;
+  isCustomer:   boolean;
+  rolesLoaded:  boolean;
+
+  // Actions
+  signUp:   (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: any }>;
+  signIn:   (email: string, password: string) => Promise<{ error: any }>;
+  signOut:  () => Promise<void>;
+  refreshRoles: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  // Prevent double-set on mount — onAuthStateChange fires after getSession
-  const initialised = React.useRef(false);
+// ── Global role cache — shared across all hooks, cleared on logout ────────────
+export const _roleCache = new Map<string, string[]>();
 
+export function invalidateRoleCache(userId?: string) {
+  if (userId) _roleCache.delete(userId);
+  else _roleCache.clear();
+}
+
+// ── AuthProvider ───────────────────────────────────────────────────────────────
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user,        setUser]        = useState<User | null>(null);
+  const [session,     setSession]     = useState<Session | null>(null);
+  const [profile,     setProfile]     = useState<UserProfile | null>(null);
+  const [roles,       setRoles]       = useState<string[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+  const initialised = useRef(false);
+  const rolesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // ── Fetch profile from public.profiles ──────────────────────────────────────
+  const fetchProfile = useCallback(async (uid: string) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, avatar_url, city')
+        .eq('id', uid)
+        .maybeSingle();
+      if (data) setProfile(data as UserProfile);
+    } catch { /* non-critical */ }
+  }, []);
+
+  // ── Fetch roles from public.user_roles ───────────────────────────────────────
+  const fetchRoles = useCallback(async (uid: string): Promise<string[]> => {
+    // Return from cache if available
+    if (_roleCache.has(uid)) {
+      const cached = _roleCache.get(uid)!;
+      setRoles(cached);
+      setRolesLoaded(true);
+      return cached;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', uid);
+
+      if (error) {
+        console.error('[AuthContext] fetchRoles error:', error.message);
+        const fallback = ['customer'];
+        _roleCache.set(uid, fallback);
+        setRoles(fallback);
+        setRolesLoaded(true);
+        return fallback;
+      }
+
+      if (!data || data.length === 0) {
+        // Seed default customer role silently
+        await supabase.from('user_roles').insert({ user_id: uid, role: 'customer' });
+        const fallback = ['customer'];
+        _roleCache.set(uid, fallback);
+        setRoles(fallback);
+        setRolesLoaded(true);
+        return fallback;
+      }
+
+      const r = data.map(d => d.role as string);
+      _roleCache.set(uid, r);
+      setRoles(r);
+      setRolesLoaded(true);
+      return r;
+    } catch (e) {
+      console.error('[AuthContext] fetchRoles exception:', e);
+      const fallback = ['customer'];
+      setRoles(fallback);
+      setRolesLoaded(true);
+      return fallback;
+    }
+  }, []);
+
+  // ── Refresh roles (called externally after approval etc.) ────────────────────
+  const refreshRoles = useCallback(async () => {
+    if (!user) return;
+    _roleCache.delete(user.id);
+    await fetchRoles(user.id);
+  }, [user, fetchRoles]);
+
+  // ── Subscribe to real-time role changes ──────────────────────────────────────
+  const subscribeToRoles = useCallback((uid: string) => {
+    // Unsubscribe from previous channel if any
+    if (rolesChannelRef.current) {
+      supabase.removeChannel(rolesChannelRef.current);
+    }
+
+    const ch = supabase.channel(`user-roles-${uid}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${uid}` },
+        async () => {
+          // Role changed — invalidate cache and re-fetch
+          _roleCache.delete(uid);
+          await fetchRoles(uid);
+        }
+      )
+      .subscribe();
+
+    rolesChannelRef.current = ch;
+  }, [fetchRoles]);
+
+  // ── Handle auth state ─────────────────────────────────────────────────────────
+  const handleAuthChange = useCallback(async (newSession: Session | null) => {
+    setSession(newSession);
+    const u = newSession?.user ?? null;
+    setUser(u);
+
+    if (u) {
+      // Fetch profile and roles in parallel
+      await Promise.all([
+        fetchProfile(u.id),
+        fetchRoles(u.id),
+      ]);
+      subscribeToRoles(u.id);
+    } else {
+      // Logged out — clear everything
+      setProfile(null);
+      setRoles([]);
+      setRolesLoaded(false);
+      _roleCache.clear();
+      if (rolesChannelRef.current) {
+        supabase.removeChannel(rolesChannelRef.current);
+        rolesChannelRef.current = null;
+      }
+    }
+
+    setLoading(false);
+    initialised.current = true;
+  }, [fetchProfile, fetchRoles, subscribeToRoles]);
+
+  // ── Bootstrap ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // 1. Subscribe to auth state changes first
+    // Subscribe to future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setLoading(false);
-        initialised.current = true;
+        handleAuthChange(newSession);
       }
     );
 
-    // 2. Hydrate immediately from existing session (no await needed —
-    //    onAuthStateChange fires synchronously with the persisted session)
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+    // Hydrate from persisted session immediately
+    supabase.auth.getSession().then(({ data: { session: existing } }) => {
       if (!initialised.current) {
-        // Only apply if the subscriber hasn't already done it
-        setSession(existingSession);
-        setUser(existingSession?.user ?? null);
-        setLoading(false);
-        initialised.current = true;
+        handleAuthChange(existing);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+      if (rolesChannelRef.current) {
+        supabase.removeChannel(rolesChannelRef.current);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Actions ───────────────────────────────────────────────────────────────────
   const signUp = useCallback(async (
-    email: string,
-    password: string,
-    fullName: string,
-    phone?: string
+    email: string, password: string, fullName: string, phone?: string
   ) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const normalizedEmail = email.toLowerCase().trim();
     const { error } = await supabase.auth.signUp({
-      email: normalizedEmail,
+      email: email.toLowerCase().trim(),
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: `${window.location.origin}/`,
         data: { full_name: fullName, phone: phone ?? '' },
       },
     });
@@ -67,9 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = useCallback(async (email: string, password: string) => {
     localStorage.removeItem('inactivityLogout');
-    const normalizedEmail = email.toLowerCase().trim();
     const { error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
+      email: email.toLowerCase().trim(),
       password,
     });
     return { error };
@@ -77,20 +234,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async () => {
     localStorage.removeItem('inactivityLogout');
+    _roleCache.clear();
     await supabase.auth.signOut();
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  // ── Derived values (memoised to avoid unnecessary re-renders) ─────────────────
+  const value = useMemo<AuthContextType>(() => ({
+    user,
+    session,
+    profile,
+    loading,
+    authenticated: !!user,
+    roles,
+    isAdmin:    roles.includes('admin'),
+    isProvider: roles.includes('provider'),
+    isCustomer: roles.includes('customer'),
+    rolesLoaded,
+    signUp,
+    signIn,
+    signOut,
+    refreshRoles,
+  }), [user, session, profile, loading, roles, rolesLoaded, signUp, signIn, signOut, refreshRoles]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// ── Hooks ──────────────────────────────────────────────────────────────────────
+
+/** Primary auth hook — use everywhere */
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+};
+
+/** Role-focused hook */
+export const useRole = () => {
+  const { roles, isAdmin, isProvider, isCustomer, rolesLoaded } = useAuth();
+  return { roles, isAdmin, isProvider, isCustomer, rolesLoaded };
+};
+
+/** Admin-only hook — returns isAdmin + guard helper */
+export const useAdmin = () => {
+  const { isAdmin, rolesLoaded, user } = useAuth();
+  return {
+    isAdmin,
+    rolesLoaded,
+    userId: user?.id,
+    /** Returns true if the current user has admin role */
+    checkAdmin: () => isAdmin,
+  };
 };

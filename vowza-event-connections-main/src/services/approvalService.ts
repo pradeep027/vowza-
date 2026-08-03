@@ -4,7 +4,7 @@
 // Every action: updates DB → assigns role → sends notification → logs audit.
 
 import { supabase } from '@/integrations/supabase/client';
-import { invalidateRoleCache } from '@/components/ProtectedRoute';
+import { invalidateRoleCache } from '@/contexts/AuthContext';
 
 export interface ApprovalResult {
   success: boolean;

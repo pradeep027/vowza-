@@ -120,7 +120,7 @@ const AppContent = () => {
           <Route path="/vendor/edit" element={<ProtectedRoute allowedRoles={['provider']}><VendorEditProfile /></ProtectedRoute>} />
           <Route path="/provider/dashboard" element={<ProtectedRoute allowedRoles={['provider']}><ProviderDashboard /></ProtectedRoute>} />
 
-          {/* ── Admin — nested layout with sidebar ───────────────────────── */}
+          {/* ── Admin — AdminLayout handles auth + admin role check internally ── */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route path="dashboard"    element={<AdminDashboardHome />} />
             <Route path="artists"      element={<AdminArtists />} />

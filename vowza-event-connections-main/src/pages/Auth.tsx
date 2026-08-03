@@ -97,7 +97,7 @@ const Auth = () => {
   const [showResetForm,  setShowResetForm]  = useState(false);
   const [signupDone,     setSignupDone]     = useState(false);
 
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, roles, rolesLoaded } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isResetMode = searchParams.get('mode') === 'reset';
@@ -111,10 +111,14 @@ const Auth = () => {
     }
   }, []);
 
-  // Redirect if already logged in
+  // Role-based redirect — admin → /admin/dashboard, provider → /provider/dashboard, else → /
   useEffect(() => {
-    if (user) navigate('/');
-  }, [user, navigate]);
+    if (user && rolesLoaded) {
+      if (roles.includes('admin'))    { navigate('/admin/dashboard', { replace: true }); return; }
+      if (roles.includes('provider')) { navigate('/provider/dashboard', { replace: true }); return; }
+      navigate('/', { replace: true });
+    }
+  }, [user, roles, rolesLoaded, navigate]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
@@ -133,7 +137,8 @@ const Auth = () => {
       else toast.error(msg || 'Login failed. Please try again.');
     } else {
       toast.success('Welcome back! 🎉');
-      navigate('/');
+      // Role-based redirect happens automatically via the useEffect above
+      // when rolesLoaded becomes true after AuthContext fetches roles
     }
     setIsLoading(false);
   };

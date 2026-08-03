@@ -73,7 +73,15 @@ export default function AdminArtists() {
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       const { data, count, error } = await q;
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('permission') || error.message?.includes('policy') || error.code === 'PGRST301') {
+          toast.error('RLS is blocking admin access. Run migration 20260803000000_approval_workflow.sql in Supabase.');
+        } else {
+          toast.error(error.message);
+        }
+        setLoading(false);
+        return;
+      }
 
       // Enrich with profile data
       const ids = (data ?? []).map((a: any) => a.user_id).filter(Boolean);

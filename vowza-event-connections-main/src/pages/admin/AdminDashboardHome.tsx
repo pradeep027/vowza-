@@ -122,6 +122,9 @@ export default function AdminDashboardHome() {
 
   const s = stats;
 
+  // Show error state if RLS is blocking all queries
+  const isBlocked = s.error && s.totalArtists === 0 && s.totalUsers === 0;
+
   if (s.loading && !chartsLoaded) return (
     <div className="p-6 space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -150,7 +153,28 @@ export default function AdminDashboardHome() {
         </button>
       </div>
 
-      {/* Pending alert */}
+      {/* RLS / Permission warning */}
+      {isBlocked && (
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-2xl p-5">
+          <h3 className="text-sm font-bold text-red-700 mb-2">⚠️ Database Access Issue</h3>
+          <p className="text-xs text-red-600 leading-relaxed">
+            The admin dashboard cannot read data. This is usually caused by missing RLS policies.
+            Run the migration file <code className="bg-red-100 px-1 rounded">20260803000000_approval_workflow.sql</code> in your
+            Supabase SQL Editor to fix admin access permissions.
+          </p>
+          <p className="text-xs text-red-500 mt-2 font-mono">{s.error}</p>
+        </div>
+      )}
+
+      {/* Empty state when DB has no data yet */}
+      {!s.loading && !isBlocked && s.totalArtists === 0 && s.totalUsers === 0 && (
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 rounded-2xl p-5">
+          <p className="text-sm font-semibold text-blue-700">📊 Dashboard is ready</p>
+          <p className="text-xs text-blue-600 mt-1">
+            No data yet — stats will appear here as artists register, customers sign up, and bookings are made.
+          </p>
+        </div>
+      )}
       {s.pendingVerifications > 0 && (
         <button onClick={() => navigate('/admin/artists')}
           className="w-full flex items-center gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 hover:bg-amber-100 transition-colors text-left">

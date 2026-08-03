@@ -1,144 +1,90 @@
-// ─── ProtectedRoute ───────────────────────────────────────────────────────────
-// Protects pages behind authentication and optional role checks.
-//
-// How roles work:
-//   1. On signup → handle_new_user() trigger inserts user_id + 'customer' into user_roles
-//   2. On provider registration → provider role added via make_provider()
-//   3. Admin promotion → run in Supabase SQL Editor:
-//        SELECT public.make_admin('your-user-uuid');
-//      OR: INSERT INTO public.user_roles (user_id, role) VALUES ('<uuid>', 'admin');
+// ─── ProtectedRoute — Role-based route guard ──────────────────────────────────
+// Uses roles from AuthContext (fetched once at login, cached for session).
+// Never duplicates role-fetching logic.
+// Never hardcodes emails or UUIDs.
+// Supports: no role check (just auth), single role, multiple roles.
 
-import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Sparkles } from 'lucide-react';
 
-interface ProtectedRouteProps {
+// Re-export for backward compatibility with approvalService
+export { invalidateRoleCache, _roleCache as roleCache } from '@/contexts/AuthContext';
+
+interface Props {
   children:              React.ReactNode;
   allowedRoles?:         string[];
   requireEmailVerified?: boolean;
 }
 
-// Cache roles in memory for the session so every route doesn't re-query
-// Export so approval service can invalidate it
-export const roleCache = new Map<string, string[]>();
-export function invalidateRoleCache(userId?: string) {
-  if (userId) roleCache.delete(userId);
-  else roleCache.clear();
+// ── Premium loading screen — shown while auth/roles are being resolved ─────────
+function AdminLoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-maroon flex items-center justify-center shadow-maroon animate-pulse">
+          <Sparkles className="w-7 h-7 text-white" />
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-white/30 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+        <p className="text-sm text-white/40 font-medium">Verifying permissions…</p>
+      </div>
+    </div>
+  );
+}
+
+function GeneralLoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-gold animate-pulse flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-foreground" />
+        </div>
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    </div>
+  );
 }
 
 const ProtectedRoute = ({
   children,
   allowedRoles = [],
   requireEmailVerified = false,
-}: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
-  const [userRoles, setUserRoles]       = useState<string[]>([]);
-  const [checkingRoles, setCheckingRoles] = useState(false);
-  const [rolesLoaded, setRolesLoaded]   = useState(false);
+}: Props) => {
+  const { user, loading, roles, rolesLoaded } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    if (!user) {
-      setUserRoles([]);
-      setRolesLoaded(true);
-      return;
-    }
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
-    // Use cache to avoid repeated DB round-trips
-    if (roleCache.has(user.id)) {
-      setUserRoles(roleCache.get(user.id)!);
-      setRolesLoaded(true);
-      return;
-    }
-
-    const fetchRoles = async () => {
-      setCheckingRoles(true);
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-
-        if (error) {
-          // Table may not exist yet in some environments — fail open with 'customer'
-          console.error('[ProtectedRoute] user_roles query error:', error.message);
-          const fallback = ['customer'];
-          setUserRoles(fallback);
-          roleCache.set(user.id, fallback);
-          return;
-        }
-
-        if (!data || data.length === 0) {
-          // No rows yet — user exists but role not seeded.
-          // Insert the default customer role and proceed.
-          await supabase
-            .from('user_roles')
-            .insert({ user_id: user.id, role: 'customer' })
-            .select()
-            .maybeSingle();
-
-          const fallback = ['customer'];
-          setUserRoles(fallback);
-          roleCache.set(user.id, fallback);
-          return;
-        }
-
-        const roles = data.map(r => r.role as string);
-        setUserRoles(roles);
-        roleCache.set(user.id, roles);
-      } catch (err) {
-        // Network/unexpected error — fail open with customer
-        const fallback = ['customer'];
-        setUserRoles(fallback);
-        roleCache.set(user.id, fallback);
-      } finally {
-        setCheckingRoles(false);
-        setRolesLoaded(true);
-      }
-    };
-
-    fetchRoles();
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear cache when user changes (logout/login)
-  useEffect(() => {
-    if (!user) {
-      roleCache.clear();
-      setRolesLoaded(false);
-    }
-  }, [user]);
-
-  // ── Loading states ────────────────────────────────────────────────────────
-  if (loading || checkingRoles || !rolesLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cream via-background to-blush/20">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold" />
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        </div>
-      </div>
-    );
+  // ── Still resolving auth or roles ────────────────────────────────────────────
+  if (loading || !rolesLoaded) {
+    return isAdminRoute ? <AdminLoadingScreen /> : <GeneralLoadingScreen />;
   }
 
-  // ── Not logged in ─────────────────────────────────────────────────────────
+  // ── Not authenticated ─────────────────────────────────────────────────────────
   if (!user) {
-    toast.error('Please login to access this page');
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // ── Email verification check ──────────────────────────────────────────────
+  // ── Email verification (optional) ────────────────────────────────────────────
   if (requireEmailVerified && !user.email_confirmed_at) {
-    toast.error('Please verify your email to access this page');
     return <Navigate to="/auth" replace />;
   }
 
-  // ── Role check ────────────────────────────────────────────────────────────
+  // ── Role check ────────────────────────────────────────────────────────────────
   if (allowedRoles.length > 0) {
-    const hasRole = allowedRoles.some(role => userRoles.includes(role));
+    const hasRole = allowedRoles.some(r => roles.includes(r));
     if (!hasRole) {
-      toast.error('Access denied. You do not have permission to access this page.');
+      // Redirect to appropriate page based on their actual roles
+      if (roles.includes('admin'))    return <Navigate to="/admin/dashboard" replace />;
+      if (roles.includes('provider')) return <Navigate to="/provider/dashboard" replace />;
       return <Navigate to="/" replace />;
     }
   }

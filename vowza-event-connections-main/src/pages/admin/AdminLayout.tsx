@@ -1,18 +1,16 @@
 // ─── Admin Layout — Enterprise Shell ─────────────────────────────────────────
-// SidebarContent is defined at MODULE scope — NOT inside AdminLayout —
-// so React never unmounts it on state changes (collapsed, mobileOpen, etc.)
+// Auth is handled entirely by AuthContext — no separate role fetch here.
+// isAdmin is derived from public.user_roles (never hardcoded emails/UUIDs).
+// Real-time role subscription is handled in AuthContext.
 
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import {
+import { Sparkles, LogOut, ChevronLeft, Menu, Activity,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
   Tag, Star, Megaphone, Bell, BarChart3, Ticket, FileText,
   Globe, HeadphonesIcon, Settings, Shield, ClipboardList,
-  Activity, Sparkles, LogOut, ChevronLeft, Menu,
 } from 'lucide-react';
 
 const NAV = [
@@ -127,38 +125,21 @@ function SidebarContent({ collapsed, adminName, onSignOut }: SidebarProps) {
 
 // ── AdminLayout ───────────────────────────────────────────────────────────────
 export default function AdminLayout() {
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut, loading, isAdmin, rolesLoaded, profile } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [collapsed,  setCollapsed]  = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminName,  setAdminName]  = useState('Admin');
-  const [verifying,  setVerifying]  = useState(true);
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) { navigate('/auth'); return; }
-    (async () => {
-      const { data: roles } = await supabase
-        .from('user_roles').select('role').eq('user_id', user.id);
-      if (!roles?.some((r: any) => r.role === 'admin')) {
-        toast.error('Admin access required');
-        navigate('/');
-        return;
-      }
-      const { data: p } = await supabase
-        .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-      if (p?.full_name) setAdminName(p.full_name);
-      setVerifying(false);
-    })();
-  }, [user, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close mobile menu on navigation
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
+  const adminName   = profile?.full_name || user?.email?.split('@')[0] || 'Admin';
   const handleSignOut = () => { signOut(); navigate('/'); };
 
-  if (loading || verifying) {
+  // ── Auth + role check ──────────────────────────────────────────────────────
+  // Show premium loader while auth resolves — never flicker
+  if (loading || !rolesLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
         <div className="flex flex-col items-center gap-3">
@@ -170,6 +151,12 @@ export default function AdminLayout() {
       </div>
     );
   }
+
+  // Not logged in → auth page
+  if (!user) { navigate('/auth', { replace: true }); return null; }
+
+  // Logged in but not admin → home
+  if (!isAdmin) { navigate('/', { replace: true }); return null; }
 
   return (
     <div className="flex h-screen bg-[#f4f5f7] dark:bg-[#0f0f14] overflow-hidden">
