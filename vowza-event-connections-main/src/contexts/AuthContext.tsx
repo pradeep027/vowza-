@@ -94,7 +94,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('user_id', uid);
 
       if (error) {
-        console.error('[AuthContext] fetchRoles error:', error.message);
+        console.error('[AuthContext] fetchRoles error:', error.message, error.code, error.details);
+        // RLS might be blocking — try reading all own roles without a filter as fallback
+        const { data: fallbackData } = await supabase
+          .from('user_roles')
+          .select('role, user_id');
+        if (fallbackData) {
+          const ownRoles = fallbackData
+            .filter((r: any) => r.user_id === uid)
+            .map((r: any) => r.role as string);
+          if (ownRoles.length > 0) {
+            console.log('[AuthContext] fallback roles:', ownRoles);
+            _roleCache.set(uid, ownRoles);
+            setRoles(ownRoles);
+            setRolesLoaded(true);
+            return ownRoles;
+          }
+        }
+        // Complete failure — default to customer, but don't seed admin
         const fallback = ['customer'];
         _roleCache.set(uid, fallback);
         setRoles(fallback);
@@ -102,7 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return fallback;
       }
 
+      console.log('[AuthContext] roles fetched for', uid, ':', data);
+
       if (!data || data.length === 0) {
+        console.warn('[AuthContext] No roles found for user', uid, '— seeding customer role');
         // Seed default customer role silently
         await supabase.from('user_roles').insert({ user_id: uid, role: 'customer' });
         const fallback = ['customer'];
@@ -113,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const r = data.map(d => d.role as string);
+      console.log('[AuthContext] resolved roles:', r, '— isAdmin:', r.includes('admin'));
       _roleCache.set(uid, r);
       setRoles(r);
       setRolesLoaded(true);

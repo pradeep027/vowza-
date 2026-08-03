@@ -157,7 +157,6 @@ export default function AdminLayout() {
 
   // Logged in but not admin → home
   if (!isAdmin) { navigate('/', { replace: true }); return null; }
-
   return (
     <div className="flex h-screen bg-[#f4f5f7] dark:bg-[#0f0f14] overflow-hidden">
 
