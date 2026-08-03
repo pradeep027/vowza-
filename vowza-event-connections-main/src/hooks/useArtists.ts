@@ -170,7 +170,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       return artists;
     },
     enabled,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,  // Always fresh — approved artists must appear immediately
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -282,7 +283,8 @@ export function useFeaturedArtists(limit = 6) {
 
       return enrichProviders(providers);
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 

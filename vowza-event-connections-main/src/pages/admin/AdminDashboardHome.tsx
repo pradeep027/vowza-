@@ -65,6 +65,16 @@ export default function AdminDashboardHome() {
 
   useEffect(() => { loadCharts(); }, []);
 
+  // Re-fetch charts when provider_profiles changes (approval/rejection triggers this)
+  useEffect(() => {
+    const ch = supabase.channel('dashboard-charts-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'provider_profiles' }, () => {
+        loadCharts();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
   const loadCharts = async () => {
     try {
       const now = new Date();

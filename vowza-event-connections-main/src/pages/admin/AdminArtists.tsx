@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { approveArtist, rejectArtist, suspendArtist } from '@/services/approvalService';
@@ -48,6 +49,7 @@ const REJECT_REASONS = [
 
 export default function AdminArtists() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [tab, setTab]         = useState<Tab>('pending');
   const [artists, setArtists] = useState<Artist[]>([]);
   const [counts,  setCounts]  = useState({ pending: 0, approved: 0, rejected: 0 });
@@ -139,7 +141,7 @@ export default function AdminArtists() {
   const handleApprove = async (artist: Artist) => {
     if (!user) return;
     setProcessing(true);
-    const result = await approveArtist(artist.id, artist.user_id, user.id);
+    const result = await approveArtist(artist.id, artist.user_id, user.id, queryClient);
     if (result.success) {
       toast.success('Artist approved — profile is now live on Vowza!');
       setSelected(null);
@@ -156,7 +158,7 @@ export default function AdminArtists() {
     const reason = rejectReason === 'Other' ? rejectOther.trim() : rejectReason;
     if (!reason) { toast.error('Select or enter a rejection reason'); return; }
     setProcessing(true);
-    const result = await rejectArtist(rejectModalFor.id, rejectModalFor.user_id, user.id, reason);
+    const result = await rejectArtist(rejectModalFor.id, rejectModalFor.user_id, user.id, reason, queryClient);
     if (result.success) {
       toast.success('Artist rejected and notified');
       setRejectModalFor(null); setRejectReason(''); setRejectOther('');
@@ -174,7 +176,7 @@ export default function AdminArtists() {
     const reason = prompt('Enter suspension reason:');
     if (!reason) return;
     setProcessing(true);
-    const result = await suspendArtist(artist.id, artist.user_id, user.id, reason);
+    const result = await suspendArtist(artist.id, artist.user_id, user.id, reason, queryClient);
     if (result.success) { toast.success('Artist suspended'); load(); loadCounts(); }
     else toast.error(result.message);
     setProcessing(false);
