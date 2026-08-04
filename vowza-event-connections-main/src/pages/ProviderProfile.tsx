@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import { useAvailability, useArtists } from "@/hooks/useArtists";
+import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
 
 const fmt = (n: number) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
@@ -130,6 +131,16 @@ const ProviderProfile = () => {
   const { data: similarArtists = [] } = useArtists({ category: provider?.profession, sortBy: "rating" }, !!provider?.profession);
 
   useEffect(() => { if (id) { fetchAll(); checkFav(); } }, [id, user]);
+
+  // Record a profile view (real analytics for the vendor dashboard).
+  // Deduped per session so a refresh does not inflate the count.
+  useEffect(() => {
+    if (!id) return;
+    const key = `pv_${id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    trackProfileView(id, user?.id ?? null, 'direct');
+  }, [id, user?.id]);
 
   const checkFav = async () => {
     if (!user || !id) return;
