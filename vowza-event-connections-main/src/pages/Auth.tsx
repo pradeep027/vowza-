@@ -115,7 +115,7 @@ const Auth = () => {
   useEffect(() => {
     if (user && rolesLoaded) {
       if (roles.includes('admin'))    { navigate('/admin/dashboard', { replace: true }); return; }
-      if (roles.includes('provider')) { navigate('/provider/dashboard', { replace: true }); return; }
+      if (roles.includes('provider')) { navigate('/vendor/dashboard', { replace: true }); return; }
       navigate('/', { replace: true });
     }
   }, [user, roles, rolesLoaded, navigate]);

@@ -11,7 +11,7 @@ export interface ApprovalResult { success: boolean; message: string; }
 
 export function invalidateAllCaches(qc?: QueryClient) {
   if (!qc) return;
-  [['artists'],['featured-artists'],['admin-stats'],['admin-artists'],['categories'],['provider_profiles']]
+  [['artists'],['admin-stats'],['admin-artists'],['categories'],['provider_profiles']]
     .forEach(k => { qc.invalidateQueries({ queryKey: k }); qc.refetchQueries({ queryKey: k }); });
 }
 

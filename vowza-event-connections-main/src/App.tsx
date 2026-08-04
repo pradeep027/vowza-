@@ -58,6 +58,17 @@ const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
 const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
 
+// ─── Vendor (artist/provider dashboard) ───────────────────────────────────────
+const VendorLayout         = lazy(() => import("./pages/vendor/VendorLayout"));
+const VendorDashboardHome  = lazy(() => import("./pages/vendor/VendorDashboardHome"));
+const VendorBookings       = lazy(() => import("./pages/vendor/VendorBookings"));
+const VendorPortfolio      = lazy(() => import("./pages/vendor/VendorPortfolio"));
+const VendorPackages       = lazy(() => import("./pages/vendor/VendorPackages"));
+const VendorWallet         = lazy(() => import("./pages/vendor/VendorWallet"));
+const VendorReviews        = lazy(() => import("./pages/vendor/VendorReviews"));
+const VendorMessages       = lazy(() => import("./pages/vendor/VendorMessages"));
+const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"));
+
 // ─── Page loader fallback ─────────────────────────────────────────────────────
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -141,6 +152,31 @@ const AppContent = () => {
             <Route path="admins"       element={<AdminAdmins />} />
             <Route path="audit-logs"   element={<AdminAuditLogs />} />
             <Route path="system-health"element={<AdminSystemHealth />} />
+          </Route>
+
+          {/* ── Vendor — VendorLayout handles auth + provider role check internally ── */}
+          <Route path="/vendor" element={<VendorLayout />}>
+            <Route path="dashboard"    element={<VendorDashboardHome />} />
+            <Route path="bookings"     element={<VendorBookings />} />
+            <Route path="portfolio"    element={<VendorPortfolio />} />
+            <Route path="packages"     element={<VendorPackages />} />
+            <Route path="wallet"       element={<VendorWallet />} />
+            <Route path="reviews"      element={<VendorReviews />} />
+            <Route path="messages"     element={<VendorMessages />} />
+            <Route path="settings"     element={<VendorSettings />} />
+            {/* Placeholder routes — render dashboard home for now */}
+            <Route path="calendar"     element={<VendorDashboardHome />} />
+            <Route path="inquiries"    element={<VendorBookings />} />
+            <Route path="availability" element={<VendorDashboardHome />} />
+            <Route path="analytics"    element={<VendorDashboardHome />} />
+            <Route path="marketing"    element={<VendorDashboardHome />} />
+            <Route path="ai-assistant" element={<VendorDashboardHome />} />
+            <Route path="transactions" element={<VendorWallet />} />
+            <Route path="payouts"      element={<VendorWallet />} />
+            <Route path="performance"  element={<VendorDashboardHome />} />
+            <Route path="documents"    element={<VendorSettings />} />
+            <Route path="help"         element={<VendorDashboardHome />} />
+            <Route path="notifications"element={<VendorDashboardHome />} />
           </Route>
 
           {/* Catch-all */}

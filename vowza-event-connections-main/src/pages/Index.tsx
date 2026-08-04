@@ -4,7 +4,6 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import TrendingCategories from "@/components/TrendingCategories";
 import BrowseByEvent from "@/components/BrowseByEvent";
-import FeaturedCollections from "@/components/FeaturedCollections";
 import HowItWorks from "@/components/HowItWorks";
 import Footer from "@/components/Footer";
 import WhyVowza from "@/components/WhyVowza";
@@ -35,12 +34,6 @@ const Index = () => (
       <ErrorBoundary>
         <Suspense fallback={<SectionSkeleton />}>
           <TrendingCategories />
-        </Suspense>
-      </ErrorBoundary>
-
-      <ErrorBoundary>
-        <Suspense fallback={<SectionSkeleton />}>
-          <FeaturedCollections />
         </Suspense>
       </ErrorBoundary>
 

@@ -24,6 +24,6 @@ export function useDashboardLink(): {
 /** Pure function — role array → dashboard URL. No hardcoded emails or UUIDs. */
 export function resolveDashboard(roles: string[]): string {
   if (roles.includes('admin'))    return '/admin/dashboard';
-  if (roles.includes('provider')) return '/provider/dashboard';
+  if (roles.includes('provider')) return '/vendor/dashboard';
   return '/browse';
 }
