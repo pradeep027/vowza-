@@ -3,17 +3,20 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
-// Prefer VITE_SUPABASE_ANON_KEY; fall back to VITE_SUPABASE_PUBLISHABLE_KEY for backwards compatibility.
-// ACTION REQUIRED: Set VITE_SUPABASE_ANON_KEY in your .env file.
-// Get it from: Supabase Dashboard → Project Settings → API → anon public
+// Key resolution priority:
+//  1. VITE_SUPABASE_ANON_KEY  — the real anon/public JWT from Supabase dashboard
+//  2. VITE_SUPABASE_PUBLISHABLE_KEY — legacy name kept for compatibility
+// If ANON_KEY is empty, fall through to the publishable key automatically.
 const SUPABASE_ANON_KEY: string =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string);
+  ((import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '').trim() ||
+  ((import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || '').trim();
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error(
-    '[Supabase] Missing environment variables. ' +
-    'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
+    '[Supabase] MISSING ENV VARS!\n' +
+    '  Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.\n' +
+    '  Get the anon key from: Supabase Dashboard → Project Settings → API → anon public\n' +
+    '  Project: https://supabase.com/dashboard/project/vavfeataqwwbpjonknne/settings/api'
   );
 }
 

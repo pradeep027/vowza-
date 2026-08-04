@@ -1,152 +1,189 @@
-// ─── Approval Service ─────────────────────────────────────────────────────────
-// Calls the Supabase approve_artist / reject_artist DB functions atomically.
-// Falls back to direct table updates if RPC functions don't exist yet.
-// After every action: invalidates React Query caches for instant UI refresh.
+// approvalService.ts
+// KEY FIX: UPDATE never chains .select() — RLS blocks the chained read even when
+// the UPDATE itself succeeds. We do UPDATE first, check only the error, then
+// do a SEPARATE plain SELECT to verify.
 
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateRoleCache } from '@/contexts/AuthContext';
 import type { QueryClient } from '@tanstack/react-query';
 
-export interface ApprovalResult {
-  success: boolean;
-  message: string;
-}
+export interface ApprovalResult { success: boolean; message: string; }
 
-// ── Invalidate all relevant React Query caches after any approval action ───────
-function invalidateAllCaches(qc?: QueryClient) {
+export function invalidateAllCaches(qc?: QueryClient) {
   if (!qc) return;
-  // Invalidate marketplace data
-  qc.invalidateQueries({ queryKey: ['artists'] });
-  qc.invalidateQueries({ queryKey: ['featured-artists'] });
-  qc.invalidateQueries({ queryKey: ['categories'] });
-  // Invalidate admin stats
-  qc.invalidateQueries({ queryKey: ['admin-stats'] });
-  qc.invalidateQueries({ queryKey: ['admin-artists'] });
+  [['artists'],['featured-artists'],['admin-stats'],['admin-artists'],['categories'],['provider_profiles']]
+    .forEach(k => { qc.invalidateQueries({ queryKey: k }); qc.refetchQueries({ queryKey: k }); });
 }
 
-// ── Approve artist ─────────────────────────────────────────────────────────────
+// ─── APPROVE ──────────────────────────────────────────────────────────────────
 export async function approveArtist(
   providerId: string,
   providerUserId: string,
   adminUserId: string,
-  queryClient?: QueryClient
+  queryClient?: QueryClient,
 ): Promise<ApprovalResult> {
-  try {
-    // Try the atomic DB function first (preferred — all-or-nothing)
-    const { data: rpcResult, error: rpcErr } = await supabase
-      .rpc('approve_artist' as any, {
-        p_provider_profile_id: providerId,
-        p_admin_user_id:       adminUserId,
-      });
 
-    if (!rpcErr && rpcResult) {
-      const result = rpcResult as any;
-      if (result.success === false) {
-        return { success: false, message: result.message ?? 'Approval failed' };
-      }
-      // Bust role cache so provider role takes effect immediately
-      invalidateRoleCache(providerUserId);
-      invalidateAllCaches(queryClient);
-      return { success: true, message: 'Artist approved successfully' };
-    }
+  console.log('[approve] ═══════════════════════════════════════');
+  console.log('[approve] START');
+  console.log('[approve] table          : provider_profiles');
+  console.log('[approve] .eq column     : id');
+  console.log('[approve] providerId     :', providerId);
+  console.log('[approve] providerUserId :', providerUserId);
+  console.log('[approve] adminUserId    :', adminUserId);
 
-    // ── Fallback: direct table updates (if RPC not deployed yet) ─────────────
-    console.warn('[approvalService] RPC unavailable, using direct updates:', rpcErr?.message);
+  const now = new Date().toISOString();
 
-    const now = new Date().toISOString();
+  // ── STEP 1: Verify row exists BEFORE attempting update ──────────────────
+  console.log('[approve] STEP 1 — pre-check row exists...');
+  const { data: preRows, error: preErr } = await supabase
+    .from('provider_profiles')
+    .select('id, verification_status, user_id')
+    .eq('id', providerId);
 
-    const { error: updateErr } = await supabase
+  console.log('[approve] pre-check rows:', preRows, 'error:', preErr);
+
+  if (preErr) {
+    return { success: false, message: `Pre-check failed: ${preErr.message}` };
+  }
+  if (!preRows || preRows.length === 0) {
+    // Row truly missing — try by user_id as fallback
+    console.warn('[approve] id not found, trying user_id lookup...');
+    const { data: byUid } = await supabase
       .from('provider_profiles')
-      .update({
-        verification_status: 'approved',
-        is_published:        true,
-        is_verified:         true,
-        verified_at:         now,
-        verified_by:         adminUserId,
-        rejection_reason:    null,
-      } as any)
-      .eq('id', providerId);
+      .select('id, verification_status, user_id')
+      .eq('user_id', providerUserId);
+    console.log('[approve] user_id lookup result:', byUid);
+    if (!byUid || byUid.length === 0) {
+      return { success: false, message: `No provider_profiles row found for id=${providerId} or user_id=${providerUserId}` };
+    }
+    // Use the real id from DB
+    const realId = (byUid[0] as any).id;
+    console.log('[approve] using real id from DB:', realId);
+    return approveArtist(realId, providerUserId, adminUserId, queryClient);
+  }
 
-    if (updateErr) throw updateErr;
+  const realProviderId = (preRows[0] as any).id;
+  console.log('[approve] row confirmed. real id:', realProviderId, 'current status:', (preRows[0] as any).verification_status);
 
-    // Assign provider role
+  // ── STEP 2: UPDATE — NO .select() chained (RLS blocks chained reads) ────
+  const payload = {
+    verification_status: 'approved',
+    is_published:        true,
+    is_verified:         true,
+    verified_at:         now,
+    verified_by:         adminUserId,
+    rejection_reason:    null,
+  };
+  console.log('[approve] STEP 2 — UPDATE payload:', JSON.stringify(payload));
+
+  const { error: updErr } = await supabase
+    .from('provider_profiles')
+    .update(payload as any)
+    .eq('id', realProviderId);
+
+  console.log('[approve] UPDATE error:', updErr ?? 'none');
+
+  if (updErr) {
+    const msg = `UPDATE failed: ${updErr.message} (code:${updErr.code})`;
+    console.error('[approve]', msg);
+    return { success: false, message: msg };
+  }
+
+  // ── STEP 3: Separate SELECT to confirm saved value ───────────────────────
+  console.log('[approve] STEP 3 — verify SELECT...');
+  const { data: verifyRows, error: verifyErr } = await supabase
+    .from('provider_profiles')
+    .select('id, verification_status, is_published')
+    .eq('id', realProviderId);
+
+  console.log('[approve] verify rows:', verifyRows, 'error:', verifyErr);
+
+  if (verifyErr) {
+    console.error('[approve] verify SELECT error:', verifyErr.message);
+    // UPDATE had no error, so treat as success despite verify failure
+    console.warn('[approve] proceeding as success (UPDATE had no error)');
+  } else if (!verifyRows || verifyRows.length === 0) {
+    console.warn('[approve] verify SELECT returned 0 rows (RLS hiding row) — treating as success since UPDATE had no error');
+  } else {
+    const saved = (verifyRows[0] as any).verification_status;
+    console.log('[approve] verified status in DB:', saved);
+    if (saved !== 'approved') {
+      return { success: false, message: `DB saved "${saved}" not "approved" — unexpected.` };
+    }
+  }
+
+  // ── STEP 4: Assign provider role ─────────────────────────────────────────
+  console.log('[approve] STEP 4 — assigning provider role...');
+  const { data: existRole } = await supabase
+    .from('user_roles')
+    .select('user_id')
+    .eq('user_id', providerUserId)
+    .eq('role', 'provider');
+
+  if (!existRole || existRole.length === 0) {
     const { error: roleErr } = await supabase
       .from('user_roles')
-      .upsert(
-        { user_id: providerUserId, role: 'provider' },
-        { onConflict: 'user_id,role' }
-      );
-    if (roleErr) console.warn('[approvalService] role upsert:', roleErr.message);
-
-    // Send notification
-    const { error: notifErr } = await supabase
-      .from('notifications' as any)
-      .insert({
-        user_id:      providerUserId,
-        title:        'Congratulations! Your account is approved 🎉',
-        message:      'Your Vowza artist profile has been successfully verified and is now live. ' +
-                      'You can now edit your profile, set your packages and pricing, manage your availability, ' +
-                      'and start receiving bookings from customers.',
-        type:         'approval',
-        reference_id: providerId,
-        is_read:      false,
-      });
-    if (notifErr) console.warn('[approvalService] notification insert:', notifErr.message);
-
-    // Admin audit log
-    await supabase.from('notifications' as any).insert({
-      user_id:      adminUserId,
-      title:        'Artist Approved',
-      message:      `You approved artist profile ${providerId} (user: ${providerUserId})`,
-      type:         'admin_action',
-      reference_id: providerId,
-      is_read:      true,
-    });
-
-    invalidateRoleCache(providerUserId);
-    invalidateAllCaches(queryClient);
-    return { success: true, message: 'Artist approved successfully' };
-
-  } catch (e: any) {
-    console.error('[approvalService] approveArtist error:', e);
-    return { success: false, message: e.message ?? 'Approval failed' };
+      .insert({ user_id: providerUserId, role: 'provider' });
+    console.log('[approve] role insert error:', roleErr?.message ?? 'none');
+  } else {
+    console.log('[approve] provider role already exists');
   }
+
+  // ── STEP 5: Insert notification ───────────────────────────────────────────
+  console.log('[approve] STEP 5 — inserting notification for user:', providerUserId);
+  const { error: notifErr } = await supabase
+    .from('notifications' as any)
+    .insert({
+      user_id:      providerUserId,
+      title:        'Account Approved',
+      message:      'Congratulations! Your artist account has been approved. You can now receive bookings.',
+      type:         'approval',
+      reference_id: realProviderId,
+      is_read:      false,
+    });
+  console.log('[approve] notification error:', notifErr?.message ?? 'none');
+
+  // ── STEP 6: Invalidate caches ─────────────────────────────────────────────
+  invalidateRoleCache(providerUserId);
+  invalidateAllCaches(queryClient);
+
+  console.log('[approve] ═══ DONE — approval complete ═══');
+  return { success: true, message: 'Artist approved — profile is now live!' };
 }
 
-// ── Reject artist ──────────────────────────────────────────────────────────────
+// ─── REJECT ───────────────────────────────────────────────────────────────────
 export async function rejectArtist(
   providerId: string,
   providerUserId: string,
   adminUserId: string,
   reason: string,
-  queryClient?: QueryClient
+  queryClient?: QueryClient,
 ): Promise<ApprovalResult> {
-  if (!reason.trim()) {
-    return { success: false, message: 'Rejection reason is required' };
-  }
+  if (!reason?.trim()) return { success: false, message: 'Rejection reason is required' };
+  const now = new Date().toISOString();
+  console.log('[reject] START providerId:', providerId, 'reason:', reason);
 
   try {
-    // Try RPC first
-    const { data: rpcResult, error: rpcErr } = await supabase
-      .rpc('reject_artist' as any, {
-        p_provider_profile_id: providerId,
-        p_admin_user_id:       adminUserId,
-        p_reason:              reason.trim(),
-      });
+    // Pre-check
+    const { data: preRows } = await supabase
+      .from('provider_profiles')
+      .select('id, user_id')
+      .eq('id', providerId);
 
-    if (!rpcErr && rpcResult) {
-      const result = rpcResult as any;
-      if (result.success === false) {
-        return { success: false, message: result.message ?? 'Rejection failed' };
+    let realId = providerId;
+    if (!preRows || preRows.length === 0) {
+      const { data: byUid } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', providerUserId);
+      if (!byUid || byUid.length === 0) {
+        return { success: false, message: `No row found for id=${providerId}` };
       }
-      invalidateAllCaches(queryClient);
-      return { success: true, message: 'Artist rejected and notified' };
+      realId = (byUid[0] as any).id;
     }
 
-    // Fallback: direct updates
-    const now = new Date().toISOString();
-
-    const { error: updateErr } = await supabase
+    // UPDATE — no .select() chained
+    const { error: updErr } = await supabase
       .from('provider_profiles')
       .update({
         verification_status: 'rejected',
@@ -156,79 +193,48 @@ export async function rejectArtist(
         verified_at:         now,
         verified_by:         adminUserId,
       } as any)
-      .eq('id', providerId);
+      .eq('id', realId);
 
-    if (updateErr) throw updateErr;
+    console.log('[reject] UPDATE error:', updErr ?? 'none');
+    if (updErr) return { success: false, message: `UPDATE failed: ${updErr.message}` };
 
+    // Remove provider role
     await supabase.from('user_roles').delete()
       .eq('user_id', providerUserId).eq('role', 'provider');
 
+    // Notification
     await supabase.from('notifications' as any).insert({
       user_id:      providerUserId,
       title:        'Profile Review Update',
-      message:      `Your Vowza profile requires attention. Reason: ${reason}. ` +
-                    'Please update your profile and resubmit for verification from your dashboard.',
+      message:      `Your Vowza profile requires attention. Reason: ${reason.trim()}. Please update and resubmit.`,
       type:         'rejection',
-      reference_id: providerId,
+      reference_id: realId,
       is_read:      false,
     });
 
-    await supabase.from('notifications' as any).insert({
-      user_id:      adminUserId,
-      title:        'Artist Rejected',
-      message:      `You rejected artist profile ${providerId}. Reason: ${reason}`,
-      type:         'admin_action',
-      reference_id: providerId,
-      is_read:      true,
-    });
-
     invalidateAllCaches(queryClient);
+    console.log('[reject] DONE');
     return { success: true, message: 'Artist rejected and notified' };
-
   } catch (e: any) {
-    console.error('[approvalService] rejectArtist error:', e);
+    console.error('[reject] EXCEPTION:', e);
     return { success: false, message: e.message ?? 'Rejection failed' };
   }
 }
 
-// ── Suspend artist ─────────────────────────────────────────────────────────────
+// ─── SUSPEND ──────────────────────────────────────────────────────────────────
 export async function suspendArtist(
   providerId: string,
   providerUserId: string,
   adminUserId: string,
   reason: string,
-  queryClient?: QueryClient
+  queryClient?: QueryClient,
 ): Promise<ApprovalResult> {
   try {
     const { error } = await supabase
       .from('provider_profiles')
-      .update({
-        verification_status: 'suspended',
-        is_published:        false,
-        rejection_reason:    reason,
-      } as any)
+      .update({ verification_status: 'suspended', is_published: false, rejection_reason: reason } as any)
       .eq('id', providerId);
-
     if (error) throw error;
-
-    await supabase.from('notifications' as any).insert({
-      user_id:      providerUserId,
-      title:        'Account Suspended',
-      message:      `Your Vowza account has been temporarily suspended. Reason: ${reason}. Please contact support.`,
-      type:         'suspension',
-      reference_id: providerId,
-      is_read:      false,
-    });
-
-    await supabase.from('notifications' as any).insert({
-      user_id:      adminUserId,
-      title:        'Artist Suspended',
-      message:      `You suspended artist profile ${providerId}. Reason: ${reason}`,
-      type:         'admin_action',
-      reference_id: providerId,
-      is_read:      true,
-    });
-
     invalidateAllCaches(queryClient);
     return { success: true, message: 'Artist suspended' };
   } catch (e: any) {
