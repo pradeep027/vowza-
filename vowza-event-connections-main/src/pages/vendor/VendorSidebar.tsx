@@ -2,6 +2,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import AppLogo from '@/components/AppLogo';
 import {
   LayoutDashboard, CalendarDays, BookOpen, MessageSquare,
   Image, Package, Clock, Star, BarChart3, Megaphone,
@@ -52,11 +53,8 @@ export default function VendorSidebar({ collapsed, setCollapsed, mobileOpen, set
   return (
     <aside className={sidebarClasses}>
       {/* Logo */}
-      <div className={cn('flex items-center h-16 border-b border-border/60 px-4 flex-shrink-0', collapsed && 'justify-center')}>
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37] flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
-        {!collapsed && <span className="ml-2.5 text-lg font-bold text-foreground tracking-tight">Vowza</span>}
+      <div className={cn('flex items-center h-16 border-b border-border/60 px-4 flex-shrink-0', collapsed && 'justify-center px-2')}>
+        <AppLogo collapsed={collapsed} size="md" />
       </div>
 
       {/* Nav items */}

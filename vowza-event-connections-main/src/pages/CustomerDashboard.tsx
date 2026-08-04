@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import AppLogo from '@/components/AppLogo';
 import { useProviders, Provider } from '@/hooks/useProviders';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -170,12 +171,7 @@ Thank you for choosing Vowza!
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-gold/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">Vowza</span>
-          </Link>
+          <AppLogo size="lg" />
           <div className="flex items-center gap-3">
             <Button
               variant={activeTab === 'browse' ? 'default' : 'ghost'}

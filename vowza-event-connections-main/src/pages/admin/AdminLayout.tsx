@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import AppLogo from '@/components/AppLogo';
 import { cn } from '@/lib/utils';
 import { Sparkles, LogOut, ChevronLeft, Menu, Activity,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
@@ -45,19 +46,17 @@ interface SidebarProps {
 function SidebarContent({ collapsed, adminName, onSignOut }: SidebarProps) {
   return (
     <div className="flex flex-col h-full">
-      {/* Logo */}
+      {/* Logo — role-aware Home navigation */}
       <div className={cn(
-        'flex items-center gap-2.5 px-4 py-5 border-b border-white/8 flex-shrink-0',
+        'flex items-center px-4 py-5 border-b border-white/8 flex-shrink-0',
         collapsed && 'justify-center px-2',
       )}>
-        <div className="w-8 h-8 rounded-xl bg-gradient-maroon flex items-center justify-center flex-shrink-0 shadow-maroon">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
-        {!collapsed && (
-          <span className="text-base font-display font-bold text-white tracking-tight">
-            Vowza Admin
-          </span>
-        )}
+        <AppLogo
+          label="Vowza Admin"
+          collapsed={collapsed}
+          theme="dark"
+          size="sm"
+        />
       </div>
 
       {/* Nav */}

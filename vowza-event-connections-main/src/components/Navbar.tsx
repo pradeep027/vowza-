@@ -16,6 +16,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useDashboardLink } from "@/hooks/useDashboardLink";
+import AppLogo from "@/components/AppLogo";
 import { cn } from "@/lib/utils";
 
 // ── Mega menu data ─────────────────────────────────────────────────────────
@@ -136,15 +137,8 @@ const Navbar = () => {
         <div className="container">
           <div className={cn("flex items-center justify-between transition-all duration-300", navH)}>
 
-            {/* ── Logo ────────────────────────────────────────────────── */}
-            <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group" aria-label="Vowza home">
-              <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon group-hover:shadow-lg transition-shadow">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-xl font-display font-bold text-foreground tracking-tight">
-                Vowza
-              </span>
-            </Link>
+            {/* ── Logo — role-aware Home navigation ───────────────────── */}
+            <AppLogo size="lg" className="flex-shrink-0" />
 
             {/* ── Desktop nav links ────────────────────────────────────── */}
             <div className="hidden lg:flex items-center gap-1" ref={megaRef}>

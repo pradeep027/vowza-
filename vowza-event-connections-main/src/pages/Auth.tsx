@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import AppLogo from '@/components/AppLogo';
 import {
   Sparkles, Lock, Eye, EyeOff, ArrowLeft, Mail,
   User, Phone, CheckCircle, ArrowRight,
@@ -31,12 +32,7 @@ const AuthLayout = memo(({ children }: { children: React.ReactNode }) => (
         style={{ background: 'radial-gradient(circle, hsl(40 95% 52%), transparent 70%)' }} />
 
       {/* Logo */}
-      <Link to="/" className="flex items-center gap-2.5 relative z-10">
-        <div className="w-9 h-9 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
-          <Sparkles className="w-4.5 h-4.5 text-white" />
-        </div>
-        <span className="text-xl font-display font-bold text-white">Vowza</span>
-      </Link>
+      <AppLogo theme="dark" size="lg" className="relative z-10" />
 
       {/* Brand copy */}
       <div className="relative z-10">
@@ -66,12 +62,7 @@ const AuthLayout = memo(({ children }: { children: React.ReactNode }) => (
     <div className="flex-1 flex items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md">
         {/* Mobile logo */}
-        <Link to="/" className="flex items-center gap-2 mb-8 lg:hidden">
-          <div className="w-8 h-8 rounded-xl bg-gradient-maroon flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-lg font-display font-bold text-foreground">Vowza</span>
-        </Link>
+        <AppLogo size="md" className="mb-8 lg:hidden" />
         {children}
       </div>
     </div>
