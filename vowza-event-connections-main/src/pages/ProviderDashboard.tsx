@@ -265,8 +265,7 @@ const ProviderDashboard = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    await signOut(); // signOut() handles redirect internally
   };
 
   const getStatusColor = (status: BookingStatus) => {

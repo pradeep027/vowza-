@@ -154,8 +154,7 @@ Thank you for choosing Vowza!
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    await signOut(); // signOut() handles redirect internally
   };
 
   if (loading) {

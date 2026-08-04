@@ -36,46 +36,80 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
   const [providerError, setProviderError] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<CheckItem[]>([]);
 
-  // ── Robust fetch: try by id, then by user_id, never use .single() ──────────
+  // ── Fetch: array queries only — NEVER .single() or .maybeSingle() ──────────
   const fetchProvider = useCallback(async (retryCount = 0) => {
     setProviderLoading(true);
     setProviderError(null);
     try {
-      console.log('[Drawer] fetching id:', artist.id, 'user_id:', artist.user_id);
+      console.log('[Drawer] ── fetch START ──────────────────────');
+      console.log('[Drawer] artist.id     :', artist.id);
+      console.log('[Drawer] artist.user_id:', artist.user_id);
 
-      // Attempt 1: match provider_profiles.id
-      const { data: byId } = await supabase
-        .from('provider_profiles').select('*')
-        .eq('id', artist.id).maybeSingle();
+      // ── 1. provider_profiles: try by id first ──────────────────────────────
+      console.log('[Drawer] Q1 table=provider_profiles filter=id eq', artist.id);
+      const { data: byId, error: e1 } = await supabase
+        .from('provider_profiles')
+        .select('*')
+        .eq('id', artist.id)
+        .limit(1);                    // array — never throws on 0 rows
 
-      // Attempt 2: match provider_profiles.user_id (fallback)
-      let provider = byId;
+      console.log('[Drawer] Q1 rows:', byId?.length ?? 0, 'error:', e1?.message ?? 'none');
+
+      let provider: any = byId && byId.length > 0 ? byId[0] : null;
+
+      // ── 2. Fallback: try by user_id ─────────────────────────────────────────
       if (!provider && artist.user_id) {
-        const { data: byUid } = await supabase
-          .from('provider_profiles').select('*')
-          .eq('user_id', artist.user_id).maybeSingle();
-        provider = byUid ?? null;
+        console.log('[Drawer] Q2 table=provider_profiles filter=user_id eq', artist.user_id);
+        const { data: byUid, error: e2 } = await supabase
+          .from('provider_profiles')
+          .select('*')
+          .eq('user_id', artist.user_id)
+          .limit(1);
+        console.log('[Drawer] Q2 rows:', byUid?.length ?? 0, 'error:', e2?.message ?? 'none');
+        provider = byUid && byUid.length > 0 ? byUid[0] : null;
       }
 
-      if (!provider) throw new Error(`No profile found for id=${artist.id}`);
+      if (!provider) {
+        throw new Error(
+          `No provider_profiles row found.\n` +
+          `  Tried id = ${artist.id}\n` +
+          `  Tried user_id = ${artist.user_id}`
+        );
+      }
 
-      // Profile row
+      console.log('[Drawer] provider found — id:', provider.id, 'status:', provider.verification_status);
+
+      // ── 3. profiles table: array query ─────────────────────────────────────
       const uid = provider.user_id || artist.user_id;
-      const { data: profile } = await supabase
+      console.log('[Drawer] Q3 table=profiles filter=id eq', uid);
+      const { data: profileRows, error: e3 } = await supabase
         .from('profiles')
         .select('id,full_name,email,phone,avatar_url,city,state,area')
-        .eq('id', uid).maybeSingle();
+        .eq('id', uid)
+        .limit(1);
+      console.log('[Drawer] Q3 rows:', profileRows?.length ?? 0, 'error:', e3?.message ?? 'none');
+      const profile = profileRows && profileRows.length > 0 ? profileRows[0] : {};
 
-      // Portfolio
-      const { data: portfolio } = await supabase
-        .from('portfolio_items').select('*')
+      // ── 4. portfolio_items: already returns array ───────────────────────────
+      console.log('[Drawer] Q4 table=portfolio_items filter=provider_id eq', provider.id);
+      const { data: portfolio, error: e4 } = await supabase
+        .from('portfolio_items')
+        .select('id,media_url,media_type,title,created_at')
         .eq('provider_id', provider.id)
-        .order('created_at', { ascending: false }).limit(12);
+        .order('created_at', { ascending: false })
+        .limit(20);
+      console.log('[Drawer] Q4 rows:', portfolio?.length ?? 0, 'error:', e4?.message ?? 'none');
 
-      setProviderData({ provider, profile: profile ?? {}, portfolio: portfolio ?? [] });
+      setProviderData({ provider, profile, portfolio: portfolio ?? [] });
+      console.log('[Drawer] ── fetch DONE ──────────────────────');
+
     } catch (err: any) {
-      console.error('[Drawer] fetchProvider error:', err);
-      if (retryCount === 0) { setTimeout(() => fetchProvider(1), 1500); return; }
+      console.error('[Drawer] fetchProvider error:', err.message);
+      if (retryCount === 0) {
+        console.log('[Drawer] auto-retry in 1.5s...');
+        setTimeout(() => fetchProvider(1), 1500);
+        return;
+      }
       setProviderError(err.message ?? 'Failed to load artist data');
     } finally {
       setProviderLoading(false);
@@ -110,8 +144,15 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
 
   const allChecked = checklist.length > 0 && checklist.every(c => c.checked);
   const doneCount  = checklist.filter(c => c.checked).length;
-  const isPending  = artist.verification_status === 'pending';
-  const isApproved = artist.verification_status === 'approved';
+
+  // Use fresh DB status once loaded — prop may be stale after approve/reject
+  const liveStatus = providerData
+    ? (providerData.provider.verification_status as string)
+    : artist.verification_status;
+
+  const isPending  = liveStatus === 'pending';
+  const isApproved = liveStatus === 'approved';
+  const isRejected = liveStatus === 'rejected';
 
   const prov    = providerData?.provider ?? {};
   const prof    = providerData?.profile  ?? {};
@@ -163,11 +204,12 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
           </div>
           <div className="flex items-center gap-2">
             <span className={cn('text-[10px] font-bold border px-2.5 py-1 rounded-full', {
-              'bg-amber-50 text-amber-700 border-amber-200':   isPending,
+              'bg-amber-50 text-amber-700 border-amber-200':     isPending,
               'bg-emerald-50 text-emerald-700 border-emerald-200': isApproved,
-              'bg-red-50 text-red-700 border-red-200':         !isPending && !isApproved,
+              'bg-red-50 text-red-700 border-red-200':           isRejected,
+              'bg-gray-100 text-gray-600 border-gray-200':       !isPending && !isApproved && !isRejected,
             })}>
-              {artist.verification_status}
+              {liveStatus}
             </span>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
               <X className="w-4 h-4" />
@@ -431,6 +473,18 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
             <button onClick={onSuspend} disabled={processing}
               className="px-4 py-3 rounded-xl border border-amber-200 text-amber-600 text-sm font-semibold hover:bg-amber-50 disabled:opacity-50">
               Suspend
+            </button>
+          </div>
+        )}
+        {isRejected && !providerLoading && !providerError && (
+          <div className="border-t border-border/60 p-4 flex gap-3 flex-shrink-0 bg-background">
+            <div className="flex-1 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500" />
+              <span className="text-sm font-semibold text-red-700">Artist Rejected</span>
+            </div>
+            <button onClick={onApprove} disabled={processing}
+              className="px-4 py-3 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+              Re-approve
             </button>
           </div>
         )}

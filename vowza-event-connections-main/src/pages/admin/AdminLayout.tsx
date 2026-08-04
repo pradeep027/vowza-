@@ -135,7 +135,7 @@ export default function AdminLayout() {
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const adminName   = profile?.full_name || user?.email?.split('@')[0] || 'Admin';
-  const handleSignOut = () => { signOut(); navigate('/'); };
+  const handleSignOut = () => { signOut(); }; // signOut() handles redirect internally
 
   // ── Auth + role check ──────────────────────────────────────────────────────
   // Show premium loader while auth resolves — never flicker

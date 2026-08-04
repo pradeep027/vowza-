@@ -180,20 +180,24 @@ export function useArtist(id: string) {
   return useQuery({
     queryKey: ['artist', id],
     queryFn:  async () => {
-      const { data: p, error } = await supabase
+      // Use array query + [0] — never .single() which throws on 0 rows
+      const { data: rows, error } = await supabase
         .from('provider_profiles')
         .select('*')
         .eq('id', id)
-        .single();
+        .limit(1);
 
       if (error) throw error;
+      if (!rows || rows.length === 0) throw new Error(`Artist not found: ${id}`);
+      const p = rows[0] as any;
 
-      const { data: profile } = await supabase
+      const { data: profileRows } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, city, state, area, phone, address')
+        .select('id, full_name, avatar_url, city, state, area, phone')
         .eq('id', p.user_id)
-        .maybeSingle();
+        .limit(1);
 
+      const profile = profileRows && profileRows.length > 0 ? profileRows[0] : null;
       const catMeta = getCategoryMeta(p.profession);
 
       return { ...p, profile: profile ?? null, category_name: catMeta.name, category_icon: catMeta.icon };
@@ -338,14 +342,15 @@ export function useAvailability(providerId: string, date: Date) {
   return useQuery({
     queryKey: ['availability', providerId, date.toISOString().split('T')[0]],
     queryFn:  async () => {
+      // Use array + [0] — maybeSingle() throws when multiple rows exist
       const { data, error } = await supabase
         .from('provider_availability')
         .select('*')
         .eq('provider_id', providerId)
         .eq('unavailable_date', date.toISOString().split('T')[0])
-        .maybeSingle();
+        .limit(1);
       if (error) throw error;
-      return { available: !data }; // no row = available
+      return { available: !data || data.length === 0 }; // no row = available
     },
     enabled:   !!providerId && !!date,
     staleTime: 1000 * 60,

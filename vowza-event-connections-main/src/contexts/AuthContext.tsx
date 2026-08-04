@@ -239,9 +239,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = useCallback(async () => {
-    localStorage.removeItem('inactivityLogout');
-    _roleCache.clear();
-    await supabase.auth.signOut();
+    try {
+      localStorage.removeItem('inactivityLogout');
+      // Clear all session/cache data before signOut
+      _roleCache.clear();
+      sessionStorage.clear();
+      // Clear every localStorage key that Supabase uses
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+          localStorage.removeItem(key);
+        }
+      });
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      console.error('[AuthContext] signOut error:', e);
+    } finally {
+      // Hard redirect — works from any context (no useNavigate needed)
+      // Forces React Query cache to be reset because the page reloads
+      window.location.href = '/auth';
+    }
   }, []);
 
   // ── Derived values (memoised to avoid unnecessary re-renders) ─────────────────
