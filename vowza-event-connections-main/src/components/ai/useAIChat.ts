@@ -367,6 +367,14 @@ export function useAIChat() {
     await send(lastUser.text);
   }, [send]);
 
+  // ── Like / Dislike a message (client-side feedback signal) ──────────────────
+  const setMessageReaction = useCallback((messageId: string, reaction: 'like' | 'dislike') => {
+    messagesRef.current = messagesRef.current.map(m =>
+      m.id === messageId ? { ...m, reaction: m.reaction === reaction ? undefined : reaction } : m
+    );
+    setMessages(messagesRef.current);
+  }, []);
+
   // ── Clear ─────────────────────────────────────────────────────────────────────
   // "New Chat" must start with ZERO memory — no leftover event type, city,
   // budget, guest count, etc. from the previous conversation. That memory is
@@ -415,6 +423,7 @@ export function useAIChat() {
     favoriteConversation,
     duplicateConversationById,
     exportConversation,
+    setMessageReaction,
     refreshConversations,
     quickPrompts: QUICK_PROMPTS,
   };

@@ -94,6 +94,112 @@ const MIN_CPG: Record<string, number> = {
 };
 
 // ─── Budget Planner ───────────────────────────────────────────────────────────
+// ─── Event Overview Generator ─────────────────────────────────────────────────
+// Produces the "expert planner" narrative that accompanies every plan_event
+// response: Decoration Ideas, Photography Plan, Entertainment Plan, Guest
+// Management, Parking Plan, Weather Backup, Emergency Planning, and Money
+// Saving Tips. This is pure AI knowledge — it never touches the vendor
+// database and is always safe to show immediately.
+const DECORATION_IDEAS: Record<string, string[]> = {
+  wedding:       ["Floral mandap with marigold, roses & jasmine in gold/red/ivory palette", "Draped fabric backdrops with fairy lights for the stage", "Hanging floral chandeliers over the mandap and entrance", "Themed centerpieces per table matching the couple's colour scheme"],
+  reception:     ["Elegant pastel florals with LED uplighting", "Modern geometric backdrop with the couple's monogram", "Candle-lit centerpieces for a romantic evening ambience", "Photo wall with fairy lights for guest photo-ops"],
+  birthday:      ["Balloon garlands and backdrop matching the theme colour", "Personalised banner with name/age cutouts", "Table centerpieces with themed props", "Photo booth corner with fun props"],
+  housewarming:  ["Traditional torans and rangoli at the entrance", "Diya and flower decor around the puja area", "Fresh flower garlands on doors and windows", "Simple elegant table settings for guests"],
+  engagement:    ["Floral arch for the ring ceremony moment", "Fairy-lit backdrop in soft pastel tones", "Elegant centerpieces with candles and roses", "Welcome signage with the couple's names"],
+  corporate:     ["Branded backdrop with company logo and colours", "Clean stage setup with LED screen for presentations", "Registration desk with branded standees", "Minimal, professional centerpieces"],
+  babyshower:    ["Soft pastel balloon arch (pink/blue/neutral)", "Themed banner and welcome signage", "Baby-themed centerpieces and dessert table styling", "Photo corner with props for the mom-to-be"],
+  default:       ["Backdrop styled to match your chosen theme and colour palette", "Fresh floral or fabric centerpieces for each table", "Entrance decor that sets the tone for guests", "Ambient lighting — fairy lights or uplighting for evening events"],
+};
+
+const PHOTOGRAPHY_PLANS: Record<string, string[]> = {
+  wedding:   ["Pre-event detail shots — decor, venue, outfits (1 hr before guests arrive)", "Candid coverage through all rituals and the main ceremony", "Golden Hour couple portraits (typically 5:30–6:30 PM)", "Family group photos — allocate a dedicated 30-min slot", "Drone/aerial shots for wide venue coverage if outdoor"],
+  reception: ["Couple's grand entry shot", "First dance and cake-cutting moments", "Candid guest interaction shots throughout the evening", "Formal family portraits early in the evening before it gets crowded"],
+  birthday:  ["Candid candid shots throughout the party", "Cake-cutting and gift-opening moments", "Group photos with family and friends", "Fun/candid shots near the photo booth"],
+  default:   ["Candid coverage of key moments throughout the event", "Formal group photos with family/guests", "Detail shots of decor and setup", "Golden hour outdoor shots if the venue allows"],
+};
+
+const ENTERTAINMENT_PLANS: Record<string, string[]> = {
+  wedding:    ["Baraat/procession music — live band or DJ", "Post-ceremony DJ set for dancing", "Optional: live singer for dinner-hour ambience"],
+  sangeet:    ["Choreographed family performances", "Live band for the first half, DJ for dancing after", "Anchor/emcee to keep the flow smooth between acts"],
+  reception:  ["Live band or DJ for background music during dinner", "Dedicated dance floor session post-dinner", "First dance moment choreographed in advance"],
+  birthday:   ["Music playlist or DJ matched to the age group and theme", "Games/activities appropriate to guest ages", "Cake-cutting moment with a dedicated song"],
+  corporate:  ["Welcome/background music during networking", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
+  default:    ["Curated music playlist or DJ matched to the event mood", "An anchor/emcee if the event has a formal programme", "A dedicated moment for key highlights (e.g. speeches, cake, awards)"],
+};
+
+const GUEST_MANAGEMENT_TIPS: string[] = [
+  "Send invitations (digital or print) at least 4-6 weeks in advance",
+  "Use an RSVP tracker (spreadsheet or app) to finalise headcount 1-2 weeks before",
+  "Assign a welcome desk/coordinator for guest check-in on the day",
+  "Plan seating charts in advance for formal sit-down events",
+  "Share venue location, parking, and dress code details in the invite",
+];
+
+const PARKING_PLANS: string[] = [
+  "Confirm venue parking capacity matches your expected guest count",
+  "Arrange valet service for venues with limited on-site parking",
+  "Put up clear parking signage/volunteers to direct guests smoothly",
+  "For large events, consider a shuttle service from an overflow parking area",
+];
+
+const EMERGENCY_PLANS: string[] = [
+  "Keep a basic first-aid kit on-site and know the nearest hospital",
+  "Have a backup power/generator plan in case of outages",
+  "Assign one point-of-contact coordinator for vendor issues on the day",
+  "Keep printed copies of all vendor contracts and contact numbers on hand",
+  "Have a weather backup (indoor space or tent) confirmed for outdoor events",
+];
+
+function pick(map: Record<string, string[]>, key?: string): string[] {
+  return map[key ?? ""] ?? map.default ?? Object.values(map)[0];
+}
+
+export function generateEventOverviewText(ctx: PlannerContext): string {
+  const eventType = ctx.eventType ?? "wedding";
+  const eventLabel = eventType.charAt(0).toUpperCase() + eventType.slice(1);
+  const city = ctx.city ?? "your city";
+  const guestCount = ctx.guestCount ?? 200;
+  const isOutdoor = ctx.venueType === "outdoor" || ctx.venueType === "both";
+
+  const decor = pick(DECORATION_IDEAS, eventType);
+  const photo = pick(PHOTOGRAPHY_PLANS, eventType);
+  const entertainment = pick(ENTERTAINMENT_PLANS, eventType);
+
+  const lines: string[] = [
+    `## 📋 ${eventLabel} Overview — ${city}, ${guestCount} guests`,
+    ``,
+    `### 🎨 Decoration Ideas`,
+    ...decor.map(d => `- ${d}`),
+    ``,
+    `### 📸 Photography Plan`,
+    ...photo.map(p => `- ${p}`),
+    ``,
+    `### 🎤 Entertainment Plan`,
+    ...entertainment.map(e => `- ${e}`),
+    ``,
+    `### 👥 Guest Management`,
+    ...GUEST_MANAGEMENT_TIPS.slice(0, 4).map(g => `- ${g}`),
+    ``,
+    `### 🚗 Parking Plan`,
+    ...PARKING_PLANS.slice(0, 3).map(p => `- ${p}`),
+  ];
+
+  if (isOutdoor) {
+    lines.push(``, `### 🌦️ Weather Backup`, `- Confirm an indoor backup venue or a covered tent option in case of rain or extreme heat`, `- Track the weather forecast closely in the week leading up to the event`);
+  }
+
+  lines.push(
+    ``, `### 🚨 Emergency Planning`,
+    ...EMERGENCY_PLANS.slice(0, 3).map(e => `- ${e}`),
+    ``, `### 💰 Money Saving Tips`,
+    "- Book vendors 4-6 months ahead for early-bird discounts",
+    "- Choose weekday dates — venues are typically 25-35% cheaper",
+    "- Use seasonal local flowers instead of imported blooms",
+  );
+
+  return lines.join('\n');
+}
+
 export function generateBudgetPlan(ctx: PlannerContext): BudgetPlan {
   const { budget = 500000, guestCount = 200, city, eventType = "wedding" } = ctx;
   const m = getMul(ctx);
@@ -695,10 +801,12 @@ export async function processMessage(
 
     case 'plan_event': {
       const plan = generateWeddingPlan(ctx);
+      const intro = `Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`;
+      const overview = generateEventOverviewText(ctx);
       return {
         response: {
           type: 'wedding_plan',
-          text: withFollowUp(`Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`, ctx),
+          text: withFollowUp(`${intro}\n\n${overview}`, ctx),
           data: { weddingPlan: plan },
         },
         updatedContext: ctx,

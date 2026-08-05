@@ -13,8 +13,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Send, Mic, MicOff, Paperclip, Sparkles,
   RotateCcw, ChevronDown, Check, Copy, PanelLeft,
-  Pencil, RefreshCw,
+  Pencil, RefreshCw, ThumbsUp, ThumbsDown, Share2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAIChat } from './useAIChat';
 import MarkdownMessage from './MarkdownMessage';
 import AIResponseCards from './AIResponseCards';
@@ -31,16 +32,21 @@ interface Props {
 
 // ─── Typing animation dots ────────────────────────────────────────────────────
 const TypingDots = () => (
-  <div className="flex items-center gap-1 px-1 py-0.5">
+  <div className="flex items-center gap-1.5 px-1.5 py-1">
     {[0, 1, 2].map(i => (
       <motion.span
         key={i}
-        className="w-2 h-2 rounded-full bg-gold/60"
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+        className="w-2 h-2 rounded-full bg-gradient-gold"
+        animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.16, ease: 'easeInOut' }}
       />
     ))}
   </div>
+);
+
+// ─── Blinking cursor shown at the end of streaming text ───────────────────────
+const StreamingCursor = () => (
+  <span className="inline-block w-[2px] h-4 bg-gold ml-0.5 align-middle animate-blink-cursor" />
 );
 
 // ─── Single message bubble ────────────────────────────────────────────────────
@@ -48,11 +54,13 @@ const MessageBubble = ({
   msg,
   onEdit,
   onRegenerate,
+  onReact,
   isLast,
 }: {
   msg:           ChatMessage;
   onEdit:        (id: string, text: string) => void;
   onRegenerate:  () => void;
+  onReact:       (id: string, reaction: 'like' | 'dislike') => void;
   isLast:        boolean;
 }) => {
   const [copied,    setCopied]    = useState(false);
@@ -64,6 +72,19 @@ const MessageBubble = ({
     navigator.clipboard.writeText(msg.text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const shareMessage = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Vowza Planner', text: msg.text });
+      } else {
+        await navigator.clipboard.writeText(msg.text);
+        toast.success('Copied to clipboard — ready to share');
+      }
+    } catch {
+      /* user cancelled share sheet — no-op */
+    }
   };
 
   const commitEdit = () => {
@@ -136,15 +157,37 @@ const MessageBubble = ({
             {/* Copy — assistant only */}
             {!isUser && (
               <button onClick={copyText} title="Copy"
-                className="text-muted-foreground hover:text-foreground transition-colors p-0.5">
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary">
                 {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
               </button>
+            )}
+
+            {/* Like / Dislike — assistant only */}
+            {!isUser && (
+              <>
+                <button onClick={() => onReact(msg.id, 'like')} title="Good response"
+                  className={`transition-colors p-1 rounded-md hover:bg-secondary ${
+                    msg.reaction === 'like' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'
+                  }`}>
+                  <ThumbsUp className={`w-3 h-3 ${msg.reaction === 'like' ? 'fill-emerald-500' : ''}`} />
+                </button>
+                <button onClick={() => onReact(msg.id, 'dislike')} title="Bad response"
+                  className={`transition-colors p-1 rounded-md hover:bg-secondary ${
+                    msg.reaction === 'dislike' ? 'text-red-500' : 'text-muted-foreground hover:text-foreground'
+                  }`}>
+                  <ThumbsDown className={`w-3 h-3 ${msg.reaction === 'dislike' ? 'fill-red-500' : ''}`} />
+                </button>
+                <button onClick={shareMessage} title="Share"
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary">
+                  <Share2 className="w-3 h-3" />
+                </button>
+              </>
             )}
 
             {/* Edit — user only */}
             {isUser && (
               <button onClick={() => { setEditing(true); setEditText(msg.text); }} title="Edit message"
-                className="text-muted-foreground hover:text-foreground transition-colors p-0.5">
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary">
                 <Pencil className="w-3 h-3" />
               </button>
             )}
@@ -152,7 +195,7 @@ const MessageBubble = ({
             {/* Regenerate — last assistant message only */}
             {!isUser && isLast && (
               <button onClick={onRegenerate} title="Regenerate response"
-                className="text-muted-foreground hover:text-foreground transition-colors p-0.5">
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary">
                 <RefreshCw className="w-3 h-3" />
               </button>
             )}
@@ -174,6 +217,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
     removeConversations, removeAllConversations,
     renameConversation, pinConversation, archiveConversation,
     favoriteConversation, duplicateConversationById, exportConversation,
+    setMessageReaction,
     quickPrompts,
   } = useAIChat();
 
@@ -396,11 +440,11 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
 
               {/* History loading skeleton */}
               {historyLoading && (
-                <div className="flex flex-col gap-3 px-4 py-4">
-                  {[1, 2, 3].map(i => (
+                <div className="flex flex-col gap-4 px-4 py-5">
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className={`flex gap-2.5 ${i % 2 === 0 ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-7 h-7 rounded-full bg-muted animate-pulse flex-shrink-0" />
-                      <div className={`h-10 rounded-2xl bg-muted animate-pulse ${i % 2 === 0 ? 'w-2/3' : 'w-3/4'}`} />
+                      <div className="w-7 h-7 rounded-full skeleton flex-shrink-0" />
+                      <div className={`h-12 rounded-2xl skeleton ${i % 2 === 0 ? 'w-2/3' : 'w-3/4'}`} />
                     </div>
                   ))}
                 </div>
@@ -411,7 +455,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                 <div
                   ref={messagesContainerRef}
                   onScroll={handleScroll}
-                  className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 scroll-smooth"
+                  className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 space-y-5 scroll-smooth scrollbar-thin"
                 >
                   {/* Empty state */}
                   {isEmpty && (
@@ -460,6 +504,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                       isLast={idx === lastAssistantIdx}
                       onEdit={editAndResend}
                       onRegenerate={regenerateLastResponse}
+                      onReact={setMessageReaction}
                     />
                   ))}
 
@@ -475,7 +520,10 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                       </div>
                       <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
                         {streamingText
-                          ? <MarkdownMessage text={streamingText} />
+                          ? <>
+                              <MarkdownMessage text={streamingText} />
+                              <StreamingCursor />
+                            </>
                           : <TypingDots />}
                       </div>
                     </motion.div>

@@ -296,6 +296,11 @@
     from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  @keyframes blink-cursor {
+    0%, 45% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  .animate-blink-cursor { animation: blink-cursor 1s step-start infinite; }
 
   .animate-fade-in      { animation: fadeIn  0.5s ease-out both; }
   .animate-fade-up      { animation: fadeUp  0.6s ease-out both; }
@@ -337,6 +342,21 @@
   /* Hide scrollbar but keep scroll */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Slim, brand-tinted scrollbar for scrollable panels (AI chat, sidebars) */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--gold) / 0.35) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--gold) / 0.35);
+    border-radius: 999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--gold) / 0.55);
+  }
 
   /* Safe-area helpers */
   .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }

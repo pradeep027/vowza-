@@ -190,6 +190,18 @@ function classifyIntent(
     return 'plan_event';
   }
 
+  // Holistic event description — user just describes their event with enough
+  // detail (event type + at least one of budget/city/guests) without using
+  // the word "plan". Vowza Planner should proactively generate a full plan
+  // instead of asking "what would you like to know?".
+  {
+    const mentionsEvent = /wedding|reception|engagement|haldi|mehendi|sangeet|birthday|housewarming|baby.shower|anniversary|corporate|conference|college|cultural|festival/i.test(l);
+    const mentionsDetail = /₹|lakh|crore|\bguests?\b|\bpeople\b|\bpax\b|in\s+[A-Z][a-z]+/i.test(message);
+    if (mentionsEvent && mentionsDetail && !/find|show|search|recommend|book|vendor|photographer|decorator|caterer|dj\b/i.test(l)) {
+      return 'plan_event';
+    }
+  }
+
   // Budget
   if (/(budget|cost breakdown|how much|afford|₹|lakh|crore|estimate|quote|price list)/i.test(l)) {
     return 'budget_breakdown';
@@ -259,25 +271,21 @@ function buildContextSummary(ctx: PlannerContext): string {
 }
 
 // ── Determine the next question to ask if info is missing ─────────────────────
+// IMPORTANT: Vowza Planner must behave like an expert planner, not a form.
+// Planning intents (plan_event/budget_breakdown/timeline/checklist/food_plan)
+// NEVER block on a question anymore — aiPlanner.ts fills sensible defaults
+// (₹5L budget, 200 guests, "wedding", "your city") and generates useful
+// output immediately. Missing preferences are instead asked as ONE soft
+// follow-up appended AFTER the plan (see nextSoftFollowUp / withFollowUp).
 function determineNextQuestion(
   intent: Intent,
   ctx: PlannerContext
 ): string | null {
-  // General questions and vendor searches don't need full context
-  if (['general_question', 'follow_up', 'greeting', 'context_update'].includes(intent)) return null;
-
-  // Vendor searches need at minimum a city
+  // Vendor searches need at minimum a city — this is the one case where a
+  // blocking question is still useful, since the DB query needs it.
   if (intent === 'find_vendors') {
     if (!ctx.city) return FIELD_QUESTIONS.city;
     return null;
-  }
-
-  // Planning intents need more context
-  if (['plan_event', 'budget_breakdown', 'timeline', 'checklist', 'food_plan'].includes(intent)) {
-    if (!ctx.eventType) return FIELD_QUESTIONS.eventType;
-    if (!ctx.city)      return FIELD_QUESTIONS.city;
-    if (!ctx.budget)    return FIELD_QUESTIONS.budget;
-    if (!ctx.guestCount)return FIELD_QUESTIONS.guestCount;
   }
 
   return null;
@@ -380,12 +388,15 @@ export function orchestrate(
   const minRating = /highly.rated|top.rated|best|verified/i.test(message) ? 4.0 : 0;
 
   // 5. Decide if retrieval is needed
+  // STRICT RULE: only search the Vowza database when the user explicitly
+  // asks for vendors (e.g. "find photographers", "recommend caterers",
+  // "show decorators"). Food menus, budgets, decoration ideas, and general
+  // event planning must be answered from AI knowledge — never trigger a
+  // vendor search just because a related keyword (e.g. "catering") appears.
   const needsRetrieval = (
     intent === 'find_vendors' ||
     intent === 'comparison' ||
-    (intent === 'food_plan' && professions.includes('catering_services')) ||
-    (intent === 'clarification' && professions.length > 0) ||
-    /show me|find me|book|available|who is|which photographer|best .* in/i.test(message)
+    (intent === 'clarification' && professions.length > 0)
   );
 
   // 6. Rewrite query for better retrieval
@@ -469,14 +480,24 @@ CRITICAL RULES:
 6. If the user says "hi" or "hello" mid-conversation, just acknowledge briefly and continue.
 7. For general questions (not event-related), answer naturally like ChatGPT.
 8. For vendor questions, ONLY use the real data provided in the RAG CONTEXT below.
-9. NEVER invent vendor names, prices, ratings, IDs, reviews, or experience — ever.
-10. When context is missing for a plan, ask ONLY the single most important missing question.
-11. If a vendor search returns zero real results, say so honestly, then IMMEDIATELY continue
+9. NEVER invent vendor names, prices, ratings, IDs, reviews, packages, or experience — ever.
+10. You are an EXPERT EVENT PLANNER, not a vendor search bot. When the user mentions an event,
+    budget, guest count, or city, immediately generate useful planning content — budget
+    allocation, timeline, checklist, food suggestions, decoration ideas, photography plan,
+    entertainment plan, guest management, parking plan, weather backup, emergency planning,
+    and money-saving tips. Use sensible defaults for anything unstated. NEVER withhold useful
+    suggestions just to ask a clarifying question first.
+11. Search the Vowza database ONLY when the user explicitly asks to find/recommend/show
+    vendors (e.g. "find photographers", "recommend caterers", "show decorators"). Do NOT
+    search vendors for food menus, budget planning, decoration ideas, or general event
+    planning questions — answer those from AI knowledge instead.
+12. If a vendor search returns zero real results, say so honestly, then IMMEDIATELY continue
     helping with budget estimation, food planning, decoration ideas, timelines, or checklists.
     NEVER end the conversation just because no vendors were found.
-12. Ask ONE natural follow-up at a time when relevant, e.g. Veg or Non-Veg? Buffet or Table
+13. Ask ONE natural follow-up at a time when relevant, e.g. Veg or Non-Veg? Buffet or Table
     Service? Indoor or Outdoor? Traditional or Modern? Morning or Evening? Luxury or Budget?
-    Never ask a preference that is already known from context.
+    Never ask a preference that is already known from context, and never let a follow-up
+    question block or delay the actual planning content.
 
 CURRENT SESSION:
 ${hasCtx ? `You already know: ${result.contextSummary.replace(/[\[\]]/g,'').trim()}` : 'Fresh conversation — no event details yet.'}

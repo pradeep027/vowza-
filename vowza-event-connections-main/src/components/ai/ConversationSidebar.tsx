@@ -383,7 +383,7 @@ const ConversationSidebar = ({
       )}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1 scrollbar-thin">
         {isLoading && (
           <div className="flex flex-col gap-2 p-3">
             {[1, 2, 3].map(i => (

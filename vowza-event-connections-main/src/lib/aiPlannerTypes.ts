@@ -305,6 +305,7 @@ export interface ChatMessage {
   text:      string;
   response?: AIResponse;
   timestamp: Date;
+  reaction?: "like" | "dislike"; // user feedback on assistant messages (client-side)
 }
 
 export interface QuickPrompt {
