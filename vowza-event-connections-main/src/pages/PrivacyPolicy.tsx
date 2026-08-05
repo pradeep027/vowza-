@@ -1,6 +1,6 @@
 // ─── Privacy Policy Page ──────────────────────────────────────────────────────
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import LegalPageHeader from "@/components/LegalPageHeader";
 
 const sections = [
   {
@@ -43,19 +43,10 @@ const sections = [
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="pt-16 md:pt-18">
-        <div className="container px-4 py-14 md:py-20">
+      <LegalPageHeader title="Privacy Policy" lastUpdated={new Date()} />
+      <main>
+        <div className="container px-4 py-10 md:py-16">
           <div className="max-w-3xl mx-auto">
-            <div className="mb-10">
-              <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
-                Privacy Policy
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
-              </p>
-            </div>
-
             <p className="text-muted-foreground text-sm leading-relaxed mb-8">
               Vowza Technologies Pvt. Ltd. ("Vowza", "we", "our", "us") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information when you use the Vowza platform.
             </p>

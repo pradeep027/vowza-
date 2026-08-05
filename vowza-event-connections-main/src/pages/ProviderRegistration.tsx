@@ -4,7 +4,7 @@
 // Steps: Basic Info → Professional Info → Portfolio → Verification Docs → Review
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -16,6 +16,10 @@ import {
   MapPin, Languages, ChevronDown, Loader2,
   FileText, Instagram, Globe, Star,
 } from 'lucide-react';
+import {
+  useProviderRegistration,
+  type Step1, type Step2, type Step3, type Step4,
+} from '@/contexts/ProviderRegistrationContext';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const PROFESSIONS = [
@@ -60,27 +64,6 @@ const STEPS = [
   { id: 5, label: 'Review',         icon: Eye       },
 ];
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface Step1 {
-  fullName: string; phone: string; otpSent: boolean; otpVerified: boolean;
-  otp: string; email: string; state: string; city: string; area: string;
-  address: string; profession: string; languages: string[];
-}
-interface Step2 {
-  experience: string; about: string; serviceAreas: string[];
-  selfieUrl: string | null; selfieBlob: Blob | null;
-}
-interface Step3 {
-  portfolioFiles: { file: File; preview: string; type: 'image'|'video' }[];
-  instagram: string; website: string;
-}
-interface Step4 {
-  aadhaarFile: File|null; aadhaarPreview: string;
-  govtIdFile: File|null;  govtIdPreview: string;
-  panFile: File|null;     panPreview: string;
-  termsAccepted: boolean;
-}
-
 // ── Reusable field wrapper ─────────────────────────────────────────────────────
 const Field = ({ label, required, children, error }: {
   label: string; required?: boolean; children: React.ReactNode; error?: string;
@@ -124,29 +107,16 @@ const ProgressBar = ({ current, total }: { current: number; total: number }) => 
 export default function ProviderRegistration() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  // ── Registration state — lifted to ProviderRegistrationContext ──────────────
+  // This survives navigating away to /terms or /privacy and back, since the
+  // provider is mounted above this route and never unmounts. See
+  // src/contexts/ProviderRegistrationContext.tsx for persistence details.
+  const { step, setStep, s1, setS1, s2, setS2, s3, setS3, s4, setS4, resetRegistration } = useProviderRegistration();
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-
-  const [s1, setS1] = useState<Step1>({
-    fullName:'', phone:'', otpSent:false, otpVerified:false,
-    otp:'', email:'', state:'', city:'', area:'', address:'',
-    profession:'', languages:[],
-  });
-  const [s2, setS2] = useState<Step2>({
-    experience:'', about:'', serviceAreas:[], selfieUrl:null, selfieBlob:null,
-  });
-  const [s3, setS3] = useState<Step3>({
-    portfolioFiles:[], instagram:'', website:'',
-  });
-  const [s4, setS4] = useState<Step4>({
-    aadhaarFile:null, aadhaarPreview:'',
-    govtIdFile:null,  govtIdPreview:'',
-    panFile:null,     panPreview:'',
-    termsAccepted:false,
-  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -155,27 +125,9 @@ export default function ProviderRegistration() {
 
   useEffect(() => {
     if (!loading && !user) navigate('/auth');
-    // Prefill email and name from auth
-    if (user?.email) setS1(p => ({ ...p, email: user.email ?? '' }));
+    // Prefill email from auth (only if not already filled in from a restored session)
+    if (user?.email) setS1(p => (p.email ? p : { ...p, email: user.email ?? '' }));
   }, [user, loading, navigate]);
-
-  // Auto-save to sessionStorage
-  useEffect(() => {
-    try { sessionStorage.setItem('vowza_reg_s1', JSON.stringify(s1)); } catch {}
-  }, [s1]);
-  useEffect(() => {
-    try { sessionStorage.setItem('vowza_reg_step', String(step)); } catch {}
-  }, [step]);
-
-  // Restore from session
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem('vowza_reg_s1');
-      if (saved) setS1(p => ({ ...p, ...JSON.parse(saved) }));
-      const savedStep = sessionStorage.getItem('vowza_reg_step');
-      if (savedStep) setStep(Math.min(parseInt(savedStep), 5));
-    } catch {}
-  }, []);
 
   // ── OTP (simulated — wire to real SMS provider in production) ────────────────
   const sendOTP = async () => {
@@ -336,8 +288,7 @@ export default function ProviderRegistration() {
         is_read: false,
       });
 
-      sessionStorage.removeItem('vowza_reg_s1');
-      sessionStorage.removeItem('vowza_reg_step');
+      resetRegistration();
       setSubmitted(true);
     } catch (e: any) {
       toast.error(e.message || 'Submission failed. Please try again.');
@@ -820,8 +771,20 @@ function Step4Form({ s4, setS4, handleDoc }: {
         </div>
         <span className="text-sm text-foreground leading-relaxed">
           I agree to Vowza's{' '}
-          <a href="/terms" target="_blank" className="text-maroon underline">Terms of Service</a> and{' '}
-          <a href="/privacy" target="_blank" className="text-maroon underline">Privacy Policy</a>.
+          <Link
+            to="/terms"
+            state={{ from: '/provider/register', fromLabel: 'Artist Registration' }}
+            className="text-maroon underline"
+          >
+            Terms of Service
+          </Link>{' '}and{' '}
+          <Link
+            to="/privacy"
+            state={{ from: '/provider/register', fromLabel: 'Artist Registration' }}
+            className="text-maroon underline"
+          >
+            Privacy Policy
+          </Link>.
           I confirm all uploaded documents are genuine.
         </span>
       </label>

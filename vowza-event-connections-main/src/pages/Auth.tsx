@@ -480,8 +480,8 @@ const Auth = () => {
 
               <p className="text-[11px] text-muted-foreground text-center">
                 By signing up you agree to our{' '}
-                <Link to="#" className="underline hover:text-foreground">Terms of Service</Link> and{' '}
-                <Link to="#" className="underline hover:text-foreground">Privacy Policy</Link>.
+                <Link to="/terms" state={{ from: '/auth', fromLabel: 'Sign Up' }} className="underline hover:text-foreground">Terms of Service</Link> and{' '}
+                <Link to="/privacy" state={{ from: '/auth', fromLabel: 'Sign Up' }} className="underline hover:text-foreground">Privacy Policy</Link>.
               </p>
             </form>
           )}

@@ -1,6 +1,6 @@
 // ─── Footer — Corporate Premium Edition ──────────────────────────────────────
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import AppLogo from "@/components/AppLogo";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
+  const location = useLocation();
 
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +45,10 @@ const Footer = () => {
       links: [
         { name: "Help Center",         href: "/contact"  },
         { name: "Contact Us",          href: "/contact"  },
-        { name: "Terms of Service",    href: "/terms"    },
-        { name: "Privacy Policy",      href: "/privacy"  },
-        { name: "Cancellation Policy", href: "/terms"    },
-        { name: "Refund Policy",       href: "/terms"    },
+        { name: "Terms of Service",    href: "/terms"    , legal: true },
+        { name: "Privacy Policy",      href: "/privacy"  , legal: true },
+        { name: "Cancellation Policy", href: "/terms"    , legal: true },
+        { name: "Refund Policy",       href: "/terms"    , legal: true },
       ],
     },
   ];
@@ -152,7 +153,11 @@ const Footer = () => {
               <ul className="space-y-3">
                 {col.links.map(l => (
                   <li key={l.name}>
-                    <Link to={l.href} className="group relative text-sm text-white/50 hover:text-white transition-colors inline-block">
+                    <Link
+                      to={l.href}
+                      state={(l as any).legal ? { from: location.pathname } : undefined}
+                      className="group relative text-sm text-white/50 hover:text-white transition-colors inline-block"
+                    >
                       {l.name}
                       <span className="absolute left-0 right-0 -bottom-0.5 h-px bg-gold origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-250" />
                     </Link>
@@ -189,8 +194,8 @@ const Footer = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/25">
             <p>© {new Date().getFullYear()} Vowza Technologies Pvt. Ltd. All rights reserved.</p>
             <div className="flex gap-6">
-              <Link to="/terms"   className="hover:text-white/60 transition-colors">Terms</Link>
-              <Link to="/privacy" className="hover:text-white/60 transition-colors">Privacy</Link>
+              <Link to="/terms"   state={{ from: location.pathname }} className="hover:text-white/60 transition-colors">Terms</Link>
+              <Link to="/privacy" state={{ from: location.pathname }} className="hover:text-white/60 transition-colors">Privacy</Link>
               <Link to="/contact" className="hover:text-white/60 transition-colors">Contact</Link>
               <Link to="/contact" className="hover:text-white/60 transition-colors">Sitemap</Link>
             </div>

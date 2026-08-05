@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { ProviderRegistrationProvider } from "@/contexts/ProviderRegistrationContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
@@ -215,15 +216,17 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner position="top-right" richColors />
-          <BrowserRouter>
-            <ErrorBoundary>
-              <AppContent />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </TooltipProvider>
+        <ProviderRegistrationProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner position="top-right" richColors />
+            <BrowserRouter>
+              <ErrorBoundary>
+                <AppContent />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ProviderRegistrationProvider>
       </CartProvider>
     </AuthProvider>
   </QueryClientProvider>
