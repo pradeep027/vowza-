@@ -67,6 +67,7 @@ const VendorPackages       = lazy(() => import("./pages/vendor/VendorPackages"))
 const VendorWallet         = lazy(() => import("./pages/vendor/VendorWallet"));
 const VendorReviews        = lazy(() => import("./pages/vendor/VendorReviews"));
 const VendorMessages       = lazy(() => import("./pages/vendor/VendorMessages"));
+const VendorNotifications  = lazy(() => import("./pages/vendor/VendorNotifications"));
 const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"));
 
 // ─── Page loader fallback ─────────────────────────────────────────────────────
@@ -156,27 +157,20 @@ const AppContent = () => {
 
           {/* ── Vendor — VendorLayout handles auth + provider role check internally ── */}
           <Route path="/vendor" element={<VendorLayout />}>
-            <Route path="dashboard"    element={<VendorDashboardHome />} />
-            <Route path="bookings"     element={<VendorBookings />} />
-            <Route path="portfolio"    element={<VendorPortfolio />} />
-            <Route path="packages"     element={<VendorPackages />} />
-            <Route path="wallet"       element={<VendorWallet />} />
-            <Route path="reviews"      element={<VendorReviews />} />
-            <Route path="messages"     element={<VendorMessages />} />
-            <Route path="settings"     element={<VendorSettings />} />
-            {/* Placeholder routes — render dashboard home for now */}
-            <Route path="calendar"     element={<VendorDashboardHome />} />
-            <Route path="inquiries"    element={<VendorBookings />} />
-            <Route path="availability" element={<VendorDashboardHome />} />
-            <Route path="analytics"    element={<VendorDashboardHome />} />
-            <Route path="marketing"    element={<VendorDashboardHome />} />
-            <Route path="ai-assistant" element={<VendorDashboardHome />} />
-            <Route path="transactions" element={<VendorWallet />} />
-            <Route path="payouts"      element={<VendorWallet />} />
-            <Route path="performance"  element={<VendorDashboardHome />} />
-            <Route path="documents"    element={<VendorSettings />} />
-            <Route path="help"         element={<VendorDashboardHome />} />
-            <Route path="notifications"element={<VendorDashboardHome />} />
+            <Route path="dashboard"     element={<VendorDashboardHome />} />
+            <Route path="bookings"      element={<VendorBookings />} />
+            <Route path="calendar"      element={<VendorDashboardHome />} />
+            <Route path="inquiries"     element={<VendorBookings />} />
+            <Route path="messages"      element={<VendorMessages />} />
+            <Route path="notifications" element={<VendorNotifications />} />
+            <Route path="portfolio"     element={<VendorPortfolio />} />
+            <Route path="packages"      element={<VendorPackages />} />
+            <Route path="reviews"       element={<VendorReviews />} />
+            <Route path="analytics"     element={<VendorDashboardHome />} />
+            {/* Wallet owns Transactions, Payouts and Bank Details as internal tabs */}
+            <Route path="wallet"        element={<VendorWallet />} />
+            <Route path="settings"      element={<VendorSettings />} />
+            <Route path="help"          element={<VendorDashboardHome />} />
           </Route>
 
           {/* Catch-all */}

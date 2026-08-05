@@ -46,6 +46,8 @@ export default function VendorMessages() {
         .neq('sender_id', user.id)
         .eq('is_read', false);
       qc.invalidateQueries({ queryKey: ['vendor-messages'] });
+      // Drop the sidebar/topbar unread badge immediately
+      qc.invalidateQueries({ queryKey: ['vendor-badges'] });
     })();
   }, [selected?.bookingId, selected?.unread, user, qc]);
 
@@ -66,6 +68,7 @@ export default function VendorMessages() {
     else {
       setDraft('');
       qc.invalidateQueries({ queryKey: ['vendor-messages'] });
+      qc.invalidateQueries({ queryKey: ['vendor-badges'] });
     }
     setSending(false);
   };

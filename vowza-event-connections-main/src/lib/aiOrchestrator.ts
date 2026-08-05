@@ -55,12 +55,36 @@ export type ResponseStrategy =
 
 // ── Missing field priority order ──────────────────────────────────────────────
 const FIELD_QUESTIONS: Record<string, string> = {
-  eventType:   'What type of event are you planning? (Wedding, Birthday, Corporate, Housewarming...)',
-  city:        'Which city will the event take place in?',
-  budget:      'What is your total budget? (e.g. ₹8 lakh, ₹15 lakh)',
-  guestCount:  'How many guests are you expecting approximately?',
-  eventDate:   'Do you have a date or month in mind?',
+  eventType:     'What type of event are you planning? (Wedding, Birthday, Corporate, Housewarming...)',
+  city:          'Which city will the event take place in?',
+  budget:        'What is your total budget? (e.g. ₹8 lakh, ₹15 lakh)',
+  guestCount:    'How many guests are you expecting approximately?',
+  eventDate:     'Do you have a date or month in mind?',
+  foodPreference:'Would you like Veg, Non-Veg, or Both for the food?',
+  venueType:     'Would you prefer Indoor or Outdoor for this event?',
 };
+
+// ── Lightweight follow-up questions — asked ONE at a time, never block a plan.
+// These make the AI feel like a natural planner ("Veg or Non-Veg? Buffet or
+// Table Service?") without gating core generation.
+const SOFT_FOLLOWUPS: { field: keyof PlannerContext; question: string; when?: (ctx: PlannerContext) => boolean }[] = [
+  { field: 'foodPreference', question: 'Would you like **Veg**, **Non-Veg**, or **Both** for the food?' },
+  { field: 'serviceStyle',   question: 'Should the food service be **Buffet** or **Table Service**?' },
+  { field: 'venueType',      question: 'Are you thinking **Indoor** or **Outdoor** for the venue?' },
+  { field: 'styleVibe',      question: 'Do you prefer a **Traditional** or **Modern** theme?' },
+  { field: 'luxuryLevel',    question: 'Should I plan this as **Luxury**, **Premium**, **Standard**, or **Budget-friendly**?' },
+  { field: 'timeOfDay',      question: 'Is this a **Morning**, **Afternoon**, **Evening**, or **Night** event?' },
+];
+
+// Returns ONE natural follow-up question for whatever preference is still
+// unknown, or null if everything relevant is already known. Never blocks
+// plan generation — callers append this to the end of a completed response.
+export function nextSoftFollowUp(ctx: PlannerContext): string | null {
+  for (const f of SOFT_FOLLOWUPS) {
+    if (!ctx[f.field] && (!f.when || f.when(ctx))) return f.question;
+  }
+  return null;
+}
 
 // ── Vendor keyword → profession_type map ──────────────────────────────────────
 const VENDOR_KEYWORDS: [RegExp, string][] = [
@@ -306,6 +330,21 @@ export function extractContextUpdates(
   // Food
   if (/non.veg/i.test(l))            updates.foodPreference = 'non-veg';
   else if (/\bveg\b/i.test(l))       updates.foodPreference = 'veg';
+  else if (/\bboth\b.*(veg|food)|veg.*non.veg/i.test(l)) updates.foodPreference = 'both';
+
+  // Service style
+  if (/\bbuffet\b/i.test(l))         updates.serviceStyle = 'buffet';
+  else if (/table\s*service/i.test(l)) updates.serviceStyle = 'table_service';
+
+  // Time of day
+  if (/\bmorning\b/i.test(l))        updates.timeOfDay = 'morning';
+  else if (/\bafternoon\b/i.test(l)) updates.timeOfDay = 'afternoon';
+  else if (/\bevening\b/i.test(l))   updates.timeOfDay = 'evening';
+  else if (/\bnight\b/i.test(l))     updates.timeOfDay = 'night';
+
+  // Style vibe
+  if (/\btraditional\b/i.test(l))    updates.styleVibe = 'traditional';
+  else if (/\bmodern\b|contemporary/i.test(l)) updates.styleVibe = 'modern';
 
   // Date / month
   const months = ['january','february','march','april','may','june',
@@ -430,8 +469,14 @@ CRITICAL RULES:
 6. If the user says "hi" or "hello" mid-conversation, just acknowledge briefly and continue.
 7. For general questions (not event-related), answer naturally like ChatGPT.
 8. For vendor questions, ONLY use the real data provided in the RAG CONTEXT below.
-9. NEVER invent vendor names, prices, or ratings.
+9. NEVER invent vendor names, prices, ratings, IDs, reviews, or experience — ever.
 10. When context is missing for a plan, ask ONLY the single most important missing question.
+11. If a vendor search returns zero real results, say so honestly, then IMMEDIATELY continue
+    helping with budget estimation, food planning, decoration ideas, timelines, or checklists.
+    NEVER end the conversation just because no vendors were found.
+12. Ask ONE natural follow-up at a time when relevant, e.g. Veg or Non-Veg? Buffet or Table
+    Service? Indoor or Outdoor? Traditional or Modern? Morning or Evening? Luxury or Budget?
+    Never ask a preference that is already known from context.
 
 CURRENT SESSION:
 ${hasCtx ? `You already know: ${result.contextSummary.replace(/[\[\]]/g,'').trim()}` : 'Fresh conversation — no event details yet.'}

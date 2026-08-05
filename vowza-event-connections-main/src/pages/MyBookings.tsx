@@ -217,12 +217,7 @@ const MyBookings = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/browse')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-gold flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-foreground" />
-            </div>
-            <span className="text-lg font-bold text-foreground">Vowza</span>
-          </Link>
+          <AppLogo size="md" />
         </div>
       </header>
 

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, ArrowRight, Loader2, Sparkles, CheckCircle } from 'lucide-react';
+import AppLogo from '@/components/AppLogo';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { BasicInfoStep } from '@/components/onboarding/steps/BasicInfoStep';
 import { CategoryStep } from '@/components/onboarding/steps/CategoryStep';
@@ -281,10 +282,7 @@ const ArtistOnboarding = () => {
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-border/60 shadow-xs">
         <div className="container px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-base font-display font-bold text-foreground">Vowza</span>
+            <AppLogo size="sm" />
             <span className="hidden sm:inline text-muted-foreground mx-1">·</span>
             <span className="hidden sm:inline text-sm text-muted-foreground">Artist Registration</span>
           </div>

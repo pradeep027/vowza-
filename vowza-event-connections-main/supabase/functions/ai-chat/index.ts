@@ -1,97 +1,152 @@
 // ─── Supabase Edge Function: ai-chat ─────────────────────────────────────────
-// Proxies OpenAI requests server-side so the API key never reaches the browser.
-// Deploy: supabase functions deploy ai-chat
-// Env:    supabase secrets set OPENAI_API_KEY=sk-...
+// Proxies Groq (OpenAI-compatible Chat Completions) server-side so the API key
+// never reaches the browser.
+//
+// Deploy:  supabase functions deploy ai-chat
+// Secret:  supabase secrets set GROQ_API_KEY=<your key>
+//
+// Request:  { messages: [{ role: 'system'|'user'|'assistant', content: string }] }
+// Response: application/x-ndjson — one JSON object per line:
+//           { delta: string, done: boolean }  |  { error: string, done: true }
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.1-8b-instant";
+
+interface LLMMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
 serve(async (req) => {
-  // ── CORS preflight ────────────────────────────────────────────────────────
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    // ── Auth check ─────────────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth" }), {
-        status: 401, headers: { ...CORS, "Content-Type": "application/json" },
-      });
+    if (!authHeader) return json({ error: "Missing auth" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return json({ error: "Supabase env not configured" }, 500);
     }
 
-    // Verify Supabase JWT (optional but recommended for production)
-    const supabaseUrl  = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey  = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase     = createClient(supabaseUrl, supabaseKey, {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
+    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
-    // ── Parse request ──────────────────────────────────────────────────────
-    const { messages } = await req.json();
-    if (!messages?.length) {
-      return new Response(JSON.stringify({ error: "No messages" }), {
-        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-      });
+    let messages: LLMMessage[] | undefined;
+    try {
+      ({ messages } = await req.json());
+    } catch {
+      return json({ error: "Invalid JSON body" }, 400);
     }
+    if (!messages?.length) return json({ error: "No messages" }, 400);
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
-        status: 503, headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
+    const groqKey = Deno.env.get("GROQ_API_KEY");
+    if (!groqKey) return json({ error: "GROQ_API_KEY not configured" }, 503);
 
-    // ── Forward to OpenAI with streaming ──────────────────────────────────
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method:  "POST",
+    // Groq is OpenAI-compatible: system/user/assistant roles pass through
+    // unchanged, so no role remapping is needed.
+    const payload = messages.filter((m) => m.content?.trim());
+    if (!payload.length) return json({ error: "No usable message content" }, 400);
+
+    const upstream = await fetch(GROQ_URL, {
+      method: "POST",
       headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${groqKey}`,
       },
       body: JSON.stringify({
-        model:       "gpt-4o-mini",
-        messages,
-        stream:      true,
+        model: GROQ_MODEL,
+        messages: payload,
+        stream: true,
         temperature: 0.7,
-        max_tokens:  2500,
+        max_tokens: 2500,
       }),
     });
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      return new Response(JSON.stringify({ error: errText }), {
-        status: openaiRes.status,
-        headers: { ...CORS, "Content-Type": "application/json" },
-      });
+    if (!upstream.ok || !upstream.body) {
+      const detail = await upstream.text().catch(() => `HTTP ${upstream.status}`);
+      return json({ error: `Groq error ${upstream.status}: ${detail}` }, 502);
     }
 
-    // ── Stream the SSE response straight through ──────────────────────────
-    return new Response(openaiRes.body, {
-      headers: {
-        ...CORS,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    const body = new ReadableStream({
+      async start(controller) {
+        const send = (obj: unknown) =>
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+
+        const reader = upstream.body!.getReader();
+        let buf = "";
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+
+            const lines = buf.split("\n");
+            // Keep the last (possibly incomplete) line in the buffer
+            buf = lines.pop() ?? "";
+
+            for (const line of lines) {
+              const t = line.trim();
+              if (!t.startsWith("data:")) continue;
+              const data = t.slice(5).trim();
+              if (!data || data === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed?.choices?.[0]?.delta?.content ?? "";
+                if (delta) send({ delta, done: false });
+              } catch {
+                // ignore partial/malformed SSE frames
+              }
+            }
+          }
+          send({ delta: "", done: true });
+        } catch (streamErr) {
+          send({
+            error: streamErr instanceof Error
+              ? streamErr.message
+              : String(streamErr),
+            done: true,
+          });
+        } finally {
+          controller.close();
+        }
       },
     });
 
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...CORS, "Content-Type": "application/json" },
+    return new Response(body, {
+      headers: {
+        ...CORS,
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+      },
     });
+  } catch (err: unknown) {
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

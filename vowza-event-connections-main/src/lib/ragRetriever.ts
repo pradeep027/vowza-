@@ -25,6 +25,8 @@ export interface RetrievedVendor {
   total_bookings: number;
   is_verified:    boolean;
   is_available:   boolean;
+  experience_years?: number | null;
+  cover_image_url?:  string | null;
   similarity?:    number;   // set if vector search was used
   avatar_url?:    string;
   packages?:      RetrievedPackage[];
@@ -174,7 +176,7 @@ async function sqlSearch(
     // Fallback: direct table query if RPC doesn't exist yet
     let q = supabase
       .from('provider_profiles')
-      .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, user_id')
+      .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, experience_years, cover_image_url, user_id')
       .in('verification_status', ['approved', 'verified'])
       .order('average_rating', { ascending: false })
       .limit(limit);
@@ -209,6 +211,8 @@ async function sqlSearch(
           total_bookings: v.total_bookings ?? 0,
           is_verified:    v.is_verified    ?? false,
           is_available:   v.is_available   ?? true,
+          experience_years: v.experience_years ?? null,
+          cover_image_url:  v.cover_image_url  ?? null,
           avatar_url:     (p as any).avatar_url,
         };
       });
@@ -228,6 +232,8 @@ async function sqlSearch(
     total_bookings: v.total_bookings ?? 0,
     is_verified:    v.is_verified    ?? false,
     is_available:   v.is_available   ?? true,
+    experience_years: v.experience_years ?? null,
+    cover_image_url:  v.cover_image_url  ?? null,
     avatar_url:     v.avatar_url,
   }));
 }
@@ -323,6 +329,22 @@ export async function retrieveVendors(
   }
 }
 
+// ── Exact required empty-state copy (verbatim — never alter) ─────────────────
+export const NO_VENDORS_FOUND_MESSAGE =
+`We couldn't find any verified vendors matching your requirements yet.
+
+Our marketplace is growing, and we're continuously onboarding trusted professionals.
+
+Meanwhile, I can still help you with:
+
+• Budget estimation
+• Event planning
+• Vendor requirement guidance
+• Cost breakdowns
+• Event timelines
+• Checklists
+• Planning tips`;
+
 // ── Build grounding context string for LLM ────────────────────────────────────
 export function buildRAGContext(result: RAGResult): string {
   if (!result.vendors.length) return '';
@@ -335,14 +357,15 @@ export function buildRAGContext(result: RAGResult): string {
   for (const v of result.vendors) {
     const name    = v.stage_name || v.full_name || 'Vendor';
     const prof    = v.profession.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const price   = fmtPrice(v.price_min);
-    const rating  = v.average_rating > 0 ? `${v.average_rating.toFixed(1)}⭐ (${v.total_reviews} reviews)` : 'New vendor';
+    const price   = v.price_min ? fmtPrice(v.price_min) : 'Contact for quotation';
+    const rating  = v.average_rating > 0 ? `${v.average_rating.toFixed(1)}⭐ (${v.total_reviews} reviews)` : 'New Vendor';
+    const exp     = v.experience_years != null ? `${v.experience_years} yrs experience` : 'Experience not provided';
     const events  = v.total_bookings > 0 ? `${v.total_bookings} events done` : '';
     const badges  = [v.is_verified ? '✅ Verified' : '', v.is_available ? '🟢 Available' : '🔴 Busy'].filter(Boolean).join(' ');
     const link    = `/artist/${v.provider_id}`;
 
     lines.push(`\n### ${name} — ${prof} (${v.city ?? 'India'})`);
-    lines.push(`- **Price:** ${price}  |  **Rating:** ${rating}  ${events ? `| ${events}` : ''}`);
+    lines.push(`- **Price:** ${price}  |  **Rating:** ${rating}  |  **Experience:** ${exp}  ${events ? `| ${events}` : ''}`);
     lines.push(`- ${badges}  |  **Profile:** ${link}`);
     if (v.bio) lines.push(`- ${v.bio.slice(0, 120)}…`);
 
@@ -360,6 +383,6 @@ export function buildRAGContext(result: RAGResult): string {
     }
   }
 
-  lines.push('\n---\n**IMPORTANT:** Use ONLY these real vendors when recommending. Always include profile links. Never invent vendor names or prices.\n');
+  lines.push('\n---\n**IMPORTANT:** Use ONLY these real vendors when recommending. Never display contact details until a booking is confirmed. Always include profile links. Never invent vendor names, ratings, prices, or experience.\n');
   return lines.join('\n');
 }

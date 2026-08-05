@@ -76,14 +76,14 @@ BEGIN
   RETURN QUERY
   SELECT
     ve.provider_id,
-    pp.profession::TEXT,
+    pp.profession::TEXT                        AS profession,
     ve.content,
-    1 - (ve.embedding <=> query_embedding) AS similarity,
-    pp.price_min,
-    pp.price_max,
-    pp.average_rating,
-    pp.is_verified,
-    pr.city
+    (1 - (ve.embedding <=> query_embedding))::FLOAT AS similarity,
+    pp.price_min::NUMERIC                      AS price_min,
+    pp.price_max::NUMERIC                      AS price_max,
+    COALESCE(pp.average_rating, 0)::FLOAT      AS average_rating,
+    COALESCE(pp.is_verified, FALSE)::BOOLEAN   AS is_verified,
+    pr.city::TEXT                              AS city
   FROM public.vendor_embeddings ve
   JOIN public.provider_profiles pp ON pp.id = ve.provider_id
   LEFT JOIN public.profiles pr      ON pr.id = pp.user_id
@@ -109,20 +109,22 @@ CREATE OR REPLACE FUNCTION public.search_vendors_sql(
   p_limit      INT      DEFAULT 10
 )
 RETURNS TABLE (
-  provider_id    UUID,
-  profession     TEXT,
-  stage_name     TEXT,
-  bio            TEXT,
-  price_min      NUMERIC,
-  price_max      NUMERIC,
-  average_rating FLOAT,
-  total_reviews  INT,
-  total_bookings INT,
-  is_verified    BOOLEAN,
-  is_available   BOOLEAN,
-  city           TEXT,
-  full_name      TEXT,
-  avatar_url     TEXT
+  provider_id       UUID,
+  profession        TEXT,
+  stage_name        TEXT,
+  bio               TEXT,
+  price_min         NUMERIC,
+  price_max         NUMERIC,
+  average_rating    FLOAT,
+  total_reviews     INT,
+  total_bookings    INT,
+  is_verified       BOOLEAN,
+  is_available      BOOLEAN,
+  experience_years  INT,
+  cover_image_url   TEXT,
+  city              TEXT,
+  full_name         TEXT,
+  avatar_url        TEXT
 )
 LANGUAGE plpgsql
 STABLE
@@ -130,20 +132,22 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    pp.id                   AS provider_id,
-    pp.profession::TEXT     AS profession,
-    pp.stage_name,
-    pp.bio,
-    pp.price_min,
-    pp.price_max,
-    COALESCE(pp.average_rating, 0)  AS average_rating,
-    COALESCE(pp.total_reviews, 0)   AS total_reviews,
-    COALESCE(pp.total_bookings, 0)  AS total_bookings,
-    COALESCE(pp.is_verified, FALSE) AS is_verified,
-    COALESCE(pp.is_available, TRUE) AS is_available,
-    pr.city,
-    pr.full_name,
-    pr.avatar_url
+    pp.id                                    AS provider_id,
+    pp.profession::TEXT                      AS profession,
+    pp.stage_name::TEXT                      AS stage_name,
+    pp.bio::TEXT                             AS bio,
+    pp.price_min::NUMERIC                    AS price_min,
+    pp.price_max::NUMERIC                    AS price_max,
+    COALESCE(pp.average_rating, 0)::FLOAT    AS average_rating,
+    COALESCE(pp.total_reviews, 0)::INT       AS total_reviews,
+    COALESCE(pp.total_bookings, 0)::INT      AS total_bookings,
+    COALESCE(pp.is_verified, FALSE)::BOOLEAN AS is_verified,
+    COALESCE(pp.is_available, TRUE)::BOOLEAN AS is_available,
+    pp.experience_years::INT                 AS experience_years,
+    pp.cover_image_url::TEXT                 AS cover_image_url,
+    pr.city::TEXT                            AS city,
+    pr.full_name::TEXT                       AS full_name,
+    pr.avatar_url::TEXT                      AS avatar_url
   FROM public.provider_profiles pp
   LEFT JOIN public.profiles pr ON pr.id = pp.user_id
   WHERE

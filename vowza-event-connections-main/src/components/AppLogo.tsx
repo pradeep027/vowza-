@@ -81,10 +81,13 @@ const AppLogo = memo(function AppLogo({
 
   const handleClick = useCallback(() => {
     if (isStatic) return;
-    // Already home — stay put, no reload, no history entry
-    if (isHome) return;
-    navigate(target);
-  }, [isStatic, isHome, navigate, target]);
+    // Recompute fresh at click-time (never trust closed-over state) and always
+    // navigate — react-router no-ops a navigate() to the current path anyway,
+    // so this is safe and guarantees the click is never silently swallowed.
+    const dest = to ?? resolveHome(roles);
+    console.log('[AppLogo] click — roles:', roles, 'destination:', dest);
+    navigate(dest);
+  }, [isStatic, to, roles, navigate]);
 
   const showText = !collapsed && !!label;
 

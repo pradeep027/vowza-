@@ -21,6 +21,8 @@ import type { ChatMessage, PlannerContext } from '@/lib/aiPlannerTypes';
 import {
   createConversation, loadMessages, saveMessage, updateMessage,
   updateConversation, deleteConversation, touchConversation, listConversations,
+  deleteConversations, deleteAllConversations, setConversationPinned, setConversationArchived,
+  setConversationFavorite, duplicateConversation, exportConversationAsFile,
 } from '@/lib/conversationRepository';
 import type { ConversationRow } from '@/lib/conversationTypes';
 import { useDashboardLink } from '@/hooks/useDashboardLink';
@@ -150,6 +152,62 @@ export function useAIChat() {
     await updateConversation(convId, { title });
     setConversations(prev => prev.map(c => c.id === convId ? { ...c, title } : c));
   }, []);
+
+  // ── Delete multiple conversations (with confirmation handled by the UI) ─────
+  const removeConversations = useCallback(async (convIds: string[]) => {
+    await deleteConversations(convIds);
+    setConversations(prev => prev.filter(c => !convIds.includes(c.id)));
+    if (conversationId && convIds.includes(conversationId)) {
+      setMessages([]);
+      setConversationId(null);
+      saveConvId(null);
+    }
+  }, [conversationId]);
+
+  // ── Delete ALL conversations for the current user ────────────────────────────
+  const removeAllConversations = useCallback(async () => {
+    if (!user) return;
+    await deleteAllConversations(user.id);
+    setConversations([]);
+    setMessages([]);
+    setConversationId(null);
+    saveConvId(null);
+  }, [user]);
+
+  // ── Pin / Unpin ───────────────────────────────────────────────────────────────
+  const pinConversation = useCallback(async (convId: string, pinned: boolean) => {
+    await setConversationPinned(convId, pinned);
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_pinned: pinned } : c));
+  }, []);
+
+  // ── Archive / Restore ─────────────────────────────────────────────────────────
+  const archiveConversation = useCallback(async (convId: string, archived: boolean) => {
+    await setConversationArchived(convId, archived);
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_archived: archived } : c));
+  }, []);
+
+  // ── Favorite / Unfavorite ─────────────────────────────────────────────────────
+  const favoriteConversation = useCallback(async (convId: string, favorite: boolean) => {
+    await setConversationFavorite(convId, favorite);
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_favorite: favorite } : c));
+  }, []);
+
+  // ── Duplicate a conversation ──────────────────────────────────────────────────
+  const duplicateConversationById = useCallback(async (convId: string) => {
+    if (!user) return;
+    const source = conversations.find(c => c.id === convId);
+    if (!source) return;
+    const newId = await duplicateConversation(user.id, source);
+    if (newId) await refreshConversations();
+  }, [user, conversations, refreshConversations]);
+
+  // ── Export a conversation as a downloadable Markdown file ───────────────────
+  const exportConversation = useCallback(async (convId: string) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv) return;
+    const msgs = convId === conversationId ? messagesRef.current : await loadMessages(convId);
+    exportConversationAsFile(conv, msgs);
+  }, [conversations, conversationId]);
 
   // ── Main send ────────────────────────────────────────────────────────────────
   const send = useCallback(async (userText: string) => {
@@ -310,6 +368,9 @@ export function useAIChat() {
   }, [send]);
 
   // ── Clear ─────────────────────────────────────────────────────────────────────
+  // "New Chat" must start with ZERO memory — no leftover event type, city,
+  // budget, guest count, etc. from the previous conversation. That memory is
+  // scoped to a single conversation only; it is never carried into a new one.
   const clearChat = useCallback(() => {
     messagesRef.current = [];
     setMessages([]);
@@ -319,6 +380,11 @@ export function useAIChat() {
     setConversationId(null);
     saveConvId(null);
     abortRef.current = true;
+
+    // Reset planning context (event type, city, budget, guests, theme, etc.)
+    contextRef.current = {};
+    setContext({});
+    sessionStorage.removeItem(CTX_KEY);
   }, []);
 
   const clearContext = useCallback(() => {
@@ -341,7 +407,14 @@ export function useAIChat() {
     clearContext,
     loadConversation,
     removeConversation,
+    removeConversations,
+    removeAllConversations,
     renameConversation,
+    pinConversation,
+    archiveConversation,
+    favoriteConversation,
+    duplicateConversationById,
+    exportConversation,
     refreshConversations,
     quickPrompts: QUICK_PROMPTS,
   };

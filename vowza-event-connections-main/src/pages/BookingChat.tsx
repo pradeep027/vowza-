@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Calendar, MapPin, Sparkles, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, IndianRupee } from 'lucide-react';
 import ChatBox from '@/components/ChatBox';
+import AppLogo from '@/components/AppLogo';
 import type { Database } from '@/integrations/supabase/types';
 import { useDashboardLink } from '@/hooks/useDashboardLink';
 
@@ -134,12 +135,7 @@ const BookingChat = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-gold flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-foreground" />
-            </div>
-            <span className="text-lg font-bold text-foreground">Vowza</span>
-          </Link>
+          <AppLogo size="md" />
           <div className="flex-1" />
           <Badge className={statusColors[booking.status]}>
             {booking.status.replace('_', ' ')}

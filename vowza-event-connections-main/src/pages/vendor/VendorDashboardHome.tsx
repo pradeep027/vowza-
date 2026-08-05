@@ -7,6 +7,7 @@ import {
   IndianRupee, TrendingUp, CalendarDays, Star, Eye, Users,
   Clock, Repeat, Image as ImageIcon, Package, Zap, Share2,
   Sparkles, Plus, ChevronLeft, ChevronRight, Inbox, AlertCircle,
+  Landmark, BadgeCheck, Building2,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,9 +17,9 @@ import {
   useVendorId, useVendorRealtime, useVendorKPIs, useVendorAnalytics,
   useVendorRevenueChart, useVendorBookingsChart, useVendorPortfolio,
   useVendorPackages, useVendorAvailability, useVendorInsights,
-  useVendorProfileCompletion,
+  useVendorProfileCompletion, useVendorBankDetails,
 } from '@/hooks/useVendorData';
-import type { Period } from '@/hooks/useVendorData';
+import type { Period, BankDetails } from '@/hooks/useVendorData';
 
 const inr = (n: number) =>
   n >= 10000000 ? `₹${(n / 10000000).toFixed(1)}Cr`
@@ -166,6 +167,78 @@ function AvailabilityCalendar({ booked, tentative, blocked }: {
   );
 }
 
+// ── Bank Details card (real data from provider_profiles) ──────────────────────
+function BankDetailsCard({ bank, loading, onManage }: {
+  bank?: BankDetails; loading: boolean; onManage: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-border/60 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-foreground">Bank Details</h3>
+        {!loading && bank?.hasBank && (
+          <span className={cn('flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border',
+            bank.isVerified
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200')}>
+            {bank.isVerified
+              ? <><BadgeCheck className="w-3 h-3" /> Verified</>
+              : <><Clock className="w-3 h-3" /> Pending</>}
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-3 animate-pulse">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-4 bg-muted rounded" style={{ width: `${55 + i * 8}%` }} />)}
+        </div>
+      ) : !bank?.hasBank ? (
+        <div className="py-6 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
+            <Landmark className="w-6 h-6 text-amber-600" />
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Add your bank details to receive payouts.
+          </p>
+          <button onClick={onManage}
+            className="w-full py-2.5 rounded-xl bg-[#8B1538] text-white text-sm font-semibold hover:bg-[#8B1538]/90 transition-colors">
+            Add Bank Details
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border/40">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{bank.bankName || 'Bank'}</p>
+              <p className="text-xs text-muted-foreground font-mono">{bank.maskedAccount}</p>
+            </div>
+          </div>
+
+          <dl className="space-y-2.5">
+            {[
+              { label: 'Account Holder', value: bank.accountHolder },
+              { label: 'IFSC Code',      value: bank.ifsc },
+              { label: 'Branch',         value: bank.branchName },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between gap-3">
+                <dt className="text-[11px] text-muted-foreground flex-shrink-0">{row.label}</dt>
+                <dd className="text-xs font-medium text-foreground truncate text-right">{row.value || '—'}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <button onClick={onManage}
+            className="w-full mt-5 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-secondary transition-colors">
+            Update Bank Details
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 const PERIODS: { key: Period; label: string }[] = [
   { key: '7d', label: '7 Days' }, { key: '30d', label: '30 Days' },
   { key: '90d', label: '90 Days' }, { key: '1y', label: '1 Year' },
@@ -189,6 +262,7 @@ export default function VendorDashboardHome() {
   const { data: portfolio }                      = useVendorPortfolio(vendorId);
   const { data: packagesData }                   = useVendorPackages(vendorId);
   const { data: availability }                   = useVendorAvailability(vendorId);
+  const { data: bank, isLoading: bankLoading }   = useVendorBankDetails(vendorId);
 
   const insights = useVendorInsights(vendorId, provider, kpis, analytics, packagesData?.packages);
   const completion = useVendorProfileCompletion(
@@ -375,6 +449,15 @@ export default function VendorDashboardHome() {
           booked={availability?.booked ?? []}
           tentative={availability?.tentative ?? []}
           blocked={availability?.blocked ?? []}
+        />
+      </div>
+
+      {/* ── ROW 5: Bank Details ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <BankDetailsCard
+          bank={bank}
+          loading={bankLoading}
+          onManage={() => navigate('/vendor/wallet')}
         />
       </div>
 

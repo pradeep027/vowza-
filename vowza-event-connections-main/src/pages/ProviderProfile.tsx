@@ -15,6 +15,7 @@ import {
   Landmark, Video as VideoIcon, Image as ImageIcon,
 } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
+import AppLogo from "@/components/AppLogo";
 import { useAvailability, useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
@@ -258,10 +259,7 @@ const ProviderProfile = () => {
         <div className="container px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-secondary"><ArrowLeft className="w-4 h-4" /></button>
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-maroon flex items-center justify-center"><Sparkles className="w-3.5 h-3.5 text-white" /></div>
-              <span className="text-base font-display font-bold text-foreground hidden sm:inline">Vowza</span>
-            </Link>
+            <AppLogo size="sm" />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={toggleFav} className={cn("p-2 rounded-lg border transition-all", isFavorite ? "border-rose-300 bg-rose-50 text-rose-500" : "border-border text-muted-foreground")}>

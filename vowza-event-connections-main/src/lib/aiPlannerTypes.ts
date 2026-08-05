@@ -33,6 +33,10 @@ export interface PlannerContext {
   hasVenue?:            boolean;
   guestCity?:           string;
   specialRequirements?: string;
+  // ── Intelligent follow-up preferences (asked naturally, one at a time) ─────
+  serviceStyle?:        "buffet" | "table_service";
+  timeOfDay?:           "morning" | "afternoon" | "evening" | "night";
+  styleVibe?:           "traditional" | "modern";
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────
@@ -149,6 +153,28 @@ export interface EventTimeline {
   multiDaySchedule?: DaySchedule[];
 }
 
+// ─── Real DB Vendor (from RAG retrieval — never invented) ────────────────────
+// Mirrors ragRetriever.RetrievedVendor structurally so AIResponse can carry
+// real marketplace data without aiPlannerTypes depending on the RAG module.
+export interface DBVendor {
+  provider_id:       string;
+  profession:        string;
+  stage_name?:       string;
+  full_name?:        string;
+  bio?:              string;
+  city?:             string;
+  price_min?:        number;
+  price_max?:        number;
+  average_rating:    number;
+  total_reviews:     number;
+  total_bookings:    number;
+  is_verified:       boolean;
+  is_available:      boolean;
+  experience_years?: number | null;
+  cover_image_url?:  string | null;
+  avatar_url?:       string;
+}
+
 // ─── Vendor ───────────────────────────────────────────────────────────────────
 export interface VendorRecommendation {
   category:        string;
@@ -247,7 +273,7 @@ export interface EventPlan {
 // ─── AI Response ──────────────────────────────────────────────────────────────
 export type ResponseType =
   | "text" | "question" | "tip"
-  | "budget_plan" | "timeline" | "vendor_recommendations"
+  | "budget_plan" | "timeline" | "vendor_recommendations" | "vendor_results"
   | "weather_advice" | "checklist" | "food_plan"
   | "negotiation" | "risk_analysis" | "success_score"
   | "full_plan" | "wedding_plan";
@@ -259,6 +285,7 @@ export interface AIResponse {
     budgetPlan?:    BudgetPlan;
     timeline?:      EventTimeline;
     vendors?:       VendorRecommendation[];
+    dbVendors?:     DBVendor[];   // real vendors retrieved from Vowza DB — never invented
     weather?:       WeatherAdvice;
     checklist?:     ChecklistItem[];
     foodPlan?:      FoodPlan;

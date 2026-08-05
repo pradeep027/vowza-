@@ -1,15 +1,16 @@
 // ─── LLM Service Layer ─────────────────────────────────────────────────────────
 //
 // Routing priority (highest to lowest):
-//   1. Supabase Edge Function proxy  — VITE_SUPABASE_URL present (production, key stays server-side)
-//   2. Direct OpenAI streaming       — VITE_OPENAI_KEY=sk-… set (local dev convenience)
-//   3. Deterministic VEDA engine     — always works, zero cost, zero latency
+//   1. Supabase Edge Function proxy → Groq (key stays server-side)
+//   2. Deterministic VEDA engine    → always works, zero cost, zero latency
 //
-// The interface is identical in all three modes — UI code never branches.
+// The interface is identical in both modes — UI code never branches.
+// The Groq API key lives ONLY in Supabase secrets (GROQ_API_KEY).
+// It is never bundled into the browser.
 
 import { processMessage } from './aiPlanner';
-import { retrieveVendors, buildRAGContext } from './ragRetriever';
-import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates } from './aiOrchestrator';
+import { retrieveVendors, buildRAGContext, NO_VENDORS_FOUND_MESSAGE } from './ragRetriever';
+import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, nextSoftFollowUp } from './aiOrchestrator';
 import type { PlannerContext, AIResponse, ChatMessage } from './aiPlannerTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -98,8 +99,8 @@ function buildMessages(history: ChatMessage[], userMsg: string, systemPrompt: st
   return messages;
 }
 
-// ─── Mode 1: Supabase Edge Function proxy (production) ───────────────────────
-// The Edge Function holds the OpenAI key server-side — it never reaches the browser.
+// ─── Mode 1: Supabase Edge Function proxy → Groq (production) ────────────────
+// The Edge Function holds GROQ_API_KEY server-side — it never reaches the browser.
 // Deploy with: supabase functions deploy ai-chat
 async function callViaEdgeFunction(
   messages: LLMMessage[],
@@ -128,62 +129,45 @@ async function callViaEdgeFunction(
     throw new Error(`Edge Function error: ${msg}`);
   }
 
-  return readOpenAIStream(res, onChunk);
+  return readGroqStream(res, onChunk);
 }
 
-// ─── Mode 2: Direct OpenAI (local dev with VITE_OPENAI_KEY set) ───────────────
-async function callDirectOpenAI(
-  messages: LLMMessage[],
-  apiKey: string,
-  onChunk: StreamCallback
-): Promise<string> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model:       'gpt-4o-mini',
-      messages,
-      stream:      true,
-      temperature: 0.7,
-      max_tokens:  2048,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any)?.error?.message ?? `OpenAI error ${res.status}`);
-  }
-
-  return readOpenAIStream(res, onChunk);
-}
-
-// ─── Shared SSE reader ────────────────────────────────────────────────────────
-async function readOpenAIStream(res: Response, onChunk: StreamCallback): Promise<string> {
+// ─── Groq NDJSON stream reader ────────────────────────────────────────────────
+// The Edge Function emits one JSON object per line: { delta, done } | { error, done }
+async function readGroqStream(res: Response, onChunk: StreamCallback): Promise<string> {
   const reader = res.body!.getReader();
   const dec    = new TextDecoder();
   let full     = '';
+  let buffer   = '';
 
-  outer: while (true) {
+  while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const lines = dec.decode(value, { stream: true }).split('\n');
+    buffer += dec.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    // Keep the last (possibly incomplete) line in the buffer
+    buffer = lines.pop() ?? '';
+
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') break outer;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
       try {
-        const delta = JSON.parse(data)?.choices?.[0]?.delta?.content ?? '';
-        if (delta) { full += delta; onChunk({ delta, done: false }); }
-      } catch { /* ignore malformed SSE lines */ }
+        const evt = JSON.parse(trimmed) as { delta?: string; done?: boolean; error?: string };
+        if (evt.error) throw new Error(evt.error);
+        if (evt.delta) {
+          full += evt.delta;
+          onChunk({ delta: evt.delta, done: false });
+        }
+      } catch (err) {
+        // Re-throw real errors; ignore malformed partial lines
+        if (err instanceof Error && err.message && !err.message.startsWith('Unexpected')) {
+          throw err;
+        }
+      }
     }
   }
 
-  // Signal completion AFTER the loop — fixes the race condition where
-  // `result` was referenced before the promise resolved.
   onChunk({ delta: '', done: true });
   return full;
 }
@@ -218,6 +202,18 @@ function injectRAGIntoVEDA(veDAText: string, ragResult: import('./ragRetriever')
   return veDAText + lines.join('\n');
 }
 
+// ── No-vendors → keep planning naturally ──────────────────────────────────────
+// The AI must NEVER end the conversation just because the DB search was empty.
+// It states the honest empty-state, then immediately offers to keep helping
+// with budget/food/decor/timeline, and asks ONE relevant follow-up question.
+function buildContinuePlanningMessage(ctx: PlannerContext): string {
+  const followUp = nextSoftFollowUp(ctx);
+  const closing = followUp
+    ? followUp
+    : `Want me to start with a **budget breakdown**, a **timeline**, or **decoration ideas** for your ${ctx.eventType ?? 'event'}?`;
+  return `${NO_VENDORS_FOUND_MESSAGE}\n\n${closing}`;
+}
+
 // ── Deterministic response builder ────────────────────────────────────────────
 function buildDeterministicResponse(
   message: string,
@@ -243,7 +239,7 @@ function buildDeterministicResponse(
     const profs = orch.professions.map(p => p.replace(/_/g, ' ')).join(', ') || 'vendors';
     return !ctx.city
       ? `I'll search Vowza for **${profs}** — which city are you looking in?`
-      : `I searched Vowza for **${profs}** in **${ctx.city}**. No verified vendors found yet — the marketplace is growing daily! I can suggest what to look for and typical price ranges. Would that help?`;
+      : buildContinuePlanningMessage(ctx);
   }
 
   if (intent === 'context_update') {
@@ -280,8 +276,9 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   const { message, history, context, onChunk } = opts;
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const directKey   = import.meta.env.VITE_OPENAI_KEY   as string | undefined;
-  const useEdge     = import.meta.env.VITE_USE_AI_PROXY  === 'true';
+  // Groq via the Edge Function is the default path. Only an explicit
+  // VITE_USE_AI_PROXY=false disables it (useful for offline development).
+  const useEdge     = import.meta.env.VITE_USE_AI_PROXY !== 'false';
 
   // ── Step 1: Orchestrate — understand intent before doing anything ─────────
   const orch = orchestrate(message, context, history);
@@ -304,6 +301,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
 
   // ── Step 3: RAG retrieval (only when orchestrator flagged it needed) ───────
   let ragContext = '';
+  let dbVendors: import('./aiPlannerTypes').DBVendor[] | undefined;
   if (orch.needsRetrieval) {
     const ragResult = await retrieveVendors(message, updatedContext, 8, {
       professions: orch.professions,
@@ -312,6 +310,46 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
       minRating:   orch.minRating,
     });
     ragContext = buildRAGContext(ragResult);
+
+    // Attach real DB vendors so the UI can render honest, DB-first vendor
+    // cards. If the search returned nothing, we never fabricate vendors —
+    // the empty state is handled by NO_VENDORS_FOUND_MESSAGE downstream.
+    if (orch.intent === 'find_vendors' || orch.intent === 'comparison') {
+      dbVendors = ragResult.vendors.map(v => ({
+        provider_id:      v.provider_id,
+        profession:       v.profession,
+        stage_name:       v.stage_name,
+        full_name:        v.full_name,
+        bio:              v.bio,
+        city:             v.city,
+        price_min:        v.price_min,
+        price_max:        v.price_max,
+        average_rating:   v.average_rating,
+        total_reviews:    v.total_reviews,
+        total_bookings:   v.total_bookings,
+        is_verified:      v.is_verified,
+        is_available:     v.is_available,
+        experience_years: v.experience_years,
+        cover_image_url:  v.cover_image_url,
+        avatar_url:       v.avatar_url,
+      }));
+    }
+  }
+
+  // ── Step 3b: Honesty short-circuit ────────────────────────────────────────
+  // If the user explicitly asked to find vendors and the DB search came back
+  // empty, never let the LLM guess or invent vendors. Respond immediately
+  // with the exact required empty-state copy — but keep the conversation
+  // going by offering to continue planning (budget/food/decor/timeline) and
+  // asking one relevant follow-up. The AI must never just stop here.
+  if (orch.intent === 'find_vendors' && dbVendors && dbVendors.length === 0) {
+    const continueMsg = buildContinuePlanningMessage(updatedContext);
+    await streamDeterministic(continueMsg, onChunk);
+    return {
+      fullText: continueMsg,
+      aiResponse: { type: 'vendor_results', text: continueMsg, data: { dbVendors: [] } },
+      updatedContext,
+    };
   }
 
   // ── Step 4: Build dynamic context-aware system prompt ────────────────────
@@ -319,30 +357,25 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
 
   // ── Step 5: Route to LLM ──────────────────────────────────────────────────
 
-  // Mode 1: Supabase Edge Function proxy (production — key stays server-side)
+  // Mode 1: Supabase Edge Function proxy → Groq (key stays server-side)
   if (useEdge && supabaseUrl) {
     try {
       const msgs = buildMessages(history, message, dynamicSystemPrompt);
       const fullText = await callViaEdgeFunction(msgs, supabaseUrl, onChunk);
-      return { fullText, aiResponse: { type: 'text', text: fullText }, updatedContext };
+      const aiResponse: AIResponse = dbVendors
+        ? { type: 'vendor_results', text: fullText, data: { dbVendors } }
+        : { type: 'text', text: fullText };
+      return { fullText, aiResponse, updatedContext };
     } catch (err) {
-      console.warn('[VEDA] Edge Function failed, falling back:', err);
+      console.warn('[Vowza AI] Groq Edge Function failed, using deterministic engine:', err);
     }
   }
 
-  // Mode 2: Direct OpenAI (local dev only)
-  if (directKey && directKey.startsWith('sk-') && directKey !== 'sk-your-key-here') {
-    try {
-      const msgs = buildMessages(history, message, dynamicSystemPrompt);
-      const fullText = await callDirectOpenAI(msgs, directKey, onChunk);
-      return { fullText, aiResponse: { type: 'text', text: fullText }, updatedContext };
-    } catch (err) {
-      console.warn('[VEDA] OpenAI failed, falling back:', err);
-    }
-  }
-
-  // Mode 3: Deterministic VEDA — always works, zero cost, context-aware
+  // Mode 2: Deterministic VEDA — always works, zero cost, context-aware
   const deterministicText = buildDeterministicResponse(message, updatedContext, orch, ragContext);
   await streamDeterministic(deterministicText, onChunk);
-  return { fullText: deterministicText, aiResponse: { type: 'text', text: deterministicText }, updatedContext };
+  const aiResponse: AIResponse = dbVendors
+    ? { type: 'vendor_results', text: deterministicText, data: { dbVendors } }
+    : { type: 'text', text: deterministicText };
+  return { fullText: deterministicText, aiResponse, updatedContext };
 }

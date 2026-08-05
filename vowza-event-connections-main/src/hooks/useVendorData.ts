@@ -89,7 +89,7 @@ export function useVendorId() {
       if (!user) return null;
       const { data, error } = await supabase
         .from('provider_profiles')
-        .select('id, verification_status, is_published, profession, average_rating, total_reviews, total_bookings, bio, gallery_urls, vendor_details, price_min, experience_years, languages, social_links')
+        .select('id, verification_status, is_published, is_available, profession, average_rating, total_reviews, total_bookings, bio, gallery_urls, vendor_details, price_min, experience_years, languages, social_links, cover_image_url, stage_name, whatsapp, bank_name, bank_account_holder, bank_account_number, bank_ifsc, branch_name, is_bank_verified')
         .eq('user_id', user.id)
         .limit(1);
       if (error) throw error;
@@ -113,6 +113,7 @@ export function useVendorRealtime(vendorId?: string | null) {
       'bookings', 'payments', 'reviews', 'messages',
       'portfolio_items', 'provider_availability',
       'profile_views', 'inquiries', 'pricing_packages',
+      'notifications', 'provider_profiles', 'profiles',
     ];
 
     const channel = supabase.channel(`vendor-rt-${vendorId}`);
@@ -136,6 +137,10 @@ export function useVendorRealtime(vendorId?: string | null) {
           qc.invalidateQueries({ queryKey: ['vendor-inquiries'] });
           qc.invalidateQueries({ queryKey: ['vendor-availability'] });
           qc.invalidateQueries({ queryKey: ['vendor-insights'] });
+          qc.invalidateQueries({ queryKey: ['vendor-badges'] });
+          qc.invalidateQueries({ queryKey: ['vendor-notifications'] });
+          qc.invalidateQueries({ queryKey: ['vendor-bank'] });
+          qc.invalidateQueries({ queryKey: ['vendor-id'] });
         }
       );
     });
@@ -941,4 +946,212 @@ export async function trackProfileView(
     // Non-critical — never block the UI on analytics
     console.warn('[trackProfileView] failed:', e);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useVendorBadges — REAL sidebar/topbar counts. No hardcoded numbers.
+//   bookings      = COUNT(status IN ('requested','pending'))
+//   messages      = COUNT(unread messages not sent by me)
+//   inquiries     = COUNT(is_read = false)
+//   notifications = COUNT(is_read = false) for my auth user
+// ─────────────────────────────────────────────────────────────────────────────
+export interface VendorBadges {
+  bookings:      number;
+  messages:      number;
+  inquiries:     number;
+  notifications: number;
+}
+
+export function useVendorBadges(vendorId?: string | null) {
+  const { user } = useAuth();
+
+  return useQuery<VendorBadges>({
+    queryKey: ['vendor-badges', vendorId, user?.id],
+    queryFn: async () => {
+      const empty: VendorBadges = { bookings: 0, messages: 0, inquiries: 0, notifications: 0 };
+      if (!vendorId || !user) return empty;
+
+      // Pending bookings — exact count, no rows transferred
+      const bookingsP = supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('provider_id', vendorId)
+        .in('status', ['requested', 'pending']);
+
+      // Unread inquiries
+      const inquiriesP = supabase
+        .from('inquiries' as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('provider_id', vendorId)
+        .eq('is_read', false);
+
+      // Unread notifications for this auth user
+      const notifsP = supabase
+        .from('notifications' as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      // Unread messages: need my booking ids first
+      const bookingIdsP = supabase
+        .from('bookings')
+        .select('id')
+        .eq('provider_id', vendorId);
+
+      const [bRes, iRes, nRes, idRes] = await Promise.all([
+        bookingsP, inquiriesP, notifsP, bookingIdsP,
+      ]);
+
+      let messages = 0;
+      const bookingIds = ((idRes.data ?? []) as any[]).map(b => b.id);
+      if (bookingIds.length > 0) {
+        const { count } = await supabase
+          .from('messages' as any)
+          .select('id', { count: 'exact', head: true })
+          .in('booking_id', bookingIds)
+          .eq('is_read', false)
+          .neq('sender_id', user.id);
+        messages = count ?? 0;
+      }
+
+      return {
+        bookings:      bRes.count ?? 0,
+        messages,
+        inquiries:     iRes.count ?? 0,
+        notifications: nRes.count ?? 0,
+      };
+    },
+    enabled: !!vendorId && !!user,
+    staleTime: 1000 * 10,
+    refetchOnWindowFocus: true,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useVendorNotifications — real notification feed with unread count
+// ─────────────────────────────────────────────────────────────────────────────
+export function useVendorNotifications(limit = 50) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['vendor-notifications', user?.id, limit],
+    queryFn: async () => {
+      const empty = { notifications: [] as any[], unread: 0 };
+      if (!user) return empty;
+
+      const { data, error } = await supabase
+        .from('notifications' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      const notifications = (data ?? []) as any[];
+      return {
+        notifications,
+        unread: notifications.filter(n => !n.is_read).length,
+      };
+    },
+    enabled: !!user,
+    staleTime: 1000 * 10,
+  });
+}
+
+/** Mark a single notification read. */
+export async function markNotificationRead(id: string) {
+  return supabase.from('notifications' as any).update({ is_read: true }).eq('id', id);
+}
+
+/** Mark every notification read for the given user. */
+export async function markAllNotificationsRead(userId: string) {
+  return supabase
+    .from('notifications' as any)
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+}
+
+/** Mark all unread messages in a booking thread as read (not sent by me). */
+export async function markThreadRead(bookingId: string, myUserId: string) {
+  return supabase
+    .from('messages' as any)
+    .update({ is_read: true })
+    .eq('booking_id', bookingId)
+    .eq('is_read', false)
+    .neq('sender_id', myUserId);
+}
+
+/** Mark an inquiry as read. */
+export async function markInquiryRead(id: string) {
+  return supabase
+    .from('inquiries' as any)
+    .update({ is_read: true, status: 'read' })
+    .eq('id', id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useVendorBankDetails — real bank/payout details from provider_profiles
+// ─────────────────────────────────────────────────────────────────────────────
+export interface BankDetails {
+  hasBank:        boolean;
+  bankName:       string | null;
+  accountHolder:  string | null;
+  accountNumber:  string | null;  // raw — mask at render time
+  maskedAccount:  string | null;
+  ifsc:           string | null;
+  branchName:     string | null;
+  isVerified:     boolean;
+}
+
+export function useVendorBankDetails(vendorId?: string | null) {
+  return useQuery<BankDetails>({
+    queryKey: ['vendor-bank', vendorId],
+    queryFn: async () => {
+      const empty: BankDetails = {
+        hasBank: false, bankName: null, accountHolder: null,
+        accountNumber: null, maskedAccount: null, ifsc: null,
+        branchName: null, isVerified: false,
+      };
+      if (!vendorId) return empty;
+
+      const { data } = await supabase
+        .from('provider_profiles')
+        .select('bank_name, bank_account_holder, bank_account_number, bank_ifsc, branch_name, is_bank_verified')
+        .eq('id', vendorId)
+        .limit(1);
+
+      const row = (data ?? [])[0] as any;
+      if (!row) return empty;
+
+      const acct = row.bank_account_number ? String(row.bank_account_number) : null;
+
+      return {
+        hasBank:       !!acct,
+        bankName:      row.bank_name ?? null,
+        accountHolder: row.bank_account_holder ?? null,
+        accountNumber: acct,
+        maskedAccount: acct ? `${'•'.repeat(Math.max(0, acct.length - 4))}${acct.slice(-4)}` : null,
+        ifsc:          row.bank_ifsc ?? null,
+        branchName:    row.branch_name ?? null,
+        isVerified:    !!row.is_bank_verified,
+      };
+    },
+    enabled: !!vendorId,
+    staleTime: 1000 * 60,
+  });
+}
+
+/** Persist bank details onto provider_profiles. */
+export async function saveBankDetails(vendorId: string, payload: {
+  bank_name?: string;
+  bank_account_holder?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  branch_name?: string;
+}) {
+  return supabase
+    .from('provider_profiles')
+    .update({ ...payload, is_bank_verified: false } as any)  // re-verify on change
+    .eq('id', vendorId);
 }

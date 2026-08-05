@@ -7,10 +7,11 @@ import {
   CheckSquare, Square, ChevronDown, ChevronUp, ExternalLink,
   AlertCircle, TrendingDown, ShieldAlert, Star,
   Sun, Sunset, Calendar, Users, MapPin, IndianRupee,
-  Clock, Sparkles, CheckCircle2, ChevronRight,
+  Clock, Sparkles, CheckCircle2, ChevronRight, BadgeCheck,
+  Image as ImageIcon, Briefcase,
 } from 'lucide-react';
 import type {
-  AIResponse, ChecklistItem, RiskItem,
+  AIResponse, ChecklistItem, RiskItem, DBVendor,
   WeddingPlan, DayPlan, TimeSlot,
 } from '@/lib/aiPlannerTypes';
 
@@ -191,6 +192,115 @@ const VendorCard = ({ response }: { response: AIResponse }) => {
           </div>
         </div>
       ))}
+    </div>
+  );
+};
+
+// ─── Real DB Vendor Card ──────────────────────────────────────────────────────
+// Renders ONLY real vendors retrieved from the Vowza database (RAG).
+// Fields: Profile Image, Name, Verified Badge, Rating, Experience,
+//         Starting Price, Availability, City, Portfolio Button, View Profile.
+// Contact details are intentionally NEVER shown here — they unlock only
+// after a booking is confirmed through the Vowza booking flow.
+const fmtVendorPrice = (n?: number) => {
+  if (!n || n <= 0) return 'Contact for quotation';
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000)   return `₹${(n / 1000).toFixed(0)}K`;
+  return `₹${n}`;
+};
+
+const SingleDBVendorCard = ({ v }: { v: DBVendor }) => {
+  const name = v.stage_name || v.full_name || 'Vendor';
+  const prof = v.profession.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const rating = v.average_rating > 0 ? v.average_rating.toFixed(1) : null;
+  const experienceLabel = v.experience_years != null && v.experience_years > 0
+    ? `${v.experience_years} yr${v.experience_years === 1 ? '' : 's'} experience`
+    : 'Experience not provided';
+  const priceLabel = fmtVendorPrice(v.price_min);
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden flex gap-3 p-3">
+      {/* Profile image */}
+      <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center">
+        {v.avatar_url || v.cover_image_url ? (
+          <img
+            src={v.avatar_url || v.cover_image_url || ''}
+            alt={name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+          {v.is_verified && (
+            <span title="Verified by Vowza" className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+              <BadgeCheck className="w-3 h-3" /> Verified
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{prof}</p>
+
+        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
+          <span className="flex items-center gap-1">
+            <Star className="w-3 h-3 text-gold fill-gold" />
+            {rating ? `${rating} (${v.total_reviews})` : 'New Vendor'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Briefcase className="w-3 h-3" />
+            {experienceLabel}
+          </span>
+          {v.city && (
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {v.city}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-2">
+          <div>
+            <p className="text-[10px] text-muted-foreground">Starting from</p>
+            <p className="text-sm font-bold text-foreground">{priceLabel}</p>
+          </div>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+            v.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+          }`}>
+            {v.is_available ? 'Available' : 'Busy'}
+          </span>
+        </div>
+
+        {/* Actions — Portfolio + View Profile only. No Contact button:
+            contact details unlock only after a confirmed booking. */}
+        <div className="flex items-center gap-2 mt-2.5">
+          <Link
+            to={`/artist/${v.provider_id}#portfolio`}
+            className="flex-1 text-center text-xs font-medium text-foreground border border-border/60 rounded-lg py-1.5 hover:bg-secondary transition-colors"
+          >
+            Portfolio
+          </Link>
+          <Link
+            to={`/artist/${v.provider_id}`}
+            className="flex-1 text-center text-xs font-semibold text-primary-foreground bg-gradient-maroon rounded-lg py-1.5 hover:opacity-90 transition-opacity flex items-center justify-center gap-1"
+          >
+            View Profile <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DBVendorResultsCard = ({ response }: { response: AIResponse }) => {
+  const vendors = response.data?.dbVendors;
+  if (!vendors?.length) return null;
+  return (
+    <div className="w-full mt-2 space-y-2">
+      {vendors.map(v => <SingleDBVendorCard key={v.provider_id} v={v} />)}
     </div>
   );
 };
@@ -836,6 +946,7 @@ const AIResponseCards = ({ response }: Props) => {
     case 'budget_plan':            return <BudgetCard       response={response} />;
     case 'timeline':               return <TimelineCard     response={response} />;
     case 'vendor_recommendations': return <VendorCard       response={response} />;
+    case 'vendor_results':         return <DBVendorResultsCard response={response} />;
     case 'checklist':              return <ChecklistCard    response={response} />;
     case 'weather_advice':         return <WeatherCard      response={response} />;
     case 'food_plan':              return <FoodCard         response={response} />;

@@ -14,6 +14,22 @@ import type {
   WeddingPlan, WeddingOverview, DayPlan, DayBudget,
   DayChecklist, DayVendor, TimeSlot,
 } from "./aiPlannerTypes";
+// Appends ONE natural follow-up question (Veg/Non-Veg, Indoor/Outdoor, etc.)
+// to a completed structured response — never blocks the plan itself.
+// NOTE: aiOrchestrator is imported dynamically (not statically) to avoid a
+// circular import cycle, matching the existing pattern used in processMessage().
+function withFollowUp(text: string, ctx: PlannerContext): string {
+  // Inline soft-followup logic (kept in sync with aiOrchestrator.SOFT_FOLLOWUPS)
+  // to avoid a synchronous circular import while still asking ONE natural
+  // follow-up question per response.
+  if (!ctx.foodPreference) return `${text}\n\nWould you like **Veg**, **Non-Veg**, or **Both** for the food?`;
+  if (!ctx.serviceStyle)   return `${text}\n\nShould the food service be **Buffet** or **Table Service**?`;
+  if (!ctx.venueType)      return `${text}\n\nAre you thinking **Indoor** or **Outdoor** for the venue?`;
+  if (!ctx.styleVibe)      return `${text}\n\nDo you prefer a **Traditional** or **Modern** theme?`;
+  if (!ctx.luxuryLevel)    return `${text}\n\nShould I plan this as **Luxury**, **Premium**, **Standard**, or **Budget-friendly**?`;
+  if (!ctx.timeOfDay)      return `${text}\n\nIs this a **Morning**, **Afternoon**, **Evening**, or **Night** event?`;
+  return text;
+}
 
 const CITY_MUL: Record<string, number> = {
   mumbai: 1.55, delhi: 1.45, bangalore: 1.35, chennai: 1.15,
@@ -657,16 +673,16 @@ export async function processMessage(
   // ── VEDA structured responses (only when all context is available) ───────
   switch (result.intent) {
     case 'budget_breakdown':
-      return { response: { type: 'budget_plan', text: `Here's the budget breakdown for your **${ctx.eventType ?? 'event'}** in **${ctx.city ?? 'your city'}** for **${ctx.guestCount ?? 200} guests** — budget **${fmt(ctx.budget ?? 500000)}**.`, data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'budget_plan', text: withFollowUp(`Here's the budget breakdown for your **${ctx.eventType ?? 'event'}** in **${ctx.city ?? 'your city'}** for **${ctx.guestCount ?? 200} guests** — budget **${fmt(ctx.budget ?? 500000)}**.`, ctx), data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
 
     case 'timeline':
-      return { response: { type: 'timeline', text: `Here's your complete planning timeline for the **${ctx.eventType ?? 'event'}**.`, data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'timeline', text: withFollowUp(`Here's your complete planning timeline for the **${ctx.eventType ?? 'event'}**.`, ctx), data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
 
     case 'checklist':
-      return { response: { type: 'checklist', text: `Here's your full checklist for the **${ctx.eventType ?? 'event'}** — every task prioritised and assigned.`, data: { checklist: generateChecklist(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'checklist', text: withFollowUp(`Here's your full checklist for the **${ctx.eventType ?? 'event'}** — every task prioritised and assigned.`, ctx), data: { checklist: generateChecklist(ctx) } }, updatedContext: ctx };
 
     case 'food_plan':
-      return { response: { type: 'food_plan', text: `Here's the food & catering plan for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}**.`, data: { foodPlan: generateFoodPlan(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'food_plan', text: withFollowUp(`Here's the food & catering plan for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}**.`, ctx), data: { foodPlan: generateFoodPlan(ctx) } }, updatedContext: ctx };
 
     case 'weather_advice':
       return { response: { type: 'weather_advice', text: `Here's the weather and season analysis for your **${ctx.eventType ?? 'event'}**${ctx.eventDate ? ` in ${ctx.eventDate}` : ''}.`, data: { weather: getWeatherAdvice(ctx) } }, updatedContext: ctx };
@@ -682,7 +698,7 @@ export async function processMessage(
       return {
         response: {
           type: 'wedding_plan',
-          text: `Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`,
+          text: withFollowUp(`Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`, ctx),
           data: { weddingPlan: plan },
         },
         updatedContext: ctx,

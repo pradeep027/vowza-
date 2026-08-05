@@ -171,7 +171,10 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
     conversationId, conversations, historyLoading,
     send, editAndResend, regenerateLastResponse,
     clearChat, loadConversation, removeConversation,
-    renameConversation, quickPrompts,
+    removeConversations, removeAllConversations,
+    renameConversation, pinConversation, archiveConversation,
+    favoriteConversation, duplicateConversationById, exportConversation,
+    quickPrompts,
   } = useAIChat();
 
   const [input,          setInput]          = useState('');
@@ -303,11 +306,11 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
               {showSidebar && user && (
                 <motion.div
                   initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 180, opacity: 1 }}
+                  animate={{ width: 240, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ duration: 0.22 }}
                   className="flex-shrink-0 overflow-hidden"
-                  style={{ width: 180 }}
+                  style={{ width: 240 }}
                 >
                   <ConversationSidebar
                     conversations={conversations}
@@ -315,7 +318,14 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                     isLoading={historyLoading}
                     onSelect={conv => { loadConversation(conv); setShowSidebar(false); }}
                     onDelete={removeConversation}
+                    onDeleteMultiple={removeConversations}
+                    onDeleteAll={removeAllConversations}
                     onRename={renameConversation}
+                    onPin={pinConversation}
+                    onArchive={archiveConversation}
+                    onFavorite={favoriteConversation}
+                    onDuplicate={duplicateConversationById}
+                    onExport={exportConversation}
                     onNewChat={() => { clearChat(); setShowSidebar(false); }}
                   />
                 </motion.div>

@@ -72,6 +72,8 @@ export default function VendorBookings() {
       toast.success(newStatus === 'confirmed' ? 'Booking accepted' : 'Booking declined');
       qc.invalidateQueries({ queryKey: ['vendor-bookings'] });
       qc.invalidateQueries({ queryKey: ['vendor-kpis'] });
+      // Pending-bookings badge must update immediately
+      qc.invalidateQueries({ queryKey: ['vendor-badges'] });
     }
     setBusy(null);
   };

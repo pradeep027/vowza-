@@ -1,8 +1,9 @@
 // ─── Footer — Corporate Premium Edition ──────────────────────────────────────
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, Star, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
+import { Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, Star, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import AppLogo from "@/components/AppLogo";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
@@ -95,12 +96,7 @@ const Footer = () => {
 
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
-            <Link to="/" className="inline-flex items-center gap-2.5 mb-5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
-                <Sparkles className="w-4.5 h-4.5 text-white" />
-              </div>
-              <span className="text-xl font-display font-bold text-white">Vowza</span>
-            </Link>
+            <AppLogo theme="dark" size="lg" className="mb-5" />
             <p className="text-white/45 text-sm leading-relaxed max-w-xs mb-6">
               India's premium AI-powered event marketplace. Connecting clients with verified artists for unforgettable celebrations.
             </p>

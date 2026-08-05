@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Mic2, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
+import { User, Mic2, CheckCircle, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import AppLogo from '@/components/AppLogo';
 
 const options = [
   {
@@ -65,12 +66,7 @@ const AccountTypeSelection = () => {
     <div className="min-h-screen bg-surface-2 flex flex-col">
       {/* Header */}
       <header className="bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-border/60 px-6 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-maroon flex items-center justify-center shadow-maroon">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-base font-display font-bold text-foreground">Vowza</span>
-        </Link>
+        <AppLogo size="sm" />
         <p className="text-xs text-muted-foreground hidden sm:block">Signed in as {user.email}</p>
       </header>
 
