@@ -44,7 +44,7 @@ const TestFeatures = () => {
               {pricingPackages.map((pkg, index) => (
                 <div key={index} className="p-4 rounded-lg bg-blue-50 border border-blue-200">
                   <h3 className="font-semibold text-lg mb-2">{pkg.name}</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-sm">Price (₹)</Label>
                       <Input type="number" placeholder="10000" className="border-blue-300" />
@@ -94,7 +94,7 @@ const TestFeatures = () => {
           <CardContent>
             <div className="space-y-2">
               {timeSlots.map((slot, index) => (
-                <div key={slot.day} className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
+                <div key={slot.day} className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 sm:flex-nowrap">
                   <input type="checkbox" className="w-4 h-4 accent-orange-500" />
                   <span className="text-sm font-medium">
                     {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][slot.day]}

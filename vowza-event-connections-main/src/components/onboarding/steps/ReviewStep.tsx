@@ -134,7 +134,7 @@ export const ReviewStep = ({ data, onNotificationChange, onEdit }: ReviewStepPro
       <div className="space-y-4">
         {/* Basic Info */}
         <Section title="Basic Information" icon={User} step={0}>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-muted-foreground">Full Name:</span>
               <p className="font-medium">{data.fullName || '-'}</p>
@@ -182,13 +182,13 @@ export const ReviewStep = ({ data, onNotificationChange, onEdit }: ReviewStepPro
         {/* Pricing */}
         <Section title="Pricing & Specialties" icon={IndianRupee} step={2}>
           <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-muted-foreground">Price Range:</span>
               <span className="font-medium">
                 {formatPrice(data.priceMin)} - {formatPrice(data.priceMax)}
               </span>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-muted-foreground">Pricing Type:</span>
               <span className="font-medium capitalize">{data.pricingType.replace('_', ' ')}</span>
             </div>
@@ -219,7 +219,7 @@ export const ReviewStep = ({ data, onNotificationChange, onEdit }: ReviewStepPro
 
       {/* Notification Permission */}
       <div className="p-4 bg-accent/10 rounded-xl border border-accent/20">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
               <Bell className="w-5 h-5 text-accent-foreground" />

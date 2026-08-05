@@ -77,7 +77,7 @@ export default function Contact() {
               <div className="bg-surface-1 rounded-2xl border border-border/60 p-6 md:p-7">
                 <h2 className="text-lg font-display font-semibold text-foreground mb-5">Send a Message</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="c-name" className="text-xs font-semibold text-muted-foreground block mb-1.5">Name *</label>
                       <input id="c-name" type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Your name" className="input-premium text-sm w-full" />

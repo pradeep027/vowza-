@@ -76,8 +76,8 @@ const VendorCard = memo(({ vendor, onClick }: { vendor: Vendor; onClick: () => v
       <button
         type="button"
         onClick={e => e.stopPropagation()}
-        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm
-                   flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-3 right-3 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/30 backdrop-blur-sm
+                   flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
         aria-label="Save"
       >
         <Heart className="w-3.5 h-3.5 text-white" />

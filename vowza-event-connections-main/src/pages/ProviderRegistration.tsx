@@ -805,9 +805,9 @@ function Step5Review({ s1, s2, s3, s4, goTo }: {
     </div>
   );
   const Row = ({ label, value }: { label: string; value: string }) => value ? (
-    <div className="flex gap-3 text-sm">
-      <span className="text-muted-foreground min-w-[110px] flex-shrink-0">{label}</span>
-      <span className="text-foreground font-medium capitalize">{value}</span>
+    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:gap-3">
+      <span className="text-muted-foreground sm:min-w-[110px] sm:flex-shrink-0">{label}</span>
+      <span className="text-foreground font-medium capitalize break-words">{value}</span>
     </div>
   ) : null;
 

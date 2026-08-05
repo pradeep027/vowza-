@@ -54,7 +54,7 @@ export default function AdminNotifications() {
         {/* Target */}
         <div>
           <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-3">Send To</label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {([['all', Users, 'All Users'], ['artists', UserCheck, 'Artists Only'], ['customers', User, 'Customers Only']] as const).map(([val, Icon, label]) => (
               <button key={val} onClick={() => setTarget(val as Target)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${target === val ? 'border-maroon bg-maroon/5' : 'border-border hover:border-maroon/30'}`}>

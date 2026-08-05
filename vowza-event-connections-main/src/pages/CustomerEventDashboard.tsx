@@ -259,7 +259,7 @@ const CustomerEventDashboard = () => {
                 {/* Event Overview */}
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <CardTitle>{selectedEvent.event_name}</CardTitle>
                       <Badge className={getStatusColor(selectedEvent.status)} variant="outline">
                         {selectedEvent.status}
@@ -304,7 +304,7 @@ const CustomerEventDashboard = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-muted-foreground">Accepted</p>
                           <p className="text-2xl font-bold text-green-600">{acceptedCount}</p>
@@ -315,7 +315,7 @@ const CustomerEventDashboard = () => {
                   </Card>
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-muted-foreground">Pending</p>
                           <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
@@ -326,7 +326,7 @@ const CustomerEventDashboard = () => {
                   </Card>
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-muted-foreground">Rejected</p>
                           <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
@@ -337,7 +337,7 @@ const CustomerEventDashboard = () => {
                   </Card>
                   <Card>
                     <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-muted-foreground">Booked</p>
                           <p className="text-2xl font-bold">₹{(totalBookedAmount / 1000).toFixed(0)}K</p>
@@ -378,7 +378,7 @@ const CustomerEventDashboard = () => {
                 {/* Artist Bookings */}
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <CardTitle>Selected Artists</CardTitle>
                       <Button
                         variant="outline"
@@ -398,7 +398,7 @@ const CustomerEventDashboard = () => {
                     ) : (
                       <div className="space-y-3">
                         {artistBookings.map((booking) => (
-                          <div key={booking.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div key={booking.id} className="flex flex-col items-start gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
@@ -411,7 +411,7 @@ const CustomerEventDashboard = () => {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-4 mt-2 text-sm">
+                              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
                                 <div className="flex items-center gap-1">
                                   <IndianRupee className="w-3 h-3" />
                                   {booking.price}
@@ -422,7 +422,7 @@ const CustomerEventDashboard = () => {
                                 </Badge>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               {booking.status === 'rejected' && (
                                 <Button
                                   size="sm"

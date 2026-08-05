@@ -121,7 +121,7 @@ export default function NotificationsPage() {
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(n.id); }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity shrink-0"
+                    className="min-w-10 min-h-10 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity shrink-0"
                     aria-label="Delete notification"
                   >
                     <Trash2 className="w-4 h-4" />

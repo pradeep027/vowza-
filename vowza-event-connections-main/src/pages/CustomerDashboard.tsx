@@ -170,9 +170,9 @@ Thank you for choosing Vowza!
     <div className="min-h-screen bg-gradient-to-br from-cream via-background to-blush/20">
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-gold/20 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <AppLogo size="lg" />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
             <Button
               variant={activeTab === 'browse' ? 'default' : 'ghost'}
               size="sm"
@@ -294,7 +294,7 @@ Thank you for choosing Vowza!
                 {paymentHistory.map((payment) => (
                   <Card key={payment.id} className="border-gold/20">
                     <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="flex items-center gap-3 mb-2">
                             <Badge className={

@@ -356,11 +356,11 @@ const ProviderDashboard = () => {
       )}
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-gold/20 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-gold to-maroon bg-clip-text text-transparent">
             Vowza Pro
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 {isAvailable ? 'Online' : 'Offline'}
@@ -400,7 +400,7 @@ const ProviderDashboard = () => {
                       rows={4}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Min Price (₹)</label>
                       <Input
@@ -507,7 +507,7 @@ const ProviderDashboard = () => {
         </div>
 
         {/* ── Tab Navigation ─────────────────────────────────────────────── */}
-        <div className="flex gap-1 p-1 bg-muted rounded-xl mb-6 w-fit">
+        <div className="flex gap-1 p-1 bg-muted rounded-xl mb-6 w-full overflow-x-auto no-scrollbar sm:w-fit">
           {([
             { id: 'bookings', label: 'Bookings', icon: Calendar },
             { id: 'calendar', label: 'My Calendar', icon: CalendarDays },
@@ -653,7 +653,7 @@ const ProviderDashboard = () => {
                           <p className="text-sm text-muted-foreground mt-1">Note: {booking.requirements}</p>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Link to={`/chat/${booking.id}`}>
                           <Button variant="outline" size="sm" className="border-gold text-gold hover:bg-gold/10">
                             <MessageCircle className="w-4 h-4 mr-1" />Chat

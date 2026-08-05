@@ -196,7 +196,7 @@ export const PortfolioStep = ({ items, onChange, onUpload, isUploading, onGaller
                 <button
                   type="button"
                   onClick={() => removeItem(item.id)}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 w-8 h-8 sm:w-6 sm:h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-4 h-4" />
                 </button>

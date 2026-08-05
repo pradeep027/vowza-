@@ -378,7 +378,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setStep('calendar')} className="flex-1">← Back</Button>
+              <Button variant="outline" onClick={() => setStep('calendar')} className="flex-1 min-w-0">← Back</Button>
               <Button onClick={handleDetailsNext} disabled={!!availError || checkingAvail}
                 className="flex-1 bg-gradient-gold hover:opacity-90">
                 {checkingAvail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Checking…</> : 'Review →'}
@@ -393,11 +393,11 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
             <div className="p-4 rounded-2xl bg-gradient-to-br from-gold/10 to-maroon/10 border border-gold/20 space-y-3">
               <h3 className="font-semibold text-foreground">Booking Summary</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Artist</span><span className="font-medium">{providerName}</span></div>
+                <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Artist</span><span className="font-medium text-right min-w-0 break-words">{providerName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span className="font-medium">{fmtDate(eventDate)}</span></div>
                 {eventTime && <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{eventTime} ({duration} hrs)</span></div>}
-                {eventTypeName && <div className="flex justify-between"><span className="text-muted-foreground">Event</span><span className="font-medium">{eventTypeName}</span></div>}
-                <div className="flex justify-between"><span className="text-muted-foreground">Venue</span><span className="font-medium text-right max-w-[200px]">{venueAddress}, {venueCity}</span></div>
+                {eventTypeName && <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Event</span><span className="font-medium text-right min-w-0 break-words">{eventTypeName}</span></div>}
+                <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Venue</span><span className="font-medium text-right min-w-0 break-words max-w-[200px]">{venueAddress}, {venueCity}</span></div>
                 <div className="border-t border-border/40 pt-2 flex justify-between font-bold">
                   <span>Amount</span><span className="text-gold">₹{parseInt(amount).toLocaleString()}</span>
                 </div>

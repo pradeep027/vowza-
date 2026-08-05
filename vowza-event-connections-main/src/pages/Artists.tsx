@@ -116,7 +116,7 @@ const ArtistCard = ({ artist, view }: { artist: Artist; view: "grid" | "list" })
         {/* Wishlist */}
         <button
           onClick={e => e.stopPropagation()}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors opacity-0 group-hover:opacity-100"
+          className="absolute top-3 right-3 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         >
           <Heart className="w-3.5 h-3.5 text-white" />
         </button>

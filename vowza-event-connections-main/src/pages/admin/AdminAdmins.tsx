@@ -59,7 +59,7 @@ export default function AdminAdmins() {
       <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5 space-y-3">
         <h3 className="font-semibold text-foreground flex items-center gap-2"><Plus className="w-4 h-4"/>Invite Admin</h3>
         <p className="text-xs text-muted-foreground">The user must already have a Vowza account.</p>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter'&&addAdmin()} placeholder="admin@example.com" className="input-premium text-sm flex-1" />
           <button onClick={addAdmin} disabled={adding} className="px-5 py-2.5 rounded-xl bg-maroon text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 flex-shrink-0">
             {adding ? 'Adding…' : 'Add Admin'}
@@ -76,7 +76,7 @@ export default function AdminAdmins() {
         ) : (
           <div className="divide-y divide-border/40">
             {admins.map((a: any) => (
-              <div key={a.user_id} className="flex items-center justify-between px-5 py-4">
+              <div key={a.user_id} className="flex flex-col items-start gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-maroon flex items-center justify-center">
                     <span className="text-sm font-bold text-white">{(a.full_name||a.email||'A').charAt(0).toUpperCase()}</span>

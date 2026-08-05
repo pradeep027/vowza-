@@ -427,7 +427,7 @@ const Navbar = () => {
             <div className="flex items-center gap-1 lg:hidden">
               <button
                 onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchInputRef.current?.focus(), 50); }}
-                className="p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                className="min-w-11 min-h-11 p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
                 aria-label="Search"
               >
                 <Search className="w-5 h-5" />
@@ -435,7 +435,7 @@ const Navbar = () => {
               {user && (
                 <button
                   onClick={() => navigate("/cart")}
-                  className="relative p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                  className="relative min-w-11 min-h-11 p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
                 >
                   <ShoppingBag className="w-5 h-5" />
                   {cart.length > 0 && (
@@ -447,7 +447,7 @@ const Navbar = () => {
               )}
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                className="min-w-11 min-h-11 p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
                 aria-label="Toggle menu"
                 aria-expanded={isOpen}
               >

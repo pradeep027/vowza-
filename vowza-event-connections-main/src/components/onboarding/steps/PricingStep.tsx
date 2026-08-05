@@ -76,7 +76,7 @@ export const PricingStep = ({ data, onChange }: PricingStepProps) => {
         <Label className="text-sm text-muted-foreground">
           Set your price range to help customers understand your rates
         </Label>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="priceMin">Minimum Price (₹)</Label>
             <div className="relative">
@@ -175,8 +175,8 @@ export const PricingStep = ({ data, onChange }: PricingStepProps) => {
 
       {/* Instant Booking */}
       <div className="p-6 bg-secondary/30 rounded-xl border border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={`p-2 rounded-full ${data.instantBooking ? 'bg-emerald-100' : 'bg-secondary'}`}>
               <Zap className={`w-5 h-5 ${data.instantBooking ? 'text-emerald-600' : 'text-muted-foreground'}`} />
             </div>
@@ -198,8 +198,8 @@ export const PricingStep = ({ data, onChange }: PricingStepProps) => {
 
       {/* Availability Toggle */}
       <div className="p-6 bg-secondary/30 rounded-xl border border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={`p-2 rounded-full ${data.isAvailable ? 'bg-green-100' : 'bg-secondary'}`}>
               {data.isAvailable ? (
                 <CheckCircle className="w-5 h-5 text-green-600" />
