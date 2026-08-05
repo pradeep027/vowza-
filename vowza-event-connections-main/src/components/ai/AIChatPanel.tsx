@@ -109,7 +109,7 @@ const MessageBubble = ({
         {isUser ? <span className="text-xs font-bold">U</span> : <Sparkles className="w-3.5 h-3.5" />}
       </div>
 
-      <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col gap-1 max-w-[85%] min-w-0 ${isUser ? 'items-end' : 'items-start'}`}>
         {/* Bubble */}
         {editing ? (
           <div className="w-full">
@@ -345,6 +345,18 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
               bg-background border border-border/60 rounded-t-3xl md:rounded-2xl
               shadow-2xl flex overflow-hidden"
           >
+            {/* ── Mobile-only backdrop so the sidebar overlays instead of squeezing chat (md+ untouched) ── */}
+            <AnimatePresence>
+              {showSidebar && user && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0 z-10 bg-black/40 md:hidden"
+                  onClick={() => setShowSidebar(false)}
+                />
+              )}
+            </AnimatePresence>
+
             {/* ── Conversation sidebar (slides in) ──────────────────────── */}
             <AnimatePresence>
               {showSidebar && user && (
@@ -353,7 +365,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                   animate={{ width: 240, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ duration: 0.22 }}
-                  className="flex-shrink-0 overflow-hidden"
+                  className="absolute inset-y-0 left-0 z-20 md:relative md:z-auto flex-shrink-0 overflow-hidden"
                   style={{ width: 240 }}
                 >
                   <ConversationSidebar
@@ -518,7 +530,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                       <div className="w-7 h-7 rounded-full bg-gradient-gold flex items-center justify-center flex-shrink-0 mt-0.5 shadow-gold">
                         <Sparkles className="w-3.5 h-3.5 text-foreground" />
                       </div>
-                      <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+                      <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] min-w-0">
                         {streamingText
                           ? <>
                               <MarkdownMessage text={streamingText} />

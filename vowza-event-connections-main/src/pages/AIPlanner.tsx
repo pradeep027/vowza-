@@ -274,6 +274,18 @@ const AIPlanner = () => {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
 
+      {/* ── Mobile-only backdrop behind the sidebar drawer (md+ untouched) ──── */}
+      <AnimatePresence>
+        {showSidebar && user && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showSidebar && user && (
@@ -282,7 +294,7 @@ const AIPlanner = () => {
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.22 }}
-            className="flex-shrink-0 overflow-hidden border-r border-border/50 bg-card"
+            className="fixed inset-y-0 left-0 z-40 md:relative md:z-auto flex-shrink-0 overflow-hidden border-r border-border/50 bg-card"
             style={{ width: 280 }}
           >
             <ConversationSidebar
@@ -432,13 +444,13 @@ const AIPlanner = () => {
             {/* Streaming bubble */}
             {isStreaming && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 max-w-3xl mr-auto">
+                className="flex gap-3 max-w-3xl mr-auto min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-gradient-gold flex items-center justify-center flex-shrink-0 mt-1 shadow-gold">
                   <Sparkles className="w-4 h-4 text-foreground" />
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 min-w-0">
                   <span className="text-[11px] font-semibold text-muted-foreground px-1">✨ Vowza Planner</span>
-                  <div className="bg-card border border-border/50 rounded-2xl rounded-tl-sm px-5 py-3.5 max-w-xl">
+                  <div className="bg-card border border-border/50 rounded-2xl rounded-tl-sm px-5 py-3.5 max-w-xl min-w-0">
                     {streamingText
                       ? <>
                           <MarkdownMessage text={streamingText} />
@@ -459,7 +471,7 @@ const AIPlanner = () => {
           {showScrollBtn && (
             <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="fixed bottom-28 right-6 md:right-10 w-9 h-9 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-secondary transition-colors z-10">
+              className="fixed bottom-28 right-4 md:right-10 w-9 h-9 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-secondary transition-colors z-10">
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </motion.button>
           )}

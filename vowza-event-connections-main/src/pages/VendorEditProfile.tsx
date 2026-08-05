@@ -324,7 +324,7 @@ export default function VendorEditProfile() {
             <div className="space-y-5">
               <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-6 space-y-4">
                 <h3 className="font-semibold text-foreground">Base Pricing</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><label className="text-xs font-semibold text-muted-foreground block mb-1.5">Starting Price (₹)</label><input type="number" value={form.price_min} onChange={e => f("price_min")(e.target.value)} className="input-premium text-sm w-full" /></div>
                   <div><label className="text-xs font-semibold text-muted-foreground block mb-1.5">Maximum Price (₹)</label><input type="number" value={form.price_max} onChange={e => f("price_max")(e.target.value)} className="input-premium text-sm w-full" /></div>
                   {pricingFields.map(field => renderField(field, details[field.key], d(field.key)))}
@@ -338,7 +338,7 @@ export default function VendorEditProfile() {
                 <div className="space-y-4">
                   {packages.map((pkg, i) => (
                     <div key={pkg.id || i} className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className="text-xs font-semibold text-muted-foreground block mb-1">Package Name</label><input value={pkg.name} onChange={e => setPackages(p => p.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="e.g. Wedding Package" className="input-premium text-sm w-full" /></div>
                         <div><label className="text-xs font-semibold text-muted-foreground block mb-1">Price (₹)</label><input type="number" value={pkg.price} onChange={e => setPackages(p => p.map((x, idx) => idx === i ? { ...x, price: e.target.value } : x))} className="input-premium text-sm w-full" /></div>
                         <div><label className="text-xs font-semibold text-muted-foreground block mb-1">Duration</label><input value={pkg.duration || ""} onChange={e => setPackages(p => p.map((x, idx) => idx === i ? { ...x, duration: e.target.value } : x))} placeholder="e.g. Full Day" className="input-premium text-sm w-full" /></div>

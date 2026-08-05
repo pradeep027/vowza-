@@ -466,7 +466,7 @@ function Step1Form({ s1, setS1, sendOTP, verifyOTP, otpLoading }: {
             🇮🇳 +91
           </div>
           <input value={s1.phone} onChange={set('phone')} placeholder="10-digit mobile number"
-            maxLength={10} className="input-premium text-sm flex-1" type="tel" disabled={s1.otpVerified} />
+            maxLength={10} className="input-premium text-sm flex-1 min-w-0" type="tel" disabled={s1.otpVerified} />
           {!s1.otpVerified && (
             <button onClick={sendOTP} disabled={otpLoading || s1.phone.length < 10}
               className="flex-shrink-0 px-4 py-2 rounded-xl bg-maroon text-white text-xs font-semibold disabled:opacity-50">
@@ -494,7 +494,7 @@ function Step1Form({ s1, setS1, sendOTP, verifyOTP, otpLoading }: {
         </div>
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="State" required>
           <select value={s1.state} onChange={set('state')} className="input-premium text-sm w-full">
             <option value="">Select State</option>
@@ -557,7 +557,7 @@ function Step2Form({ s2, setS2, openCamera, retake }: {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Years of Experience" required>
           <select value={s2.experience} onChange={set('experience')} className="input-premium text-sm w-full">
             <option value="">Select</option>

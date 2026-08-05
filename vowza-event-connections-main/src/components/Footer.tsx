@@ -81,7 +81,7 @@ const Footer = () => {
               </h3>
               <p className="text-white/45 text-sm">Get weekly inspiration, planning tips, and exclusive offers.</p>
             </div>
-            <form onSubmit={handleNewsletter} className="flex w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]">
+            <form onSubmit={handleNewsletter} className="flex flex-col sm:flex-row w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]">
               <input
                 type="email"
                 placeholder="your@email.com"
@@ -92,7 +92,7 @@ const Footer = () => {
               <motion.button
                 whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 type="submit"
-                className="px-5 py-3 rounded-xl bg-gradient-gold text-gray-900 font-semibold text-sm shadow-gold hover:opacity-90 transition-all flex-shrink-0 flex items-center gap-1.5"
+                className="w-full sm:w-auto justify-center px-5 py-3 rounded-xl bg-gradient-gold text-gray-900 font-semibold text-sm shadow-gold hover:opacity-90 transition-all flex-shrink-0 flex items-center gap-1.5"
               >
                 Subscribe <ArrowRight className="w-3.5 h-3.5" />
               </motion.button>

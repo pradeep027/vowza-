@@ -184,7 +184,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[92vw] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold bg-gradient-to-r from-gold to-maroon bg-clip-text text-transparent">
             Book {providerName}
@@ -313,7 +313,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
             </div>
 
             {/* Time + Duration */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />Start Time</Label>
                 <Input type="time" value={eventTime}
@@ -340,7 +340,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
                 onChange={e => setVenueAddress(e.target.value)} required
                 className="border-border focus:border-gold" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>City *</Label>
                 <Input placeholder="City" value={venueCity}
