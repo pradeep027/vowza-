@@ -25,5 +25,5 @@ export function useDashboardLink(): {
 export function resolveDashboard(roles: string[]): string {
   if (roles.includes('admin'))    return '/admin/dashboard';
   if (roles.includes('provider')) return '/vendor/dashboard';
-  return '/browse';
+  return '/dashboard';
 }

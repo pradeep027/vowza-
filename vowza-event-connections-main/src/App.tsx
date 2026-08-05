@@ -58,6 +58,18 @@ const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
 const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
 
+// ─── Customer (user dashboard) ────────────────────────────────────────────────
+const CustomerLayout       = lazy(() => import("./pages/customer/CustomerLayout"));
+const DashboardHome        = lazy(() => import("./pages/customer/DashboardHome"));
+const MyBookingsPage       = lazy(() => import("./pages/customer/MyBookingsPage"));
+const WishlistPage         = lazy(() => import("./pages/customer/WishlistPage"));
+const NotificationsPage    = lazy(() => import("./pages/customer/NotificationsPage"));
+const MyProfilePage        = lazy(() => import("./pages/customer/MyProfilePage"));
+const PaymentHistoryPage   = lazy(() => import("./pages/customer/PaymentHistoryPage"));
+const MyReviewsPage        = lazy(() => import("./pages/customer/MyReviewsPage"));
+const AIPlannerListPage    = lazy(() => import("./pages/customer/AIPlannerListPage"));
+const CustomerSettingsPage = lazy(() => import("./pages/customer/SettingsPage"));
+
 // ─── Vendor (artist/provider dashboard) ───────────────────────────────────────
 const VendorLayout         = lazy(() => import("./pages/vendor/VendorLayout"));
 const VendorDashboardHome  = lazy(() => import("./pages/vendor/VendorDashboardHome"));
@@ -153,6 +165,19 @@ const AppContent = () => {
             <Route path="admins"       element={<AdminAdmins />} />
             <Route path="audit-logs"   element={<AdminAuditLogs />} />
             <Route path="system-health"element={<AdminSystemHealth />} />
+          </Route>
+
+          {/* ── Customer — CustomerLayout handles auth + customer-only role check internally ── */}
+          <Route path="/dashboard" element={<CustomerLayout />}>
+            <Route index               element={<DashboardHome />} />
+            <Route path="bookings"     element={<MyBookingsPage />} />
+            <Route path="wishlist"     element={<WishlistPage />} />
+            <Route path="notifications"element={<NotificationsPage />} />
+            <Route path="profile"      element={<MyProfilePage />} />
+            <Route path="payments"     element={<PaymentHistoryPage />} />
+            <Route path="reviews"      element={<MyReviewsPage />} />
+            <Route path="ai-planner"   element={<AIPlannerListPage />} />
+            <Route path="settings"     element={<CustomerSettingsPage />} />
           </Route>
 
           {/* ── Vendor — VendorLayout handles auth + provider role check internally ── */}

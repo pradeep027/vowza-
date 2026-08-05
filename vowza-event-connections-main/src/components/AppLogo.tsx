@@ -22,7 +22,8 @@ export function resolveHome(roles: string[] = []): string {
   if (roles.includes('super_admin') || roles.includes('superadmin')) return '/super-admin/dashboard';
   if (roles.includes('admin'))                                        return '/admin/dashboard';
   if (roles.includes('provider') || roles.includes('vendor'))         return '/vendor/dashboard';
-  return '/'; // customer + unauthenticated
+  if (roles.length > 0) return '/dashboard'; // authenticated customer
+  return '/'; // unauthenticated
 }
 
 type Theme = 'light' | 'dark';
