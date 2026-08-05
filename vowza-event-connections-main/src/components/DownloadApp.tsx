@@ -1,5 +1,5 @@
 // ─── DownloadApp — App download CTA section ──────────────────────────────────
-import { Smartphone, Star, Users, ArrowRight } from "lucide-react";
+import { Smartphone, ArrowRight } from "lucide-react";
 
 const DownloadApp = () => (
   <section className="py-14 md:py-24 bg-[#09090f] overflow-hidden">
@@ -42,18 +42,9 @@ const DownloadApp = () => (
             ))}
           </div>
 
-          {/* Stats */}
-          <div className="flex flex-wrap items-center justify-center gap-8">
-            {[
-              { icon: Star,  label: "4.9 App Rating" },
-              { icon: Users, label: "50K+ Pre-registered" },
-              { icon: ArrowRight, label: "Notify Me →" },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-1.5 text-sm text-white/35">
-                <Icon className="w-4 h-4 text-white/25" />
-                <span>{label}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-center gap-1.5 text-sm text-white/40">
+            <span>Notify me when it launches</span>
+            <ArrowRight className="w-4 h-4" />
           </div>
         </div>
       </div>

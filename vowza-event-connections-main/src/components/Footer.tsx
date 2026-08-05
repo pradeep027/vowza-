@@ -1,7 +1,8 @@
 // ─── Footer — Corporate Premium Edition ──────────────────────────────────────
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, Star, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
+import { motion } from "framer-motion";
+import { Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
 
@@ -59,17 +60,25 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-[#09090f] text-white">
+    <footer className="relative bg-[#09090f] text-white overflow-hidden">
+      {/* Ambient glow — ties footer visually to the Hero's premium dark theme */}
+      <div aria-hidden className="glow-orb pointer-events-none" style={{ top: "-10%", left: "50%", transform: "translateX(-50%)", width: 700, height: 400, background: "radial-gradient(ellipse at center, hsl(345 72% 30% / 0.18) 0%, transparent 70%)" }} />
 
       {/* ── Newsletter ────────────────────────────────────────────────── */}
-      <div className="border-b border-white/8">
+      <div className="relative border-b border-white/8">
         <div className="container px-4 py-12 md:py-14">
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8 p-6 md:p-8 rounded-3xl glass-premium"
+          >
             <div className="max-w-md">
               <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-2">
                 Get exclusive deals & artist picks
               </h3>
-              <p className="text-white/45 text-sm">Join 25,000+ planners who get weekly inspiration and offers.</p>
+              <p className="text-white/45 text-sm">Get weekly inspiration, planning tips, and exclusive offers.</p>
             </div>
             <form onSubmit={handleNewsletter} className="flex w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]">
               <input
@@ -79,20 +88,21 @@ const Footer = () => {
                 onChange={e => setEmail(e.target.value)}
                 className="flex-1 px-4 py-3 rounded-xl bg-white/8 border border-white/12 text-white placeholder:text-white/35 text-sm focus:outline-none focus:border-gold/40 transition-colors"
               />
-              <button
+              <motion.button
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 type="submit"
                 className="px-5 py-3 rounded-xl bg-gradient-gold text-gray-900 font-semibold text-sm shadow-gold hover:opacity-90 transition-all flex-shrink-0 flex items-center gap-1.5"
               >
                 Subscribe <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              </motion.button>
             </form>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* ── Main grid ─────────────────────────────────────────────────── */}
-      <div className="container px-4 py-12 md:py-20">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-10">
+      <div className="relative container px-4 py-12 md:py-20">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-10 md:gap-12">
 
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
@@ -106,26 +116,31 @@ const Footer = () => {
               {[
                 { Icon: Shield,     label: "Secure Payments" },
                 { Icon: BadgeCheck, label: "Verified Artists" },
-                { Icon: Star,       label: "4.9★ Rating" },
               ].map(({ Icon, label }) => (
-                <div key={label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/6 border border-white/8 text-xs font-medium text-white/60">
+                <motion.div
+                  key={label}
+                  whileHover={{ y: -2 }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-premium text-xs font-medium text-white/60 hover:text-white/85 transition-colors"
+                >
                   <Icon className="w-3.5 h-3.5 text-gold" />
                   {label}
-                </div>
+                </motion.div>
               ))}
             </div>
 
             {/* Socials */}
             <div className="flex gap-2.5">
               {socials.map(({ Icon, href, label }) => (
-                <a
+                <motion.a
                   key={label}
                   href={href}
                   aria-label={label}
-                  className="w-9 h-9 rounded-xl bg-white/8 border border-white/8 flex items-center justify-center hover:bg-gold hover:text-gray-900 hover:border-transparent transition-all duration-200"
+                  whileHover={{ y: -3, scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-9 h-9 rounded-xl bg-white/8 border border-white/8 flex items-center justify-center hover:bg-gold hover:text-gray-900 hover:border-transparent hover:shadow-gold transition-colors duration-200"
                 >
                   <Icon className="w-4 h-4" />
-                </a>
+                </motion.a>
               ))}
             </div>
           </div>
@@ -137,8 +152,9 @@ const Footer = () => {
               <ul className="space-y-3">
                 {col.links.map(l => (
                   <li key={l.name}>
-                    <Link to={l.href} className="text-sm text-white/50 hover:text-white transition-colors">
+                    <Link to={l.href} className="group relative text-sm text-white/50 hover:text-white transition-colors inline-block">
                       {l.name}
+                      <span className="absolute left-0 right-0 -bottom-0.5 h-px bg-gold origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-250" />
                     </Link>
                   </li>
                 ))}

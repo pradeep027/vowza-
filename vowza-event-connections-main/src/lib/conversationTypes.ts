@@ -13,9 +13,9 @@ export interface ConversationRow {
   context_summary: PlannerContext | null;
   last_active_at:  string;       // ISO-8601
   created_at:      string;       // ISO-8601
-  is_pinned:       boolean;
-  is_archived:     boolean;
-  is_favorite:     boolean;
+  is_pinned?:      boolean;
+  is_archived?:    boolean;
+  is_favorite?:    boolean;
 }
 
 // ─── ai_messages row ──────────────────────────────────────────────────────────

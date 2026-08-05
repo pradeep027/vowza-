@@ -73,9 +73,6 @@ export async function createConversation(
     title:           generateTitle(firstMessage, context),
     context_summary: context,
     last_active_at:  new Date().toISOString(),
-    is_pinned:       false,
-    is_archived:     false,
-    is_favorite:     false,
   };
 
   const { data, error } = await supabase
@@ -119,7 +116,14 @@ export async function listConversations(userId: string): Promise<ConversationRow
     console.error('[ConversationRepository] listConversations:', error.message);
     return [];
   }
-  return (data as any[]) ?? [];
+  // Normalize: if DB doesn't have is_pinned/is_archived/is_favorite columns yet,
+  // default them to false so the sidebar still renders correctly.
+  return ((data as any[]) ?? []).map((row: any) => ({
+    ...row,
+    is_pinned:   row.is_pinned   ?? false,
+    is_archived: row.is_archived ?? false,
+    is_favorite: row.is_favorite ?? false,
+  }));
 }
 
 // ─── Load messages for a conversation ─────────────────────────────────────────
@@ -224,17 +228,29 @@ export async function deleteAllConversations(userId: string): Promise<void> {
 
 // ─── Pin / Unpin ───────────────────────────────────────────────────────────────
 export async function setConversationPinned(conversationId: string, pinned: boolean): Promise<void> {
-  await updateConversation(conversationId, { is_pinned: pinned });
+  const { error } = await supabase
+    .from('ai_conversations')
+    .update({ is_pinned: pinned } as any)
+    .eq('id', conversationId);
+  if (error) console.warn('[ConversationRepository] setConversationPinned — column may not exist yet:', error.message);
 }
 
 // ─── Archive / Restore ─────────────────────────────────────────────────────────
 export async function setConversationArchived(conversationId: string, archived: boolean): Promise<void> {
-  await updateConversation(conversationId, { is_archived: archived });
+  const { error } = await supabase
+    .from('ai_conversations')
+    .update({ is_archived: archived } as any)
+    .eq('id', conversationId);
+  if (error) console.warn('[ConversationRepository] setConversationArchived — column may not exist yet:', error.message);
 }
 
 // ─── Favorite / Unfavorite ──────────────────────────────────────────────────────
 export async function setConversationFavorite(conversationId: string, favorite: boolean): Promise<void> {
-  await updateConversation(conversationId, { is_favorite: favorite });
+  const { error } = await supabase
+    .from('ai_conversations')
+    .update({ is_favorite: favorite } as any)
+    .eq('id', conversationId);
+  if (error) console.warn('[ConversationRepository] setConversationFavorite — column may not exist yet:', error.message);
 }
 
 // ─── Duplicate a conversation (copies title + context + all messages) ──────────
@@ -247,9 +263,6 @@ export async function duplicateConversation(
     title:           `${source.title} (Copy)`,
     context_summary: source.context_summary,
     last_active_at:  new Date().toISOString(),
-    is_pinned:       false,
-    is_archived:     false,
-    is_favorite:     false,
   };
 
   const { data, error } = await supabase

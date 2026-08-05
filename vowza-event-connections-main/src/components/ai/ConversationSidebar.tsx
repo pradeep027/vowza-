@@ -235,7 +235,9 @@ const ConversationSidebar = ({
       )}
 
       {editingId !== conv.id && !selectMode && (
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-card/95 rounded-lg">
+        <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5 transition-opacity bg-card/95 rounded-lg ${
+          conv.id === activeId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
           {onFavorite && (
             <button
               onClick={e => { e.stopPropagation(); onFavorite(conv.id, !conv.is_favorite); }}

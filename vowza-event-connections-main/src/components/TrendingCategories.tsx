@@ -4,6 +4,7 @@
 // Uses live DB counts when available; gracefully shows static list as fallback.
 
 import { memo } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -229,44 +230,52 @@ const CATEGORIES: CategoryDef[] = [
 interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }
 
 const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => (
-  <button
+  <motion.button
     onClick={onClick}
     aria-label={`Browse ${cat.name}`}
+    initial={{ opacity: 0, y: 18 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-40px" }}
+    transition={{ duration: 0.45, delay: Math.min(idx, 15) * 0.035, ease: [0.22, 1, 0.36, 1] }}
+    whileHover={{ y: -6, scale: 1.035 }}
+    whileTap={{ scale: 0.97 }}
     className={`
       group relative flex flex-col items-center gap-3
-      p-4 md:p-5 rounded-2xl
-      bg-surface-1 border border-border/60
+      p-4 md:p-5 rounded-2xl overflow-hidden
+      bg-surface-1/70 backdrop-blur-sm border border-border/60
       ring-2 ring-transparent hover:${cat.ring}
-      hover:border-transparent hover:shadow-lg
-      transition-all duration-300 hover:-translate-y-1.5
-      animate-fade-up focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+      hover:border-transparent hover:shadow-xl
+      transition-[border-color,box-shadow] duration-300
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
     `}
-    style={{ animationDelay: `${Math.min(idx, 15) * 0.035}s` }}
   >
+    {/* Soft radial glow on hover, tinted per-category */}
+    <span className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 ${cat.color} blur-2xl scale-150 pointer-events-none`} />
+
     {/* Icon bubble */}
     <div
       className={`
-        w-12 h-12 md:w-14 md:h-14 rounded-2xl
+        relative z-10 w-12 h-12 md:w-14 md:h-14 rounded-2xl
         ${cat.color}
         flex items-center justify-center flex-shrink-0
-        group-hover:scale-110 transition-transform duration-300
+        group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300
       `}
     >
       <cat.icon className={`w-5 h-5 md:w-6 md:h-6 ${cat.text}`} aria-hidden />
     </div>
 
     {/* Label */}
-    <span className="text-[11px] md:text-xs font-semibold text-foreground text-center leading-snug group-hover:text-maroon transition-colors">
+    <span className="relative z-10 text-[11px] md:text-xs font-semibold text-foreground text-center leading-snug group-hover:text-maroon transition-colors">
       {cat.name}
     </span>
 
     {/* Live count — only shown when real data exists */}
     {count > 0 && (
-      <span className="text-[9px] md:text-[10px] font-medium text-muted-foreground -mt-1">
+      <span className="relative z-10 text-[9px] md:text-[10px] font-medium text-muted-foreground -mt-1">
         {count}+ artists
       </span>
     )}
-  </button>
+  </motion.button>
 ));
 CategoryCard.displayName = "CategoryCard";
 
@@ -298,7 +307,13 @@ const TrendingCategories = () => {
       <div className="container px-4">
 
         {/* ── Section header ── */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10 md:mb-12">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10 md:mb-12"
+        >
           <div>
             <div className="section-label bg-maroon/8 text-maroon mb-4 inline-flex">
               Browse Categories
@@ -318,7 +333,7 @@ const TrendingCategories = () => {
             All categories
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </button>
-        </div>
+        </motion.div>
 
         {/* ── Grid ── */}
         {isLoading ? (

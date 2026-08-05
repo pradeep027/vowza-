@@ -118,11 +118,19 @@ const Auth = () => {
     setIsLoading(true);
     const { error } = await signIn(loginEmail.trim(), loginPassword);
     if (error) {
+      // Log full diagnostic info — check browser DevTools console to see the
+      // real reason Supabase rejected the login (status code, error code, message).
+      console.error('[Auth] Sign-in failed:', {
+        message: (error as any).message,
+        status:  (error as any).status,
+        code:    (error as any).code,
+        name:    (error as any).name,
+      });
       const msg = error.message || '';
       if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid email or password'))
         toast.error('Incorrect email or password.');
       else if (msg.toLowerCase().includes('email not confirmed'))
-        toast.error('Please verify your email before logging in.');
+        toast.error('Please verify your email before logging in — check your inbox for the confirmation link.');
       else if (msg.toLowerCase().includes('user not found'))
         toast.error('No account found with this email.');
       else toast.error(msg || 'Login failed. Please try again.');

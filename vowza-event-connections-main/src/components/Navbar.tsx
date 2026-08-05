@@ -3,12 +3,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Menu, X, Search, Sparkles, ShoppingBag, Bell, Heart,
   ChevronDown, User, LogOut, LayoutDashboard, BookOpen,
   Camera, Music, Disc3, Palette, Mic2, Users, Utensils,
   Wand2, Star, Zap, MapPin, CalendarDays, ArrowRight,
-  BadgeCheck,
+  BadgeCheck, UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +55,7 @@ const Navbar = () => {
   const [searchQuery,  setSearchQuery]  = useState("");
   const [profileOpen,  setProfileOpen]  = useState(false);
 
-  const { user, signOut } = useAuth();
+  const { user, signOut, isProvider, rolesLoaded } = useAuth();
   const { dashboardLink } = useDashboardLink();
   const { cart }          = useCart();
   const navigate          = useNavigate();
@@ -128,10 +129,10 @@ const Navbar = () => {
       {/* ── Main nav ──────────────────────────────────────────────────── */}
       <nav
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-out",
           isScrolled
-            ? "bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl shadow-sm border-b border-border/60"
-            : "bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-border/40"
+            ? "bg-white/92 dark:bg-gray-950/92 backdrop-blur-2xl shadow-[0_1px_0_0_hsl(var(--border)),0_8px_30px_-8px_hsl(220_20%_10%/0.12)] border-b border-transparent"
+            : "bg-white/70 dark:bg-gray-950/70 backdrop-blur-md border-b border-border/30"
         )}
       >
         <div className="container">
@@ -141,26 +142,31 @@ const Navbar = () => {
             <AppLogo size="lg" className="flex-shrink-0" />
 
             {/* ── Desktop nav links ────────────────────────────────────── */}
-            <div className="hidden lg:flex items-center gap-1" ref={megaRef}>
+            <div className="hidden lg:flex items-center gap-2" ref={megaRef}>
 
               {/* Browse — mega menu trigger */}
               <div
-                className="relative"
+                className="relative group"
                 onMouseEnter={() => setMegaOpen(true)}
                 onMouseLeave={() => setMegaOpen(false)}
               >
                 <button
                   className={cn(
-                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    "relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
                     megaOpen || isActive("/artists")
-                      ? "text-foreground bg-secondary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                      ? "text-maroon"
+                      : "text-foreground/85 hover:text-maroon"
                   )}
                   aria-expanded={megaOpen}
                   aria-haspopup="true"
                 >
                   Browse Artists
                   <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", megaOpen && "rotate-180")} />
+                  {/* Animated underline */}
+                  <span className={cn(
+                    "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left transition-transform duration-250 ease-out",
+                    megaOpen || isActive("/artists") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  )} />
                 </button>
 
                 {/* Mega menu dropdown */}
@@ -221,36 +227,41 @@ const Navbar = () => {
               <Link
                 to="/ai-planner"
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive("/ai-planner")
-                    ? "text-foreground bg-secondary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  "group relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
+                  isActive("/ai-planner") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
                 )}
               >
                 <Sparkles className="w-3.5 h-3.5 text-gold" />
                 Vowza AI Planner
+                <span className={cn(
+                  "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-gold origin-left transition-transform duration-250 ease-out",
+                  isActive("/ai-planner") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                )} />
               </Link>
 
               {/* How it works */}
               <a
                 href="/#how-it-works"
-                className="px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                className="group relative px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] text-foreground/85 hover:text-maroon transition-colors duration-250 ease-out"
               >
                 How it works
+                <span className="absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-250 ease-out" />
               </a>
 
               {user && (
                 <Link
                   to="/my-bookings"
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive("/my-bookings")
-                      ? "text-foreground bg-secondary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    "group relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
+                    isActive("/my-bookings") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
                   )}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   My Bookings
+                  <span className={cn(
+                    "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left transition-transform duration-250 ease-out",
+                    isActive("/my-bookings") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  )} />
                 </Link>
               )}
             </div>
@@ -262,11 +273,11 @@ const Navbar = () => {
               <div className="relative" ref={searchRef}>
                 <button
                   onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchInputRef.current?.focus(), 50); }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-sm"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary transition-colors duration-250 ease-out text-foreground/70 hover:text-maroon text-sm"
                   aria-label="Search"
                 >
                   <Search className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline text-xs">Search artists…</span>
+                  <span className="hidden xl:inline text-xs font-medium">Search artists…</span>
                   <kbd className="hidden xl:inline ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-gray-800 border border-border rounded text-muted-foreground">⌘K</kbd>
                 </button>
 
@@ -274,14 +285,14 @@ const Navbar = () => {
                 {searchOpen && (
                   <div className="absolute right-0 top-full mt-2 w-[380px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border/60 overflow-hidden animate-scale-in z-50">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
-                      <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <Search className="w-4 h-4 text-foreground/60 flex-shrink-0" />
                       <input
                         ref={searchInputRef}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchKeyDown}
                         placeholder="Search artists, categories, cities…"
-                        className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                        className="flex-1 text-sm font-medium bg-transparent text-foreground placeholder:text-foreground/50 placeholder:font-normal focus:outline-none focus:placeholder:text-foreground/65 transition-colors duration-250"
                         autoComplete="off"
                       />
                       {searchQuery && (
@@ -318,7 +329,8 @@ const Navbar = () => {
               {user ? (
                 <>
                   {/* Cart */}
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
                     onClick={() => navigate("/cart")}
                     className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                     aria-label="Cart"
@@ -329,23 +341,25 @@ const Navbar = () => {
                         {cart.length}
                       </span>
                     )}
-                  </button>
+                  </motion.button>
 
                   {/* Wishlist */}
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
                     onClick={() => navigate("/artists?saved=true")}
                     className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                     aria-label="Saved"
                   >
                     <Heart className="w-[18px] h-[18px]" />
-                  </button>
+                  </motion.button>
 
                   {/* Notifications */}
                   <NotificationBell />
 
                   {/* Profile dropdown */}
                   <div className="relative" ref={profileRef}>
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
                       onClick={() => setProfileOpen(!profileOpen)}
                       className={cn(
                         "flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all",
@@ -358,7 +372,7 @@ const Navbar = () => {
                         <User className="w-3.5 h-3.5 text-white" />
                       </div>
                       <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform", profileOpen && "rotate-180")} />
-                    </button>
+                    </motion.button>
 
                     {profileOpen && (
                       <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border/60 overflow-hidden animate-scale-in z-50">
@@ -375,6 +389,18 @@ const Navbar = () => {
                           <Link to="/artists?saved=true" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
                             <Heart className="w-4 h-4 text-muted-foreground" /> Saved Artists
                           </Link>
+                          {/* Artist role — show relevant CTA based on whether they're already a registered artist */}
+                          {rolesLoaded && (
+                            isProvider ? (
+                              <Link to="/vendor/dashboard" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                                <BadgeCheck className="w-4 h-4 text-gold-dark" /> Artist Dashboard
+                              </Link>
+                            ) : (
+                              <Link to="/provider/register" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                                <UserPlus className="w-4 h-4 text-gold-dark" /> Become an Artist
+                              </Link>
+                            )
+                          )}
                         </div>
                         <div className="p-2 border-t border-border/40">
                           <button
@@ -389,18 +415,11 @@ const Navbar = () => {
                   </div>
                 </>
               ) : (
-                <>
-                  <Link to="/auth">
-                    <button className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                      Sign in
-                    </button>
-                  </Link>
-                  <Link to="/provider/register">
-                    <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon hover:opacity-90 transition-all hover:-translate-y-0.5">
-                      Join as Artist
-                    </button>
-                  </Link>
-                </>
+                <Link to="/auth">
+                  <button className="px-4 py-2 rounded-lg text-[15px] font-semibold text-foreground/85 hover:text-maroon hover:bg-secondary transition-colors duration-250 ease-out">
+                    Sign in
+                  </button>
+                </Link>
               )}
             </div>
 
@@ -441,14 +460,14 @@ const Navbar = () => {
           {searchOpen && (
             <div className="lg:hidden pb-3 animate-fade-down" ref={searchRef}>
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border/60">
-                <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Search className="w-4 h-4 text-foreground/60 flex-shrink-0" />
                 <input
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="Search artists, categories, cities…"
-                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  className="flex-1 text-sm font-medium bg-transparent text-foreground placeholder:text-foreground/50 placeholder:font-normal focus:outline-none focus:placeholder:text-foreground/65 transition-colors duration-250"
                   autoComplete="off"
                 />
                 {searchQuery
@@ -509,21 +528,27 @@ const Navbar = () => {
                 <>
                   <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
                   <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
+                  {rolesLoaded && (
+                    isProvider ? (
+                      <Link to="/vendor/dashboard" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                        <BadgeCheck className="w-4 h-4" /> Artist Dashboard
+                      </Link>
+                    ) : (
+                      <Link to="/provider/register" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                        <UserPlus className="w-4 h-4" /> Become an Artist
+                      </Link>
+                    )
+                  )}
                   <div className="h-px bg-border my-2" />
                   <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-destructive hover:bg-destructive/5 transition-colors">
                     <LogOut className="w-4 h-4" /> Sign out
                   </button>
                 </>
               ) : (
-                <div className="flex flex-col gap-2 pt-2">
+                <div className="pt-2">
                   <Link to="/auth">
-                    <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-medium border border-border text-foreground hover:bg-secondary transition-colors">
+                    <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold border border-border text-foreground hover:text-maroon hover:border-maroon/30 hover:bg-secondary transition-colors duration-250 ease-out">
                       Sign in
-                    </button>
-                  </Link>
-                  <Link to="/provider/register">
-                    <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold bg-gradient-maroon text-white shadow-maroon">
-                      Join as Artist — Free
                     </button>
                   </Link>
                 </div>
