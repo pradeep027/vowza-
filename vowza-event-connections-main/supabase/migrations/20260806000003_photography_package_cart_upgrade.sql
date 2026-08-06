@@ -122,7 +122,7 @@ BEGIN
     INSERT INTO public.photography_package_invoices(booking_id,invoice_number,amount) VALUES(v_booking,'PH-' || upper(replace(v_booking::text,'-','')),p.price+v_addons);
     INSERT INTO public.photography_booking_timeline(booking_id,actor_id,event_type,message) VALUES(v_booking,auth.uid(),'booking_requested','Photography booking requested');
     SELECT user_id INTO v_provider_user FROM public.provider_profiles WHERE id=p.photographer_id;
-    INSERT INTO public.notifications(user_id,title,message,type,reference_id) VALUES (auth.uid(),'Photography booking requested','Your photography booking request was created.','booking',v_booking::text),(v_provider_user,'New photography booking','You have a new photography package booking request.','booking',v_booking::text);
+    INSERT INTO public.notifications(user_id,title,message,type,reference_id) VALUES (auth.uid(),'Photography booking requested','Your photography booking request was created.','booking',v_booking),(v_provider_user,'New photography booking','You have a new photography package booking request.','booking',v_booking);
     v_bookings := array_append(v_bookings,v_booking);
   END LOOP;
   IF coalesce(array_length(v_bookings,1),0)=0 THEN RAISE EXCEPTION 'Your photography cart is empty'; END IF;

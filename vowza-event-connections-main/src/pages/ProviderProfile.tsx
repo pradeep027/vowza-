@@ -659,7 +659,7 @@ const ProviderProfile = () => {
               <button onClick={() => { setReportOpen(false); setReportReason(""); }} className="btn-outline flex-1 justify-center py-2.5 text-sm">Cancel</button>
               <button onClick={async () => {
                 if (!reportReason.trim()) { toast.error("Please provide a reason"); return; }
-                await supabase.from("notifications" as any).insert({ user_id: user?.id, title: "Profile Reported", message: `Profile ${id} reported: ${reportReason}`, type: "report", reference_id: id });
+                await supabase.from("notifications" as any).insert({ user_id: user?.id, title: "Profile Reported", message: `Profile ${id} reported: ${reportReason}`, type: "report", reference_id: id || null });
                 toast.success("Reported"); setReportOpen(false); setReportReason("");
               }} className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold hover:bg-destructive/90">Submit Report</button>
             </div>
