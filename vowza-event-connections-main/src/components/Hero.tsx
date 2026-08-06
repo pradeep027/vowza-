@@ -304,7 +304,7 @@ const Hero = () => {
   }, [navigate]);
 
   return (
-    <section className="relative overflow-hidden" style={{ background:"#07060d" }}>
+    <section className="hero relative overflow-hidden" style={{ background:"#07060d" }}>
       <HeroBg />
 
       <div className="relative z-10" style={{ paddingTop:"clamp(4.5rem,9vw,7rem)", paddingBottom:"clamp(3.5rem,7vw,5.5rem)" }}>

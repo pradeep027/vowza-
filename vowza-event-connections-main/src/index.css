@@ -535,3 +535,87 @@
            bg-violet-50 text-violet-700 border border-violet-200;
   }
 }
+
+
+/* Hero mobile layout — scoped below 768px so desktop remains unchanged. */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .hero {
+    min-height: 100vh;
+    height: auto;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .hero > .relative.z-10 {
+    padding-top: 90px !important;
+    padding-bottom: 60px !important;
+  }
+
+  .hero h1 {
+    width: 100%;
+    font-size: clamp(42px, 12vw, 48px) !important;
+    line-height: 1.05 !important;
+    overflow: visible;
+    word-break: normal;
+  }
+
+  .hero h1 + p {
+    width: 100%;
+    max-width: none;
+    font-size: 16px !important;
+    line-height: 1.7 !important;
+  }
+
+  /* Stack Quick Search and AI Planner as full-width, 52px controls. */
+  .hero .relative.inline-flex.items-center.gap-1.p-1.rounded-2xl.glass-premium {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+
+  .hero .relative.inline-flex.items-center.gap-1.p-1.rounded-2xl.glass-premium > button {
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+  }
+
+  .hero .relative.inline-flex.items-center.gap-1.p-1.rounded-2xl.glass-premium > [aria-hidden] {
+    display: none;
+  }
+
+  /* The existing mobile search form becomes a vertically spaced full-width card. */
+  .hero .md\:hidden.flex.flex-col {
+    gap: 0;
+  }
+
+  .hero .md\:hidden.flex.flex-col > div {
+    width: 100%;
+    margin-bottom: 14px;
+  }
+
+  .hero .md\:hidden.flex.flex-col > button {
+    width: 100%;
+    min-height: 56px;
+  }
+
+  /* Trending and service cards remain intentional touch carousels, not page overflow. */
+  .hero .overflow-x-auto {
+    max-width: 100%;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hero .lg\:hidden.-mx-4 > div > div {
+    width: 150px;
+  }
+}
