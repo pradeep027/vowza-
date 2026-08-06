@@ -9,6 +9,21 @@ import {
   Search, MapPin, Sparkles, TrendingUp, ChevronDown, X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import MobileHero from "./MobileHero";
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateViewport = () => setIsMobile(mediaQuery.matches);
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
+
+  return isMobile;
+};
 
 const EVENT_OPTIONS = [
   "Wedding","Reception","Birthday Party","Corporate Event",
@@ -272,7 +287,7 @@ const fadeUp = {
   show:   (delay = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } }),
 };
 
-const Hero = () => {
+const DesktopHero = () => {
   const navigate = useNavigate();
 
   const [tab,          setTab]       = useState<"search"|"ai">("search");
@@ -304,7 +319,7 @@ const Hero = () => {
   }, [navigate]);
 
   return (
-    <section className="hero relative overflow-hidden" style={{ background:"#07060d" }}>
+    <section className="relative overflow-hidden" style={{ background:"#07060d" }}>
       <HeroBg />
 
       <div className="relative z-10" style={{ paddingTop:"clamp(4.5rem,9vw,7rem)", paddingBottom:"clamp(3.5rem,7vw,5.5rem)" }}>
@@ -583,6 +598,11 @@ const Hero = () => {
       </div>
     </section>
   );
+};
+
+const Hero = () => {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileHero /> : <DesktopHero />;
 };
 
 export default Hero;
