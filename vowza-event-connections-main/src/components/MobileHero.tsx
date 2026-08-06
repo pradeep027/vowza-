@@ -38,50 +38,53 @@ const MobileHero = () => {
   };
 
   return (
-    <section className="flex min-h-screen w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-[60px] pt-[90px]">
+    <section className="flex w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-8 pt-[72px]">
       <div className="mx-auto flex w-full max-w-[600px] flex-col">
+        {/* ── Heading block ── */}
         <div className="flex w-full flex-col text-center">
-          <div className="mb-5 inline-flex self-center items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5">
+          <div className="mb-3 inline-flex self-center items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <Sparkles className="h-3 w-3 text-gold" />
-            <span className="text-[11px] font-semibold tracking-wide text-white/70">India&apos;s Premium Event Marketplace</span>
+            <span className="text-[10.5px] font-semibold tracking-wide text-white/70">India&apos;s Premium Event Marketplace</span>
           </div>
 
-          <h1 className="w-full overflow-visible break-normal font-display text-[clamp(42px,12vw,48px)] font-bold leading-[1.05] tracking-[-0.03em] text-white">
+          <h1 className="w-full overflow-visible break-normal font-display text-[clamp(36px,11vw,44px)] font-bold leading-[1.08] tracking-[-0.03em] text-white">
             Where <span className="text-gradient-gold">Talent</span><br />
             Meets <span className="text-gradient-maroon">Celebration</span>
           </h1>
 
-          <p className="mt-5 w-full max-w-none text-base leading-[1.7] text-white/55">
+          <p className="mt-3 w-full max-w-none text-[15px] leading-[1.65] text-white/55">
             Find and book verified event professionals across India—from photographers and decorators to DJs, caterers, bands, and entertainers—all in one trusted platform.
           </p>
         </div>
 
-        <div className="mt-7 flex w-full flex-col gap-3">
+        {/* ── Quick Search / AI Planner toggle ── */}
+        <div className="mt-5 flex w-full gap-2">
           <button
             type="button"
             onClick={() => setMode("search")}
-            className={`flex h-[52px] w-full items-center justify-center rounded-xl px-4 text-sm font-semibold transition-colors ${mode === "search" ? "bg-white text-zinc-950" : "border border-white/15 bg-white/5 text-white/75"}`}
+            className={`flex h-11 flex-1 items-center justify-center rounded-xl text-[13px] font-semibold transition-colors ${mode === "search" ? "bg-white text-zinc-950" : "border border-white/15 bg-white/5 text-white/75"}`}
           >
             Quick Search
           </button>
           <button
             type="button"
             onClick={() => setMode("ai")}
-            className={`flex h-[52px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors ${mode === "ai" ? "bg-gradient-gold text-zinc-950" : "border border-white/15 bg-white/5 text-white/75"}`}
+            className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-semibold transition-colors ${mode === "ai" ? "bg-gradient-gold text-zinc-950" : "border border-white/15 bg-white/5 text-white/75"}`}
           >
-            <Sparkles className="h-4 w-4" />
-            Vowza AI Planner
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Planner
           </button>
         </div>
 
+        {/* ── Search card ── */}
         {mode === "search" ? (
-          <div className="mt-5 flex w-full flex-col rounded-[22px] bg-white p-2 shadow-2xl">
-            <label className="mb-[14px] flex w-full items-center gap-3 rounded-[14px] bg-slate-50 px-[18px] py-[15px] text-left">
-              <Sparkles className="h-[15px] w-[15px] shrink-0 text-maroon" />
+          <div className="mt-3 flex w-full flex-col rounded-2xl bg-white p-2 shadow-2xl">
+            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+              <Sparkles className="h-[14px] w-[14px] shrink-0 text-maroon" />
               <span className="min-w-0 flex-1">
-                <span className="mb-1 block text-[9.5px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Event Type</span>
+                <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Event Type</span>
                 <span className="block w-full">
-                  <select value={eventType} onChange={(event) => setEventType(event.target.value)} className="w-full appearance-none bg-transparent pr-4 text-[13.5px] font-semibold text-zinc-900 outline-none">
+                  <select value={eventType} onChange={(event) => setEventType(event.target.value)} className="w-full appearance-none bg-transparent pr-4 text-[13px] font-semibold text-zinc-900 outline-none">
                     <option value="">Select Event Type</option>
                     {EVENT_OPTIONS.map((event) => <option key={event} value={event}>{event}</option>)}
                   </select>
@@ -90,40 +93,41 @@ const MobileHero = () => {
               <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
             </label>
 
-            <label className="mb-[14px] flex w-full items-center gap-3 rounded-[14px] bg-slate-50 px-[18px] py-[15px] text-left">
-              <MapPin className="h-[15px] w-[15px] shrink-0 text-maroon" />
+            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+              <MapPin className="h-[14px] w-[14px] shrink-0 text-maroon" />
               <span className="min-w-0 flex-1">
-                <span className="mb-1 block text-[9.5px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Location</span>
-                <input value={location} onChange={(event) => setLocation(event.target.value)} onKeyDown={(event) => event.key === "Enter" && findArtists()} placeholder="Search by City, District or State" className="w-full bg-transparent text-[13.5px] font-semibold text-zinc-900 outline-none placeholder:text-gray-400" />
+                <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Location</span>
+                <input value={location} onChange={(event) => setLocation(event.target.value)} onKeyDown={(event) => event.key === "Enter" && findArtists()} placeholder="Search by City, District or State" className="w-full bg-transparent text-[13px] font-semibold text-zinc-900 outline-none placeholder:text-gray-400" />
               </span>
             </label>
 
-            <button type="button" onClick={findArtists} className="flex h-14 w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-maroon text-[13.5px] font-bold text-white shadow-lg">
+            <button type="button" onClick={findArtists} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-maroon text-[13px] font-bold text-white shadow-lg">
               <Search className="h-4 w-4" />
               Find Verified Artists
             </button>
           </div>
         ) : (
-          <div className="mt-5 flex w-full flex-col rounded-[22px] bg-white p-2 shadow-2xl">
-            <label className="mb-[14px] flex w-full items-center gap-3 rounded-[14px] bg-slate-50 px-[18px] py-[15px] text-left">
-              <Sparkles className="h-[15px] w-[15px] shrink-0 text-gold-dark" />
+          <div className="mt-3 flex w-full flex-col rounded-2xl bg-white p-2 shadow-2xl">
+            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+              <Sparkles className="h-[14px] w-[14px] shrink-0 text-gold-dark" />
               <span className="min-w-0 flex-1">
-                <span className="mb-1 block text-[9.5px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Tell us about your event</span>
-                <input value={plannerQuery} onChange={(event) => setPlannerQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && openPlanner()} placeholder="Plan a wedding for 300 guests…" className="w-full bg-transparent text-[13.5px] font-semibold text-zinc-900 outline-none placeholder:text-gray-400" />
+                <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Tell us about your event</span>
+                <input value={plannerQuery} onChange={(event) => setPlannerQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && openPlanner()} placeholder="Plan a wedding for 300 guests…" className="w-full bg-transparent text-[13px] font-semibold text-zinc-900 outline-none placeholder:text-gray-400" />
               </span>
             </label>
-            <button type="button" onClick={openPlanner} className="flex h-14 w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-gold text-[13.5px] font-bold text-zinc-950 shadow-lg">
+            <button type="button" onClick={openPlanner} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-gold text-[13px] font-bold text-zinc-950 shadow-lg">
               <Sparkles className="h-4 w-4" />
               Plan My Event
             </button>
           </div>
         )}
 
-        <div className="mt-6 flex w-full gap-3 overflow-x-auto pb-2 no-scrollbar" aria-label="Browse event categories">
+        {/* ── Category quick cards — visible immediately after search ── */}
+        <div className="mt-4 flex w-full gap-2.5 overflow-x-auto pb-1 no-scrollbar" aria-label="Browse event categories">
           {MOBILE_CARDS.map((card) => (
-            <button key={card.label} type="button" onClick={() => navigate(`/artists?search=${encodeURIComponent(card.label)}`)} className="flex w-[150px] shrink-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/10 text-left shadow-xl">
-              <img src={card.image} alt="" className="h-24 w-full object-cover" loading="lazy" />
-              <span className="flex min-h-[52px] items-center px-3 text-xs font-semibold leading-tight text-white">{card.label}</span>
+            <button key={card.label} type="button" onClick={() => navigate(`/artists?search=${encodeURIComponent(card.label)}`)} className="flex w-[130px] shrink-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/10 text-left shadow-xl">
+              <img src={card.image} alt="" className="h-20 w-full object-cover" loading="lazy" />
+              <span className="flex min-h-[44px] items-center px-2.5 text-[11px] font-semibold leading-tight text-white">{card.label}</span>
             </button>
           ))}
         </div>
