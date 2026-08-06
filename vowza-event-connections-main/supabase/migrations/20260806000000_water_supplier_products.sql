@@ -123,6 +123,8 @@ CREATE TABLE IF NOT EXISTS public.supplier_delivery_settings (
   extra_delivery_charge numeric(12,2) NOT NULL DEFAULT 100 CHECK (extra_delivery_charge >= 0),
   same_day_delivery_enabled boolean NOT NULL DEFAULT false,
   emergency_delivery_enabled boolean NOT NULL DEFAULT false,
+  working_hours jsonb NOT NULL DEFAULT '{}'::jsonb,
+  service_areas text[] NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK (delivery_origin_lat IS NULL OR delivery_origin_lat BETWEEN -90 AND 90),
   CHECK (delivery_origin_lng IS NULL OR delivery_origin_lng BETWEEN -180 AND 180),
@@ -138,6 +140,7 @@ CREATE TABLE IF NOT EXISTS public.product_orders (
   delivery_lng numeric(10,7) NOT NULL,
   delivery_date date NOT NULL,
   delivery_time_slot text,
+  special_instructions text,
   estimated_delivery_minutes integer,
   distance_km numeric(8,2) NOT NULL CHECK (distance_km >= 0),
   subtotal numeric(12,2) NOT NULL CHECK (subtotal >= 0),
@@ -325,7 +328,8 @@ CREATE OR REPLACE FUNCTION public.create_water_product_order(
   p_delivery_lat numeric,
   p_delivery_lng numeric,
   p_delivery_date date,
-  p_delivery_time_slot text DEFAULT NULL
+  p_delivery_time_slot text DEFAULT NULL,
+  p_special_instructions text DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -358,8 +362,8 @@ BEGIN
     line_total := variant.price * (item->>'quantity')::integer;
     subtotal_total := subtotal_total + line_total;
   END LOOP;
-  INSERT INTO public.product_orders (provider_id, customer_id, delivery_address, delivery_lat, delivery_lng, delivery_date, delivery_time_slot, estimated_delivery_minutes, distance_km, subtotal, delivery_charge, total_amount)
-  VALUES (p_provider_id, auth.uid(), p_delivery_address, p_delivery_lat, p_delivery_lng, p_delivery_date, p_delivery_time_slot, quote.estimated_delivery_minutes, quote.distance_km, subtotal_total, quote.delivery_charge, subtotal_total + quote.delivery_charge)
+  INSERT INTO public.product_orders (provider_id, customer_id, delivery_address, delivery_lat, delivery_lng, delivery_date, delivery_time_slot, special_instructions, estimated_delivery_minutes, distance_km, subtotal, delivery_charge, total_amount)
+  VALUES (p_provider_id, auth.uid(), p_delivery_address, p_delivery_lat, p_delivery_lng, p_delivery_date, p_delivery_time_slot, nullif(trim(p_special_instructions), ''), quote.estimated_delivery_minutes, quote.distance_km, subtotal_total, quote.delivery_charge, subtotal_total + quote.delivery_charge)
   RETURNING id INTO order_id;
   FOR item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
     SELECT v.id, v.product_id, v.label, v.price, p.name INTO variant FROM public.water_product_variants v JOIN public.water_products p ON p.id = v.product_id WHERE v.id = (item->>'variantId')::uuid;
@@ -371,4 +375,23 @@ BEGIN
   RETURN order_id;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.create_water_product_order(uuid, jsonb, text, numeric, numeric, date, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_water_product_order(uuid, jsonb, text, numeric, numeric, date, text, text) TO authenticated;
+
+
+-- Customer-safe availability only; stock counts remain supplier-private.
+CREATE OR REPLACE FUNCTION public.get_water_variant_availability(p_provider_id uuid)
+RETURNS TABLE(variant_id uuid, is_in_stock boolean)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT v.id, s.quantity_available > 0
+  FROM public.water_product_variants v
+  JOIN public.water_products p ON p.id = v.product_id
+  JOIN public.water_product_stock s ON s.variant_id = v.id
+  WHERE p.provider_id = p_provider_id
+    AND p.is_active AND p.is_visible AND NOT p.is_archived
+    AND v.is_available;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_water_variant_availability(uuid) TO anon, authenticated;
