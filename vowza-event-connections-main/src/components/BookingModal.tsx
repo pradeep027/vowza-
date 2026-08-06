@@ -34,6 +34,12 @@ interface BookingModalProps {
 
 type Step = 'calendar' | 'details' | 'confirm';
 
+interface ValidationErrors {
+  venueAddress?: string;
+  venueCity?: string;
+  amount?: string;
+}
+
 const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalProps) => {
   const [step,              setStep]             = useState<Step>('calendar');
   const [eventTypes,        setEventTypes]        = useState<EventType[]>([]);
@@ -47,11 +53,30 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
   const [eventDate,      setEventDate]      = useState('');
   const [eventTime,      setEventTime]      = useState('');
   const [duration,       setDuration]       = useState('4');
+  const [venueName,      setVenueName]      = useState('');
   const [venueAddress,   setVenueAddress]   = useState('');
   const [venueCity,      setVenueCity]      = useState('');
+  const [venueState,     setVenueState]     = useState('');
+  const [venuePincode,   setVenuePincode]   = useState('');
   const [venueArea,      setVenueArea]      = useState('');
+  const [guestCount,     setGuestCount]     = useState('');
   const [requirements,   setRequirements]   = useState('');
   const [amount,         setAmount]         = useState('');
+
+  // Special requirements checkboxes
+  const [specialReqs, setSpecialReqs] = useState({
+    candidPhotography: false,
+    traditionalPhotography: false,
+    droneCoverage: false,
+    videography: false,
+    familyGroupPhotos: false,
+  });
+
+  // Validation
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+
+  // Terms acceptance (Step 3)
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +87,8 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
       setEventDate('');
       setAvailError(null);
       setNearbyDates([]);
+      setValidationErrors({});
+      setTermsAccepted(false);
       supabase.from('event_types').select('id, name').order('name').then(({ data }) => {
         if (data) setEventTypes(data);
       });
@@ -109,11 +136,18 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
     }
   };
 
+  const validateDetails = (): boolean => {
+    const errors: ValidationErrors = {};
+    if (!venueAddress.trim()) errors.venueAddress = 'Venue address is required';
+    if (!venueCity.trim()) errors.venueCity = 'City is required';
+    if (!amount || parseInt(amount) <= 0) errors.amount = 'Please enter a valid amount';
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleDetailsNext = async () => {
-    if (!venueAddress || !venueCity || !amount) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+    if (!validateDetails()) return;
+
     // Final availability check before showing confirm
     setCheckingAvail(true);
     const result = await checkDateAvailable(provider.id, eventDate, eventTime || undefined, parseInt(duration));
@@ -127,6 +161,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
 
   const handleSubmit = async () => {
     if (!user) { toast.error('Please login to book'); return; }
+    if (!termsAccepted) { toast.error('Please accept the terms and conditions'); return; }
     setIsLoading(true);
 
     try {
@@ -167,9 +202,24 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
 
       await NotificationService.notifyBookingReceived(user.id, provider.id, bookingData.id);
 
+      // Store booking details for success page
+      const eventTypeName = eventTypes.find(e => e.id === eventTypeId)?.name;
+      sessionStorage.setItem('vowza_booking_success', JSON.stringify({
+        bookingId: bookingData.id,
+        artistName: providerName,
+        eventDate: eventDate,
+        eventTime: eventTime,
+        duration: duration,
+        venue: `${venueAddress}, ${venueCity}`,
+        amount: bookingAmount,
+        platformFee: platformFee,
+        eventType: eventTypeName || 'Event',
+        status: 'requested'
+      }));
+
       toast.success('Booking request sent! The artist will respond within 24 hours.');
       onClose();
-      navigate('/my-bookings');
+      navigate('/booking-success');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create booking');
     } finally {
@@ -333,25 +383,89 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
               </div>
             </div>
 
-            {/* Venue */}
+            {/* Venue Name (optional) */}
+            <div className="space-y-1.5">
+              <Label>Venue Name</Label>
+              <Input placeholder="e.g. Grand Ballroom, Hotel Taj" value={venueName}
+                onChange={e => setVenueName(e.target.value)}
+                className="border-border focus:border-gold" />
+            </div>
+
+            {/* Venue Address */}
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />Venue Address *</Label>
               <Input placeholder="Full venue address" value={venueAddress}
-                onChange={e => setVenueAddress(e.target.value)} required
-                className="border-border focus:border-gold" />
+                onChange={e => { setVenueAddress(e.target.value); if (validationErrors.venueAddress) setValidationErrors(prev => ({ ...prev, venueAddress: undefined })); }}
+                className={`border-border focus:border-gold ${validationErrors.venueAddress ? 'border-red-500 focus:border-red-500' : ''}`} />
+              {validationErrors.venueAddress && (
+                <p className="text-xs text-red-500 mt-1">{validationErrors.venueAddress}</p>
+              )}
             </div>
+
+            {/* City + State */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>City *</Label>
                 <Input placeholder="City" value={venueCity}
-                  onChange={e => setVenueCity(e.target.value)} required
-                  className="border-border focus:border-gold" />
+                  onChange={e => { setVenueCity(e.target.value); if (validationErrors.venueCity) setValidationErrors(prev => ({ ...prev, venueCity: undefined })); }}
+                  className={`border-border focus:border-gold ${validationErrors.venueCity ? 'border-red-500 focus:border-red-500' : ''}`} />
+                {validationErrors.venueCity && (
+                  <p className="text-xs text-red-500 mt-1">{validationErrors.venueCity}</p>
+                )}
               </div>
               <div className="space-y-1.5">
-                <Label>Area</Label>
-                <Input placeholder="Area / Locality" value={venueArea}
-                  onChange={e => setVenueArea(e.target.value)}
+                <Label>State *</Label>
+                <Input placeholder="State" value={venueState}
+                  onChange={e => setVenueState(e.target.value)}
                   className="border-border focus:border-gold" />
+              </div>
+            </div>
+
+            {/* Pincode */}
+            <div className="space-y-1.5">
+              <Label>Pincode</Label>
+              <Input placeholder="Pincode" value={venuePincode}
+                onChange={e => setVenuePincode(e.target.value)}
+                className="border-border focus:border-gold" />
+            </div>
+
+            {/* Area */}
+            <div className="space-y-1.5">
+              <Label>Area / Locality</Label>
+              <Input placeholder="Area / Locality" value={venueArea}
+                onChange={e => setVenueArea(e.target.value)}
+                className="border-border focus:border-gold" />
+            </div>
+
+            {/* Number of Guests */}
+            <div className="space-y-1.5">
+              <Label>Number of Guests</Label>
+              <Input type="number" placeholder="Expected guest count" value={guestCount}
+                onChange={e => setGuestCount(e.target.value)}
+                className="border-border focus:border-gold" />
+            </div>
+
+            {/* Special Requirements */}
+            <div className="space-y-2">
+              <Label>Special Requirements</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { key: 'candidPhotography' as const, label: 'Candid Photography' },
+                  { key: 'traditionalPhotography' as const, label: 'Traditional Photography' },
+                  { key: 'droneCoverage' as const, label: 'Drone Coverage' },
+                  { key: 'videography' as const, label: 'Videography' },
+                  { key: 'familyGroupPhotos' as const, label: 'Family Group Photos' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={specialReqs[key]}
+                      onChange={e => setSpecialReqs(prev => ({ ...prev, [key]: e.target.checked }))}
+                      className="accent-[#8B1538] rounded"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -368,8 +482,11 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
               <Label className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" />Offered Amount (₹) *</Label>
               <Input type="number" min={provider.price_min || 0}
                 placeholder={`Min: ₹${provider.price_min?.toLocaleString() || '0'}`}
-                value={amount} onChange={e => setAmount(e.target.value)} required
-                className="border-border focus:border-gold" />
+                value={amount} onChange={e => { setAmount(e.target.value); if (validationErrors.amount) setValidationErrors(prev => ({ ...prev, amount: undefined })); }}
+                className={`border-border focus:border-gold ${validationErrors.amount ? 'border-red-500 focus:border-red-500' : ''}`} />
+              {validationErrors.amount && (
+                <p className="text-xs text-red-500 mt-1">{validationErrors.amount}</p>
+              )}
               {provider.price_min && provider.price_max && (
                 <p className="text-xs text-muted-foreground">
                   Suggested: ₹{provider.price_min.toLocaleString()} – ₹{provider.price_max.toLocaleString()}
@@ -397,7 +514,8 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
                 <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span className="font-medium">{fmtDate(eventDate)}</span></div>
                 {eventTime && <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{eventTime} ({duration} hrs)</span></div>}
                 {eventTypeName && <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Event</span><span className="font-medium text-right min-w-0 break-words">{eventTypeName}</span></div>}
-                <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Venue</span><span className="font-medium text-right min-w-0 break-words max-w-[200px]">{venueAddress}, {venueCity}</span></div>
+                <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Venue</span><span className="font-medium text-right min-w-0 break-words max-w-[200px]">{venueAddress}, {venueCity}{venueState ? `, ${venueState}` : ''}</span></div>
+                {guestCount && <div className="flex justify-between"><span className="text-muted-foreground">Guests</span><span className="font-medium">{guestCount}</span></div>}
                 <div className="border-t border-border/40 pt-2 flex justify-between font-bold">
                   <span>Amount</span><span className="text-gold">₹{parseInt(amount).toLocaleString()}</span>
                 </div>
@@ -412,9 +530,17 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
               Your booking request will be sent to the artist. The artist has 24 hours to accept or decline.
             </div>
 
+            {/* Terms & Conditions checkbox */}
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-border/60 bg-secondary/30 cursor-pointer">
+              <input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#8B1538]" />
+              <span className="text-xs text-muted-foreground">
+                I agree to the <a href="/terms" target="_blank" className="text-[#8B1538] underline">Terms &amp; Conditions</a>, <a href="/terms" target="_blank" className="text-[#8B1538] underline">Cancellation Policy</a>, and <a href="/privacy" target="_blank" className="text-[#8B1538] underline">Privacy Policy</a>.
+              </span>
+            </label>
+
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep('details')} className="flex-1">← Back</Button>
-              <Button onClick={handleSubmit} disabled={isLoading}
+              <Button onClick={handleSubmit} disabled={isLoading || !termsAccepted}
                 className="flex-1 bg-gradient-gold hover:opacity-90">
                 {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending…</> : 'Confirm Booking'}
               </Button>

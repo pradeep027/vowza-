@@ -93,14 +93,24 @@ export const NotificationService = {
 
   // Booking notifications
   async notifyBookingReceived(customerId: string, providerId: string, bookingId: string) {
-    // Notify provider
-    await this.createNotification({
-      userId: providerId,
-      type: 'booking_received',
-      title: 'New Booking Request',
-      message: 'You have received a new booking request. Check your dashboard for details.',
-      metadata: { bookingId }
-    });
+    // Look up provider's auth user_id from provider_profiles
+    const { data: providerProfile } = await supabase
+      .from('provider_profiles')
+      .select('user_id')
+      .eq('id', providerId)
+      .single();
+    const providerUserId = providerProfile?.user_id;
+
+    // Notify provider (using their auth user_id, not provider_profiles.id)
+    if (providerUserId) {
+      await this.createNotification({
+        userId: providerUserId,
+        type: 'booking_received',
+        title: 'New Booking Request',
+        message: 'You have received a new booking request. Check your dashboard for details.',
+        metadata: { bookingId }
+      });
+    }
 
     // Notify customer
     await this.createNotification({

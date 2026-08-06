@@ -45,11 +45,13 @@ export default function VendorBookings() {
   // ── Accept / Reject ────────────────────────────────────────────────────────
   const updateStatus = async (booking: any, newStatus: 'confirmed' | 'cancelled') => {
     setBusy(booking.id);
+    // Map UI status to valid database enum values
+    const dbStatus = newStatus === 'confirmed' ? 'accepted' : 'cancelled';
     const { error } = await supabase
       .from('bookings')
       .update({
-        status: newStatus,
-        responded_at: new Date().toISOString(),
+        status: dbStatus,
+        updated_at: new Date().toISOString(),
       } as any)
       .eq('id', booking.id);
 

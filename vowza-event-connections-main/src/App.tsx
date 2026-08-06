@@ -27,6 +27,7 @@ const BookingChat          = lazy(() => import("./pages/BookingChat"));
 const Artists              = lazy(() => import("./pages/Artists"));
 const Checkout             = lazy(() => import("./pages/Checkout"));
 const Cart                 = lazy(() => import("./components/Cart"));
+const BookingSuccess       = lazy(() => import("./pages/BookingSuccess"));
 const NotFound             = lazy(() => import("./pages/NotFound"));
 const AIPlanner            = lazy(() => import("./pages/AIPlanner"));
 const EventPlanning        = lazy(() => import("./pages/EventPlanning"));
@@ -198,6 +199,8 @@ const AppContent = () => {
             <Route path="settings"      element={<VendorSettings />} />
             <Route path="help"          element={<VendorDashboardHome />} />
           </Route>
+
+          <Route path="/booking-success" element={<ProtectedRoute><BookingSuccess /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
