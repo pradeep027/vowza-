@@ -1,0 +1,27 @@
+{
+  "buildCommand": "cd vowza-event-connections-main && npm install && npm run build",
+  "outputDirectory": "vowza-event-connections-main/dist",
+  "installCommand": "echo skip",
+  "rewrites": [
+    {
+      "source": "/((?!_next|api|static|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",         "value": "DENY"    },
+        { "key": "X-XSS-Protection",        "value": "1; mode=block" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ]
+}
