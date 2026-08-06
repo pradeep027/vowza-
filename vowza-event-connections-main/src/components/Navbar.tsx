@@ -68,7 +68,7 @@ const Navbar = () => {
 
   // ── Scroll shrink ──────────────────────────────────────────────────────
   useEffect(() => {
-    const fn = () => setIsScrolled(window.scrollY > 30);
+    const fn = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
@@ -129,10 +129,11 @@ const Navbar = () => {
       {/* ── Main nav ──────────────────────────────────────────────────── */}
       <nav
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-out",
+          "fixed top-0 left-0 right-0 z-50",
+          "transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isScrolled
-            ? "bg-white/92 dark:bg-gray-950/92 backdrop-blur-2xl shadow-[0_1px_0_0_hsl(var(--border)),0_8px_30px_-8px_hsl(220_20%_10%/0.12)] border-b border-transparent"
-            : "bg-white/70 dark:bg-gray-950/70 backdrop-blur-md border-b border-border/30"
+            ? "bg-[#FFFFFF] dark:bg-gray-950 backdrop-blur-[12px] border-b border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
+            : "bg-white/70 dark:bg-gray-950/70 backdrop-blur-md border-b border-transparent shadow-none"
         )}
       >
         <div className="container">
