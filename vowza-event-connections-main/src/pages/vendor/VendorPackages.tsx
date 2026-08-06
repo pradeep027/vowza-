@@ -9,6 +9,7 @@ import {
   Check, X, TrendingUp,
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
+import WaterProductsManager from './WaterProductsManager';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -37,6 +38,12 @@ export default function VendorPackages() {
   const packages     = data?.packages     ?? [];
   const mostPopular  = data?.mostPopular  ?? null;
   const totalBookings = data?.totalBookings ?? 0;
+
+  // Water Suppliers use a product catalogue. All other professions retain
+  // the original Services & Packages experience below without any changes.
+  if (provider?.profession === 'water_supplier') {
+    return <WaterProductsManager provider={provider} />;
+  }
 
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };
   const openEdit = (p: any) => {

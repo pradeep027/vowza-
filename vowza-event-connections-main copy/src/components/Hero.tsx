@@ -2,6 +2,18 @@ import { useState, useRef, useEffect } from "react";
 import { Search, MapPin, Calendar, Sparkles, TrendingUp, Clock, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import MobileHero from "./MobileHero";
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+};
 import { trendingSearches, popularCities } from "@/data/services";
 
 // ─── Vowza Planner suggestions ────────────────────────────────────────────────
@@ -21,7 +33,7 @@ const eventOptions = [
   "Temple Event", "Private Party",
 ];
 
-const Hero = () => {
+const DesktopHero = () => {
   const navigate = useNavigate();
 
   // ── Vowza Planner — opens the dedicated /ai-planner page ────────────────
@@ -311,6 +323,11 @@ const Hero = () => {
       </div>
     </section>
   );
+};
+
+const Hero = () => {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileHero /> : <DesktopHero />;
 };
 
 export default Hero;

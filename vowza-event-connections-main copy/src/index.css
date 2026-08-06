@@ -342,3 +342,12 @@
     animation-delay: 0.4s;
   }
 }
+
+
+@layer base {
+  html,
+  body,
+  #root {
+    overflow-x: hidden;
+  }
+}
