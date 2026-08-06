@@ -234,8 +234,7 @@ const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => (
     onClick={onClick}
     aria-label={`Browse ${cat.name}`}
     initial={{ opacity: 0, y: 18 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: "0px" }}
+    animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.45, delay: Math.min(idx, 15) * 0.035, ease: [0.22, 1, 0.36, 1] }}
     whileHover={{ y: -6, scale: 1.035 }}
     whileTap={{ scale: 0.97 }}
@@ -309,8 +308,7 @@ const TrendingCategories = () => {
         {/* ── Section header ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "0px" }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10 md:mb-12"
         >
