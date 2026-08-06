@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
 import WaterProductsManager from './WaterProductsManager';
-import { isWaterSupplier } from '@/lib/providerCategory';
+import PhotographerPackageManager from './PhotographerPackageManager';
+import { isPhotographer, isWaterSupplier } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -44,6 +45,9 @@ export default function VendorPackages() {
   // the original Services & Packages experience below without any changes.
   if (isWaterSupplier(provider)) {
     return <WaterProductsManager provider={provider} />;
+  }
+  if (isPhotographer(provider)) {
+    return <PhotographerPackageManager provider={provider} />;
   }
 
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };

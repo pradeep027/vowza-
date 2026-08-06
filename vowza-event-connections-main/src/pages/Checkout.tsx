@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ArrowLeft, IndianRupee, CreditCard, Smartphone, Building2 } from 'lucide-react';
 import WaterProductCheckout from '@/components/WaterProductCheckout';
+import PhotographyPackageCheckout from '@/components/PhotographyPackageCheckout';
 
 const Checkout = () => {
   const { user } = useAuth();
@@ -36,6 +37,10 @@ const Checkout = () => {
     name: ''
   });
 
+  const [photographyCheckout] = useState(() => {
+    try { const raw = sessionStorage.getItem('vowza_photography_checkout'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+
   const [waterCheckout] = useState(() => {
     try {
       const raw = sessionStorage.getItem('vowza_water_checkout');
@@ -45,9 +50,8 @@ const Checkout = () => {
     }
   });
 
-  if (waterCheckout) {
-    return <WaterProductCheckout payload={waterCheckout} />;
-  }
+  if (photographyCheckout) return <PhotographyPackageCheckout payload={photographyCheckout} />;
+  if (waterCheckout) return <WaterProductCheckout payload={waterCheckout} />;
 
   const platformFee = Math.round(cartTotal * 0.05);
   const totalAmount = cartTotal + platformFee;
