@@ -101,8 +101,7 @@ const BrowseByEvent = () => {
                 onClick={() => handleClick(event.id)}
                 className="group relative overflow-hidden rounded-2xl bg-card border border-border/60
                            hover:border-gold/30 hover:shadow-elevated transition-all duration-300
-                           hover:-translate-y-1 text-left animate-fade-in p-4 md:p-5"
-                style={{ animationDelay: `${index * 0.05}s` }}
+                           hover:-translate-y-1 text-left p-4 md:p-5"
               >
                 {/* Subtle gradient accent top-right */}
                 <div
