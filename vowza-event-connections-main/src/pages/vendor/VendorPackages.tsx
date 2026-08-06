@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
 import WaterProductsManager from './WaterProductsManager';
+import { isWaterSupplier } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -41,7 +42,7 @@ export default function VendorPackages() {
 
   // Water Suppliers use a product catalogue. All other professions retain
   // the original Services & Packages experience below without any changes.
-  if (provider?.profession === 'water_supplier') {
+  if (isWaterSupplier(provider)) {
     return <WaterProductsManager provider={provider} />;
   }
 

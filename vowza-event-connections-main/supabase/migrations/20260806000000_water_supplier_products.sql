@@ -314,3 +314,61 @@ DROP POLICY IF EXISTS water_product_images_public_read ON storage.objects;
 CREATE POLICY water_product_images_public_read ON storage.objects FOR SELECT USING (bucket_id = 'water-product-images');
 DROP POLICY IF EXISTS water_product_images_owner_write ON storage.objects;
 CREATE POLICY water_product_images_owner_write ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'water-product-images' AND auth.uid()::text = (storage.foldername(name))[1]) WITH CHECK (bucket_id = 'water-product-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+
+-- Atomic customer checkout. Product prices, ownership, stock, and delivery charge are
+-- always re-read in the database; the browser never decides final amounts.
+CREATE OR REPLACE FUNCTION public.create_water_product_order(
+  p_provider_id uuid,
+  p_items jsonb,
+  p_delivery_address text,
+  p_delivery_lat numeric,
+  p_delivery_lng numeric,
+  p_delivery_date date,
+  p_delivery_time_slot text DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  quote record;
+  order_id uuid;
+  item jsonb;
+  variant record;
+  line_total numeric;
+  subtotal_total numeric := 0;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  SELECT * INTO quote FROM public.quote_water_delivery(p_provider_id, p_delivery_lat, p_delivery_lng);
+  FOR item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    SELECT v.id, v.product_id, v.label, v.price, p.name, s.quantity_available
+      INTO variant
+      FROM public.water_product_variants v
+      JOIN public.water_products p ON p.id = v.product_id
+      JOIN public.water_product_stock s ON s.variant_id = v.id
+     WHERE v.id = (item->>'variantId')::uuid
+       AND p.id = (item->>'productId')::uuid
+       AND p.provider_id = p_provider_id
+       AND p.is_active AND p.is_visible AND NOT p.is_archived AND v.is_available
+     FOR UPDATE OF s;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Selected product is no longer available'; END IF;
+    IF (item->>'quantity')::integer <= 0 OR variant.quantity_available < (item->>'quantity')::integer THEN RAISE EXCEPTION 'Insufficient stock for %', variant.label; END IF;
+    line_total := variant.price * (item->>'quantity')::integer;
+    subtotal_total := subtotal_total + line_total;
+  END LOOP;
+  INSERT INTO public.product_orders (provider_id, customer_id, delivery_address, delivery_lat, delivery_lng, delivery_date, delivery_time_slot, estimated_delivery_minutes, distance_km, subtotal, delivery_charge, total_amount)
+  VALUES (p_provider_id, auth.uid(), p_delivery_address, p_delivery_lat, p_delivery_lng, p_delivery_date, p_delivery_time_slot, quote.estimated_delivery_minutes, quote.distance_km, subtotal_total, quote.delivery_charge, subtotal_total + quote.delivery_charge)
+  RETURNING id INTO order_id;
+  FOR item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    SELECT v.id, v.product_id, v.label, v.price, p.name INTO variant FROM public.water_product_variants v JOIN public.water_products p ON p.id = v.product_id WHERE v.id = (item->>'variantId')::uuid;
+    line_total := variant.price * (item->>'quantity')::integer;
+    INSERT INTO public.product_order_items (order_id, product_id, variant_id, product_name, variant_label, unit_price, quantity, line_total) VALUES (order_id, variant.product_id, variant.id, variant.name, variant.label, variant.price, (item->>'quantity')::integer, line_total);
+    UPDATE public.water_product_stock SET quantity_available = quantity_available - (item->>'quantity')::integer WHERE variant_id = variant.id;
+  END LOOP;
+  INSERT INTO public.delivery_charges (order_id, free_radius_km, distance_km, charge, is_free_delivery) SELECT order_id, free_delivery_radius_km, quote.distance_km, quote.delivery_charge, quote.is_free_delivery FROM public.supplier_delivery_settings WHERE provider_id = p_provider_id;
+  RETURN order_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.create_water_product_order(uuid, jsonb, text, numeric, numeric, date, text) TO authenticated;

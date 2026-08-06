@@ -19,6 +19,8 @@ import AppLogo from "@/components/AppLogo";
 import { useAvailability, useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
+import { isWaterSupplier } from "@/lib/providerCategory";
+import WaterSupplierMenu from "@/components/WaterSupplierMenu";
 
 const fmt = (n: number) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
@@ -416,7 +418,7 @@ const ProviderProfile = () => {
               )}
 
               {/* ── PACKAGES TAB ── */}
-              {activeTab === "packages" && (
+              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplierMenu provider={provider} profile={profile} /> : (
                 <div className="bg-surface-1 rounded-2xl border border-border/60 p-6">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Pricing & Packages</h2>
                   {packages.length === 0 ? (
@@ -453,7 +455,7 @@ const ProviderProfile = () => {
                     </div>
                   )}
                 </div>
-              )}
+              ))}
 
               {/* ── REVIEWS TAB ── */}
               {activeTab === "reviews" && (
