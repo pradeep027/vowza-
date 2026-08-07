@@ -4,23 +4,23 @@
 // Uses live DB counts when available; gracefully shows static list as fallback.
 
 import { memo } from "react";
-import VowzaIcon from '@/components/VowzaIcon';
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Camera,          // Photographers
   Video,           // Videographers
-  Music2,          // Bands
+  Guitar,          // Bands
   Disc3,           // DJs
   Mic,             // Singers
   PersonStanding,  // Dancers
   Users,           // Choreographers
-  Paintbrush,      // Decorators
-  // Makeup Artists
-  Hand,            // Mehendi Artists
+  Flower2,         // Decorators
+  Palette,         // Makeup Artists
+  Fingerprint,     // Mehendi Artists
   Wand2,           // Magicians
-  MonitorPlay,     // Anchors & Hosts + Drone
+  MicVocal,        // Anchors & Hosts
+  MonitorPlay,     // Drone
   Utensils,        // Catering Services
   Lightbulb,       // Lighting Services
   Volume2,         // Sound Services
@@ -74,7 +74,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "music_band",
     name:  "Bands",
-    icon:  Music2,
+    icon:  Guitar,
     color: "bg-amber-50 dark:bg-amber-950/40",
     text:  "text-amber-600 dark:text-amber-400",
     ring:  "ring-amber-200 dark:ring-amber-800",
@@ -119,7 +119,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "wedding_decorator",
     name:  "Decorators",
-    icon:  Paintbrush,
+    icon:  Flower2,
     color: "bg-lime-50 dark:bg-lime-950/40",
     text:  "text-lime-700 dark:text-lime-400",
     ring:  "ring-lime-200 dark:ring-lime-800",
@@ -128,7 +128,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "makeup_artist",
     name:  "Makeup Artists",
-    icon: VowzaIcon,
+    icon:  Palette,
     color: "bg-orange-50 dark:bg-orange-950/40",
     text:  "text-orange-600 dark:text-orange-400",
     ring:  "ring-orange-200 dark:ring-orange-800",
@@ -137,7 +137,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "mehendi_artist",
     name:  "Mehendi Artists",
-    icon:  Hand,
+    icon:  Fingerprint,
     color: "bg-green-50 dark:bg-green-950/40",
     text:  "text-green-600 dark:text-green-400",
     ring:  "ring-green-200 dark:ring-green-800",
@@ -155,7 +155,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "anchor",
     name:  "Anchors & Hosts",
-    icon:  MonitorPlay,
+    icon:  MicVocal,
     color: "bg-cyan-50 dark:bg-cyan-950/40",
     text:  "text-cyan-600 dark:text-cyan-400",
     ring:  "ring-cyan-200 dark:ring-cyan-800",
