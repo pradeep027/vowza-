@@ -65,6 +65,7 @@ const Navbar = () => {
   const location          = useLocation();
 
   const searchRef  = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const megaRef    = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -87,8 +88,10 @@ const Navbar = () => {
   // ── Outside click handler ──────────────────────────────────────────────
   useEffect(() => {
     const fn = (e: MouseEvent) => {
-      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchOpen(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      const target = e.target as Node;
+      const insideSearch = searchRef.current?.contains(target) || mobileSearchRef.current?.contains(target);
+      if (!insideSearch) setSearchOpen(false);
+      if (profileRef.current && !profileRef.current.contains(target)) setProfileOpen(false);
     };
     document.addEventListener("mousedown", fn);
     return () => document.removeEventListener("mousedown", fn);
@@ -566,7 +569,7 @@ const Navbar = () => {
 
           {/* ── Mobile search bar (slides in) ──────────────────────────── */}
           {searchOpen && (
-            <div className="lg:hidden pb-3 animate-fade-down" ref={searchRef}>
+            <div className="lg:hidden pb-3 animate-fade-down" ref={mobileSearchRef}>
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border/60">
                 <Search className="w-4 h-4 text-foreground/60 flex-shrink-0" />
                 <input
