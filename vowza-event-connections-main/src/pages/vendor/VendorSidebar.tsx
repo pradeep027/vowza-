@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/AppLogo';
 import { useVendorId, useVendorRealtime, useVendorBadges } from '@/hooks/useVendorData';
-import { isPhotographer, isWaterSupplier } from '@/lib/providerCategory';
+import { isPhotographer, isWaterSupplier, isCaterer } from '@/lib/providerCategory';
 import {
   LayoutDashboard, CalendarDays, BookOpen, MessageSquare,
   Image as ImageIcon, Package, Star, BarChart3, Wallet,
@@ -84,7 +84,7 @@ export default function VendorSidebar({ collapsed, setCollapsed, mobileOpen, set
               key={item.to}
               to={item.to}
               onClick={() => setMobileOpen(false)}
-              title={collapsed ? (item.to === '/vendor/packages' ? isWaterSupplier(provider) ? 'Water Products' : isPhotographer(provider) ? 'Photography Packages' : item.label : item.label) : undefined}
+              title={collapsed ? (item.to === '/vendor/packages' ? isWaterSupplier(provider) ? 'Water Products' : isPhotographer(provider) ? 'Photography Packages' : isCaterer(provider) ? 'Catering Packages' : item.label : item.label) : undefined}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative',
                 isActive
@@ -97,7 +97,7 @@ export default function VendorSidebar({ collapsed, setCollapsed, mobileOpen, set
                   <item.icon className={cn('w-[18px] h-[18px] flex-shrink-0', isActive && 'text-[#8B1538]')} />
                   {!collapsed && (
                     <>
-                      <span className="truncate">{item.to === '/vendor/packages' ? isWaterSupplier(provider) ? 'Water Products' : isPhotographer(provider) ? 'Photography Packages' : item.label : item.label}</span>
+                      <span className="truncate">{item.to === '/vendor/packages' ? isWaterSupplier(provider) ? 'Water Products' : isPhotographer(provider) ? 'Photography Packages' : isCaterer(provider) ? 'Catering Packages' : item.label : item.label}</span>
                       {count > 0 && (
                         <span className="ml-auto text-[10px] font-bold bg-[#8B1538] text-white px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                           {count > 99 ? '99+' : count}

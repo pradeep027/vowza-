@@ -11,7 +11,8 @@ import {
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
 import WaterProductsManager from './WaterProductsManager';
 import PhotographerPackageManager from './PhotographerPackageManager';
-import { isPhotographer, isWaterSupplier } from '@/lib/providerCategory';
+import CateringPackageManager from './CateringPackageManager';
+import { isPhotographer, isWaterSupplier, isCaterer } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -48,6 +49,9 @@ export default function VendorPackages() {
   }
   if (isPhotographer(provider)) {
     return <PhotographerPackageManager provider={provider} />;
+  }
+  if (isCaterer(provider)) {
+    return <CateringPackageManager provider={provider} />;
   }
 
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };

@@ -30,3 +30,12 @@ export function isPhotographer(provider: unknown): boolean {
   return [row.profession, row.category, row.category_name, details.category, details.category_name, details.profession]
     .some(value => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_') === 'photographer');
 }
+
+/** Canonical category gate for catering service providers. */
+export function isCaterer(provider: unknown): boolean {
+  if (!provider || typeof provider !== 'object') return false;
+  const row = provider as Record<string, unknown>;
+  const details = (row.vendor_details ?? row.category_details ?? {}) as Record<string, unknown>;
+  return [row.profession, row.category, row.category_name, details.category, details.category_name, details.profession]
+    .some(value => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_') === 'catering_services');
+}
