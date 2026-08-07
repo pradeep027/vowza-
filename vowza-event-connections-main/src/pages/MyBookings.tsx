@@ -24,12 +24,15 @@ import type { Database } from '@/integrations/supabase/types';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
 
-type BookingStatus = Database['public']['Enums']['booking_status'];
-
 interface ProviderInfo {
   id: string;
   full_name: string;
   profession: string;
+  avatar_url?: string;
+  phone?: string;
+  email?: string;
+  whatsapp?: string;
+  city?: string;
 }
 
 const statusColors: Record<BookingStatus, string> = {
@@ -74,6 +77,19 @@ const MyBookings = () => {
     }
   }, [user, loading, navigate]);
 
+  // ── Realtime subscription for booking status changes ──────────────────
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel(`customer-bookings-rt-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `customer_id=eq.${user.id}` }, () => {
+        setRefreshKey(k => k + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   useEffect(() => {
     const fetchProviders = async () => {
       if (bookings.length === 0) return;
@@ -89,20 +105,26 @@ const MyBookings = () => {
         const userIds = providersData.map(p => p.user_id);
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, full_name')
+          .select('id, full_name, phone, email, avatar_url')
           .in('id', userIds);
 
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p.full_name]) || []);
-        
         const providerMap = new Map(
-          providersData.map(p => [
-            p.id,
-            {
-              id: p.id,
-              full_name: profilesMap.get(p.user_id) || 'Unknown',
-              profession: p.profession
-            }
-          ])
+          providersData.map(p => {
+            const prof = profilesData?.find(pr => pr.id === p.user_id);
+            return [
+              p.id,
+              {
+                id: p.id,
+                full_name: prof?.full_name || 'Unknown',
+                profession: p.profession,
+                avatar_url: prof?.avatar_url || undefined,
+                phone: prof?.phone || undefined,
+                email: prof?.email || undefined,
+                whatsapp: (p as any).whatsapp || prof?.phone || undefined,
+                city: (p as any).city || undefined,
+              }
+            ];
+          })
         );
         
         setProviders(providerMap);
@@ -110,7 +132,7 @@ const MyBookings = () => {
     };
 
     fetchProviders();
-  }, [bookings]);
+  }, [bookings, refreshKey]);
 
   const handleCancel = (bookingId: string) => {
     setCancelTarget(bookingId);
@@ -327,6 +349,51 @@ const MyBookings = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Artist Contact — only visible after approval */}
+                      {booking.status === 'accepted' && provider && (provider.phone || provider.email) && (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                          <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">✓ Booking Confirmed — Contact Artist</p>
+                          <div className="flex flex-wrap gap-2">
+                            {provider.phone && (
+                              <a href={`tel:${provider.phone}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>📞</span> Call {provider.phone}
+                              </a>
+                            )}
+                            {provider.phone && (
+                              <a href={`https://wa.me/${provider.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>💬</span> WhatsApp
+                              </a>
+                            )}
+                            {provider.email && (
+                              <a href={`mailto:${provider.email}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>✉️</span> Email
+                              </a>
+                            )}
+                            <Link to={`/artist/${provider.id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary border border-border/60 text-xs font-semibold text-foreground hover:bg-secondary/80 transition-colors">
+                              View Profile
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pending status message */}
+                      {booking.status === 'requested' && (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            ⏳ Waiting for artist to respond. You will receive a notification once they accept or decline. Contact details will be shared after confirmation.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Rejected message */}
+                      {booking.status === 'rejected' && (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                            ❌ This booking was declined by the artist. Please explore other artists for your event.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -359,6 +426,33 @@ const MyBookings = () => {
                         </div>
                         <span className="font-semibold">₹{booking.amount.toLocaleString()}</span>
                       </div>
+
+                      {/* Artist Contact for completed bookings */}
+                      {(booking.status === 'completed') && provider && (provider.phone || provider.email) && (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                          <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">✓ Booking Completed — Contact Artist</p>
+                          <div className="flex flex-wrap gap-2">
+                            {provider.phone && (
+                              <a href={`tel:${provider.phone}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>📞</span> Call {provider.phone}
+                              </a>
+                            )}
+                            {provider.phone && (
+                              <a href={`https://wa.me/${provider.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>💬</span> WhatsApp
+                              </a>
+                            )}
+                            {provider.email && (
+                              <a href={`mailto:${provider.email}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                <span>✉️</span> Email
+                              </a>
+                            )}
+                            <Link to={`/artist/${provider.id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary border border-border/60 text-xs font-semibold text-foreground hover:bg-secondary/80 transition-colors">
+                              View Profile
+                            </Link>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
