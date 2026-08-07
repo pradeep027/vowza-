@@ -3,20 +3,19 @@ import { useState, useEffect, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, MapPin, Star, Clock, CheckCircle, User,
-  Sparkles, Share2, MessageCircle, Phone, Mail, Globe,
+  Share2, Globe,
   Instagram, Facebook, Youtube, Heart, Flag,
-  Shield, TrendingUp, BadgeCheck, Zap, Users, X,
-  ChevronDown, ChevronUp, Package, UtensilsCrossed,
-  Landmark, Video as VideoIcon, Image as ImageIcon,
+  BadgeCheck, Zap, Users, X,
+  ChevronDown, ChevronUp,
+  Video as VideoIcon, Image as ImageIcon,
 } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import AppLogo from "@/components/AppLogo";
-import { useAvailability, useArtists } from "@/hooks/useArtists";
+import { useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
 import { isPhotographer, isWaterSupplier } from "@/lib/providerCategory";
@@ -107,7 +106,6 @@ const ProviderProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addToCart, isInCart } = useCart();
 
   const [provider, setProvider] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -121,7 +119,6 @@ const ProviderProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -129,9 +126,8 @@ const ProviderProfile = () => {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"about" | "gallery" | "reviews" | "packages" | "menu" | "rentals" | "poojas">("about");
+  const [activeTab, setActiveTab] = useState<"about" | "gallery" | "reviews" | "packages" | "menu" | "rentals" | "poojas">("packages");
 
-  const { data: isAvailable } = useAvailability(id || "", selectedDate || new Date());
   const { data: similarArtists = [] } = useArtists({ category: provider?.profession, sortBy: "rating" }, !!provider?.profession);
 
   useEffect(() => { if (id) { fetchAll(); checkFav(); } }, [id, user]);
@@ -201,12 +197,6 @@ const ProviderProfile = () => {
   };
 
   const handleBookNow = () => { if (!user) { toast.error("Please login"); navigate("/auth"); return; } setShowBooking(true); };
-  const handleAddToCart = (pkg?: any) => {
-    if (!user) { toast.error("Please login"); navigate("/auth"); return; }
-    if (!provider || !profile) return;
-    addToCart({ providerId: provider.id, providerName: profile.full_name, profession: professionLabels[provider.profession] || provider.profession, price: pkg?.price || provider.price_min || 0, date: new Date().toLocaleDateString(), time: "Flexible", duration: pkg?.duration || "1", package: pkg?.name || "Standard" });
-    toast.success("Added to cart");
-  };
 
   const submitReview = async () => {
     if (!user) { toast.error("Login to review"); return; }
@@ -246,9 +236,9 @@ const ProviderProfile = () => {
 
   // Determine which tabs to show
   const tabs: { key: string; label: string }[] = [
-    { key: "about",    label: "About"    },
-    { key: "gallery",  label: "Gallery"  },
     { key: "packages", label: "Packages" },
+    { key: "gallery",  label: "Gallery"  },
+    { key: "about",    label: "About"    },
     { key: "reviews",  label: "Reviews"  },
     ...(menuItems.length > 0    ? [{ key: "menu",    label: "Menu"    }] : []),
     ...(rentalItems.length > 0  ? [{ key: "rentals", label: "Rentals" }] : []),
@@ -270,9 +260,6 @@ const ProviderProfile = () => {
             </button>
             <button onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success("Link copied"); }} className="p-2 rounded-lg border border-border text-muted-foreground">
               <Share2 className="w-4 h-4" />
-            </button>
-            <button onClick={handleBookNow} disabled={!provider.is_available} className="btn-primary py-2 px-5 text-xs">
-              {provider.is_available ? "Book Now" : "Unavailable"}
             </button>
           </div>
         </div>
@@ -315,8 +302,8 @@ const ProviderProfile = () => {
             </div>
           </div>
 
-          {/* Two-column layout */}
-          <div className="flex flex-col lg:flex-row gap-7 mb-16">
+          {/* Content layout */}
+          <div className="flex flex-col gap-7 mb-16 max-w-4xl">
             <div className="flex-1 min-w-0 space-y-5">
               {/* Tab nav — scrollable on mobile */}
               <div className="flex gap-1 p-1 bg-secondary rounded-xl border border-border/50 overflow-x-auto no-scrollbar">
@@ -429,7 +416,7 @@ const ProviderProfile = () => {
                           <p className="text-2xl font-bold text-foreground">{fmt(provider.price_min || 0)}{provider.price_max ? ` – ${fmt(provider.price_max)}` : "+"}</p>
                           <p className="text-xs text-muted-foreground mt-1">Starting price</p>
                         </div>
-                        <button onClick={() => handleAddToCart()} disabled={isInCart(provider.id)} className="btn-gold text-sm py-2.5">{isInCart(provider.id) ? "In Cart" : "Book Now"}</button>
+                        <button onClick={handleBookNow} className="btn-gold text-sm py-2.5">Book Package</button>
                       </div>
                     ) : <p className="text-sm text-muted-foreground text-center py-8">Pricing available on request.</p>
                   ) : (
@@ -448,8 +435,8 @@ const ProviderProfile = () => {
                               ))}
                             </ul>
                           )}
-                          <button onClick={() => handleAddToCart(pkg)} disabled={isInCart(provider.id)} className={cn("w-full py-2.5 rounded-xl text-xs font-semibold", i === 1 ? "btn-gold" : "btn-outline")}>
-                            {isInCart(provider.id) ? "In Cart" : "Add to Cart"}
+                          <button onClick={handleBookNow} className={cn("w-full py-2.5 rounded-xl text-xs font-semibold", i === 1 ? "btn-gold" : "btn-outline")}>
+                            Book Package
                           </button>
                         </div>
                       ))}
@@ -591,52 +578,10 @@ const ProviderProfile = () => {
               )}
             </div>
 
-            {/* ── Sticky booking sidebar ── */}
-            <div className="lg:w-76 xl:w-80 flex-shrink-0">
-              <div className="sticky top-16 space-y-4">
-                <div className="bg-surface-1 rounded-2xl border border-border/60 p-6 shadow-lg">
-                  <div className="text-center mb-5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Starting from</p>
-                    <p className="text-3xl font-bold text-foreground">{provider.price_min ? fmt(provider.price_min) : provider.price_max ? fmt(provider.price_max) : "On Request"}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">per event</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mb-5">
-                    {[{ label: "Events", val: provider.total_bookings || 0 }, { label: "Rating", val: (provider.average_rating || 0).toFixed(1) }, { label: "Exp.", val: `${provider.experience_years || 0}yr` }].map(s => (
-                      <div key={s.label} className="text-center p-2.5 rounded-xl bg-secondary">
-                        <p className="text-sm font-bold text-foreground">{s.val}</p>
-                        <p className="text-[10px] text-muted-foreground">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={handleBookNow} disabled={!provider.is_available}
-                    className={cn("w-full py-3.5 rounded-xl text-sm font-bold transition-all", provider.is_available ? "btn-primary justify-center" : "bg-muted text-muted-foreground cursor-not-allowed")}>
-                    {provider.is_available ? "Book Now" : "Currently Unavailable"}
-                  </button>
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <p className="text-xs font-semibold text-foreground mb-2">Check Availability</p>
-                    <input type="date" className="input-premium text-sm py-2 w-full" min={new Date().toISOString().split("T")[0]} onChange={e => setSelectedDate(e.target.value ? new Date(e.target.value) : null)} />
-                    {selectedDate && isAvailable !== undefined && (
-                      <p className={cn("text-xs font-medium mt-2", (isAvailable as any)?.available ? "text-emerald-600" : "text-red-600")}>
-                        {(isAvailable as any)?.available ? "✓ Available on this date" : "✗ Not available on this date"}
-                      </p>
-                    )}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
-                    {profile.phone && <a href={`tel:${profile.phone}`} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-secondary"><Phone className="w-3.5 h-3.5" />Call Now</a>}
-                    {(provider.whatsapp || profile.phone) && <a href={`https://wa.me/${(provider.whatsapp || profile.phone || "").replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600"><MessageCircle className="w-3.5 h-3.5" />WhatsApp</a>}
-                    {profile.email && <a href={`mailto:${profile.email}`} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-secondary"><Mail className="w-3.5 h-3.5" />Email</a>}
-                  </div>
-                </div>
-                <div className="bg-surface-2 rounded-2xl border border-border/50 p-4 space-y-3">
-                  {[{ icon: Shield, label: "Secure escrow payment" }, { icon: BadgeCheck, label: "Verified professional" }, { icon: TrendingUp, label: "Money-back guarantee" }].map(({ icon: Icon, label }) => (
-                    <div key={label} className="flex items-center gap-2.5 text-xs text-muted-foreground"><Icon className="w-4 h-4 text-emerald-500" />{label}</div>
-                  ))}
-                </div>
-                <button onClick={() => setReportOpen(true)} className="w-full text-xs text-muted-foreground hover:text-destructive flex items-center justify-center gap-1.5 py-2">
-                  <Flag className="w-3 h-3" />Report this profile
-                </button>
-              </div>
-            </div>
+            {/* Report button */}
+            <button onClick={() => setReportOpen(true)} className="w-full text-xs text-muted-foreground hover:text-destructive flex items-center justify-center gap-1.5 py-2">
+              <Flag className="w-3 h-3" />Report this profile
+            </button>
           </div>
         </div>
       </main>
