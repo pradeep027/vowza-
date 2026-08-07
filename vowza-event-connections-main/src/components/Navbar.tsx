@@ -69,6 +69,7 @@ const Navbar = () => {
   const profileRef = useRef<HTMLDivElement>(null);
   const megaRef    = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // ── Scroll shrink ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -537,7 +538,7 @@ const Navbar = () => {
             {/* ── Mobile: search + hamburger ───────────────────────────── */}
             <div className="flex items-center gap-1 lg:hidden">
               <button
-                onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+                onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => mobileSearchInputRef.current?.focus(), 50); }}
                 className="min-w-11 min-h-11 p-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
                 aria-label="Search"
               >
@@ -573,7 +574,7 @@ const Navbar = () => {
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border/60">
                 <Search className="w-4 h-4 text-foreground/60 flex-shrink-0" />
                 <input
-                  ref={searchInputRef}
+                  ref={mobileSearchInputRef}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
