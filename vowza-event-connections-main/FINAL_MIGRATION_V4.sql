@@ -292,3 +292,4 @@ GRANT EXECUTE ON FUNCTION public.reject_artist  TO authenticated;
 
 -- ── Final confirmation ─────────────────────────────────────────────────────
 SELECT 'Migration V4 completed successfully. Admin panel should now show data.' AS result;
+

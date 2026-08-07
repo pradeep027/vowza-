@@ -29,8 +29,6 @@ ALTER TABLE public.photography_package_bookings ADD COLUMN IF NOT EXISTS album_a
 ALTER TABLE public.photography_package_bookings ADD COLUMN IF NOT EXISTS selected_album_details jsonb;
 CREATE INDEX IF NOT EXISTS photography_cart_items_album_idx ON public.photography_cart_items(album_id);
 
--- Replace the earlier two-argument RPC so all client calls use this album-aware implementation.
-DROP FUNCTION IF EXISTS public.add_photography_cart_item(uuid, uuid[]);
 CREATE OR REPLACE FUNCTION public.add_photography_cart_item(p_package_id uuid, p_addon_ids uuid[] DEFAULT '{}', p_album_id uuid DEFAULT NULL) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE p public.photography_packages%ROWTYPE; v_cart_id uuid;
 BEGIN
@@ -51,7 +49,6 @@ BEGIN
   SELECT * INTO c FROM public.photography_carts WHERE id=p_cart_id AND customer_id=auth.uid() AND status='active' FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Active photography cart not found'; END IF;
   FOR item IN SELECT * FROM public.photography_cart_items WHERE cart_id=c.id LOOP
-    v_album := NULL;
     SELECT * INTO p FROM public.photography_packages WHERE id=item.package_id AND photographer_id=c.photographer_id AND is_active AND is_visible AND status='published' FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'A package is no longer available'; END IF;
     IF EXISTS(SELECT 1 FROM public.photographer_availability WHERE photographer_id=p.photographer_id AND available_date=p_event_date AND NOT is_available) THEN RAISE EXCEPTION 'Photographer is unavailable on this date'; END IF;
@@ -63,7 +60,7 @@ BEGIN
     INSERT INTO public.photography_package_invoices(booking_id,invoice_number,amount) VALUES(v_booking,'PH-' || upper(replace(v_booking::text,'-','')),p.price+v_addons+coalesce(v_album.price,0));
     INSERT INTO public.photography_booking_timeline(booking_id,actor_id,event_type,message) VALUES(v_booking,auth.uid(),'booking_requested','Photography booking requested');
     SELECT user_id INTO v_provider_user FROM public.provider_profiles WHERE id=p.photographer_id;
-    INSERT INTO public.notifications(user_id,title,message,type,reference_id) VALUES (auth.uid(),'Photography booking requested','Your photography booking request was created.','booking',v_booking),(v_provider_user,'New photography booking','You have a new photography package booking request.','booking',v_booking);
+    INSERT INTO public.notifications(user_id,title,message,type,reference_id) VALUES (auth.uid(),'Photography booking requested','Your photography booking request was created.','booking',v_booking::text),(v_provider_user,'New photography booking','You have a new photography package booking request.','booking',v_booking::text);
     v_bookings := array_append(v_bookings,v_booking);
   END LOOP;
   IF coalesce(array_length(v_bookings,1),0)=0 THEN RAISE EXCEPTION 'Your photography cart is empty'; END IF;

@@ -1,6 +1,6 @@
 -- Keep database ownership guards aligned with the Water Supplier UI category gate.
 CREATE OR REPLACE FUNCTION public.is_water_supplier(p_provider_id uuid)
-RETURNS booleangit status
+RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
