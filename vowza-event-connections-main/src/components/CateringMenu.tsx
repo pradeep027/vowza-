@@ -15,7 +15,7 @@ export default function CateringMenu({ provider, profile }: { provider: any; pro
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-catering-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('catering_packages' as any).select('*').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('catering_packages' as any).select('*, catering_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -50,8 +50,11 @@ export default function CateringMenu({ provider, profile }: { provider: any; pro
           const isOpen = expanded[pkg.id];
           return (
             <div key={pkg.id} className="overflow-hidden rounded-2xl border border-border/60 bg-white">
-              <div className="flex h-28 items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-                <Utensils className="h-10 w-10 text-[#8b1538]/30" />
+              <div className="h-28 bg-gradient-to-br from-amber-50 to-orange-50 overflow-hidden">
+                {(() => {
+                  const cover = (pkg.catering_gallery ?? []).find((g: any) => g.is_cover);
+                  return cover ? <img src={cover.public_url} alt={pkg.name} className="w-full h-full object-cover" /> : <div className="flex h-full items-center justify-center"><Utensils className="h-10 w-10 text-[#8b1538]/30" /></div>;
+                })()}
               </div>
               <div className="p-5">
                 <div className="flex items-start justify-between">

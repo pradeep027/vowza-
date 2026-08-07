@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Pencil, Copy, Trash2, Eye, EyeOff, Utensils, Users, X,
-  Check, ChevronRight, ChevronLeft, GripVertical, Star, Leaf,
+  Check, ChevronRight, ChevronLeft, GripVertical, Star, Leaf, Upload,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +57,10 @@ type Draft = {
   plate_includes: PlateInclude[];
   menu_sections: MenuSection[];
   addons: Addon[];
+  cover_file: File | null;
+  cover_url: string;
+  gallery_files: File[];
+  gallery_urls: { id: string; url: string; is_cover: boolean }[];
 };
 
 const blank = (): Draft => ({
@@ -66,6 +70,7 @@ const blank = (): Draft => ({
   cuisine_types: [], service_types: [], meal_types: [], serving_styles: [],
   plate_includes: [...DEFAULT_PLATE_INCLUDES],
   menu_sections: [], addons: [],
+  cover_file: null, cover_url: '', gallery_files: [], gallery_urls: [],
 });
 
 const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py-2.5 text-sm text-[#3d1924] outline-none transition placeholder:text-stone-400 focus:border-[#8b1538] focus:ring-2 focus:ring-[#8b1538]/15';
@@ -133,6 +138,17 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
       } catch (_) { /* keep defaults */ }
     }
 
+    // Load gallery images
+    let galleryUrls: { id: string; url: string; is_cover: boolean }[] = [];
+    let coverUrl = '';
+    try {
+      const galRes = await supabase.from('catering_gallery' as any).select('id, public_url, is_cover, sort_order').eq('package_id', pkg.id).order('sort_order');
+      const gallery = (galRes.data ?? []).map((g: any) => ({ id: g.id, url: g.public_url, is_cover: g.is_cover }));
+      const cover = gallery.find((g: any) => g.is_cover);
+      coverUrl = cover?.url || '';
+      galleryUrls = gallery;
+    } catch (_) { /* non-critical */ }
+
     setDraft({
       id: pkg.id, name: pkg.name || '', description: pkg.description || '',
       price_per_plate: String(pkg.price_per_plate ?? ''), starting_price: String(pkg.starting_price ?? ''),
@@ -143,6 +159,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
       cuisine_types: pkg.cuisine_types ?? [], service_types: pkg.service_types ?? [],
       meal_types: pkg.meal_types ?? [], serving_styles: pkg.serving_styles ?? [],
       plate_includes: plateIncludes, menu_sections: menuSections, addons: addons,
+      cover_file: null, cover_url: coverUrl, gallery_files: [], gallery_urls: galleryUrls,
     });
     setStep(1);
   };
@@ -220,6 +237,44 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
               price: Number(a.price) || 0, description: a.description || null, sort_order: i,
             }))
           );
+        }
+
+        // Upload cover photo
+        if (draft.cover_file && packageId) {
+          const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${draft.cover_file.name.split('.').pop()}`;
+          const { error: upErr } = await supabase.storage.from('catering-images').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
+          if (!upErr) {
+            const publicUrl = supabase.storage.from('catering-images').getPublicUrl(path).data.publicUrl;
+            // Remove old cover
+            await supabase.from('catering_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true);
+            await supabase.from('catering_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: true, sort_order: 0 });
+          }
+        }
+
+        // Upload new gallery files
+        if (draft.gallery_files.length > 0 && packageId) {
+          for (let i = 0; i < draft.gallery_files.length; i++) {
+            const file = draft.gallery_files[i];
+            const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${file.name.split('.').pop()}`;
+            const { error: upErr } = await supabase.storage.from('catering-images').upload(path, file, { contentType: file.type });
+            if (!upErr) {
+              const publicUrl = supabase.storage.from('catering-images').getPublicUrl(path).data.publicUrl;
+              await supabase.from('catering_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, sort_order: draft.gallery_urls.length + i + 1 });
+            }
+          }
+        }
+
+        // Delete removed gallery images (compare existing IDs with current gallery_urls)
+        if (draft.id && packageId) {
+          const currentIds = draft.gallery_urls.map(g => g.id).filter(Boolean);
+          if (currentIds.length > 0 || draft.gallery_urls.length === 0) {
+            const { data: existing } = await supabase.from('catering_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false);
+            const existingIds = (existing ?? []).map((e: any) => e.id);
+            const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
+            if (toDelete.length > 0) {
+              await supabase.from('catering_gallery' as any).delete().in('id', toDelete);
+            }
+          }
         }
       }
 
@@ -468,6 +523,67 @@ function StepBasicInfo({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft)
               <option value="archived">Archived</option>
             </select>
           </label>
+
+          {/* Cover Photo */}
+          <div className="sm:col-span-2">
+            <span className="text-sm font-semibold text-[#4b1d2b]">Cover Photo</span>
+            <p className="text-xs text-stone-500 mb-2">Recommended: 1600×900px, JPG/PNG/WEBP, max 5MB</p>
+            {(draft.cover_file || draft.cover_url) ? (
+              <div className="relative rounded-xl overflow-hidden border border-[#eadfcf] bg-stone-50">
+                <img src={draft.cover_file ? URL.createObjectURL(draft.cover_file) : draft.cover_url} alt="Cover" className="w-full h-40 object-cover" />
+                <button type="button" onClick={() => setDraft({ ...draft, cover_file: null, cover_url: '' })}
+                  className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d8b77b] bg-[#fffdf9] p-6 transition hover:border-[#8b1538] hover:bg-[#fbf0e4]">
+                <Upload className="h-6 w-6 text-[#8b1538] mb-2" />
+                <span className="text-sm font-semibold text-[#4b1d2b]">Upload cover photo</span>
+                <span className="text-xs text-stone-500 mt-1">Drag & drop or click to browse</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f && f.size <= 5*1024*1024) setDraft({ ...draft, cover_file: f }); else if (f) toast.error('Max 5MB'); }} />
+              </label>
+            )}
+          </div>
+
+          {/* Gallery */}
+          <div className="sm:col-span-2">
+            <span className="text-sm font-semibold text-[#4b1d2b]">Package Gallery</span>
+            <p className="text-xs text-stone-500 mb-2">Upload photos of your food, buffet setup, and events (max 8 images)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {/* Existing images */}
+              {draft.gallery_urls.map((img, i) => (
+                <div key={img.id || i} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50">
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => setDraft({ ...draft, gallery_urls: draft.gallery_urls.filter((_, idx) => idx !== i) })}
+                    className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {/* New file previews */}
+              {draft.gallery_files.map((f, i) => (
+                <div key={`new-${i}`} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50">
+                  <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                  <span className="absolute top-1 left-1 rounded-full bg-[#f4d58d] px-1.5 py-0.5 text-[9px] font-bold text-[#62132d]">NEW</span>
+                  <button type="button" onClick={() => setDraft({ ...draft, gallery_files: draft.gallery_files.filter((_, idx) => idx !== i) })}
+                    className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {/* Upload button */}
+              {(draft.gallery_urls.length + draft.gallery_files.length) < 8 && (
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d8b77b] bg-[#fffdf9] aspect-square transition hover:border-[#8b1538]">
+                  <Plus className="h-5 w-5 text-[#8b1538]" />
+                  <span className="text-[10px] text-stone-500 mt-1">Add photo</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
+                    onChange={e => { const files = Array.from(e.target.files ?? []).filter(f => f.size <= 5*1024*1024).slice(0, 8 - draft.gallery_urls.length - draft.gallery_files.length); if (files.length) setDraft({ ...draft, gallery_files: [...draft.gallery_files, ...files] }); }} />
+                </label>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
