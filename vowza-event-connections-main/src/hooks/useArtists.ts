@@ -9,6 +9,7 @@ import { artistCategories } from '@/data/artistCategories';
 
 export interface ArtistFilters {
   category?:   string;
+  categories?: string[]; // multiple allowed professions (for event filtering)
   search?:     string;
   city?:       string;
   state?:      string;
@@ -138,6 +139,11 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       });
 
       // Step 4 — Client-side filters
+      // Filter by multiple allowed professions (event-based filtering)
+      if (filters.categories && filters.categories.length > 0) {
+        artists = artists.filter(a => filters.categories!.includes(a.profession));
+      }
+
       if (filters.search) {
         const q = filters.search.toLowerCase();
         artists = artists.filter(a =>

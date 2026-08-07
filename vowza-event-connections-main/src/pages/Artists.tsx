@@ -11,6 +11,7 @@ import {
   LayoutGrid, List, ArrowRight, Filter,
 } from "lucide-react";
 import { useArtists, useCategories, type ArtistFilters, type Artist } from "@/hooks/useArtists";
+import { getCategoriesForEvent, getEventName } from "@/data/eventCategoryMap";
 import { toast } from "sonner";
 
 const cities = ["Hyderabad","Bangalore","Mumbai","Delhi","Chennai","Pune","Kolkata","Ahmedabad","Jaipur","Lucknow","Kochi","Indore","Nagpur","Vizag","Vijayawada"];
@@ -182,6 +183,7 @@ const Artists = () => {
 
   const filters: ArtistFilters = {
     category:   categoryParam || undefined,
+    categories: (!categoryParam && eventCategories) ? eventCategories : undefined,
     search:     search        || undefined,
     city:       city          || undefined,
     budgetMin:  budget ? parseInt(budget.split("-")[0]) : undefined,
@@ -210,24 +212,42 @@ const Artists = () => {
 
   const categoryLabel = categoryParam
     ? (categories.find((c: any) => c.profession_type === categoryParam || c.id === categoryParam) as any)?.name || categoryParam
+    : eventParam ? (getEventName(eventParam) || eventParam) + " Artists"
     : "All Artists";
+
+  // Get event-specific categories for the sidebar filter
+  const eventCategories = eventParam ? getCategoriesForEvent(eventParam) : null;
+  const filteredSidebarCategories = eventCategories
+    ? (categories as any[]).filter((c: any) => eventCategories.includes(c.profession_type || c.id))
+    : (categories as any[]);
 
   // ── Sidebar content (shared desktop + mobile) ──────────────────────────────
   const SidebarContent = () => (
     <div className="space-y-0">
+      {/* Event indicator */}
+      {eventParam && getEventName(eventParam) && (
+        <div className="mb-4 px-3 py-2.5 rounded-xl bg-maroon/5 border border-maroon/15">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-maroon/70 mb-1">Event Filter</p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-maroon">{getEventName(eventParam)}</span>
+            <button onClick={() => navigate('/artists')} className="text-[10px] text-muted-foreground hover:text-maroon underline">Clear</button>
+          </div>
+        </div>
+      )}
+
       {/* Category */}
-      <FilterBlock title="Category">
+      <FilterBlock title={eventParam ? "Services for this event" : "Category"}>
         <div className="space-y-1">
           <button
-            onClick={() => navigate("/artists")}
+            onClick={() => navigate(eventParam ? `/artists?event=${eventParam}` : "/artists")}
             className={cn("w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors", !categoryParam ? "bg-maroon/8 text-maroon" : "text-muted-foreground hover:bg-secondary")}
           >
-            All Categories
+            {eventParam ? "All Event Services" : "All Categories"}
           </button>
-          {(categories as any[]).slice(0, 12).map((c: any) => (
+          {filteredSidebarCategories.slice(0, 16).map((c: any) => (
             <button
               key={c.id}
-              onClick={() => navigate(`/artists?category=${c.profession_type || c.id}`)}
+              onClick={() => navigate(`/artists?${eventParam ? `event=${eventParam}&` : ''}category=${c.profession_type || c.id}`)}
               className={cn("w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-between",
                 categoryParam === (c.profession_type || c.id) ? "bg-maroon/8 text-maroon" : "text-muted-foreground hover:bg-secondary")}
             >
