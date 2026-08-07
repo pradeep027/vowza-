@@ -30,6 +30,7 @@ interface BookingModalProps {
     price_max: number | null;
   };
   providerName: string;
+  selectedPackage?: any;
 }
 
 type Step = 'calendar' | 'details' | 'confirm';
@@ -40,7 +41,7 @@ interface ValidationErrors {
   amount?: string;
 }
 
-const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalProps) => {
+const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage }: BookingModalProps) => {
   const [step,              setStep]             = useState<Step>('calendar');
   const [eventTypes,        setEventTypes]        = useState<EventType[]>([]);
   const [isLoading,         setIsLoading]         = useState(false);
@@ -92,7 +93,8 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
       supabase.from('event_types').select('id, name').order('name').then(({ data }) => {
         if (data) setEventTypes(data);
       });
-      if (provider.price_min) setAmount(provider.price_min.toString());
+      if (selectedPackage?.price) setAmount(String(selectedPackage.price));
+      else if (provider.price_min) setAmount(provider.price_min.toString());
     }
   }, [isOpen, provider.price_min]);
 
@@ -237,7 +239,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
       <DialogContent className="w-[92vw] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold bg-gradient-to-r from-gold to-maroon bg-clip-text text-transparent">
-            Book {providerName}
+            {selectedPackage ? `Book: ${selectedPackage.name}` : `Book ${providerName}`}
           </DialogTitle>
           <DialogDescription>
             {step === 'calendar' && 'Select an available date on the calendar'}
@@ -260,6 +262,20 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
           ))}
           <span className="text-xs text-muted-foreground ml-auto capitalize">{step}</span>
         </div>
+
+        {/* Selected Package Banner */}
+        {selectedPackage && (
+          <div className="p-3 rounded-xl bg-[#8B1538]/5 border border-[#8B1538]/15 mb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">{selectedPackage.name}</p>
+                {selectedPackage.duration && <p className="text-xs text-muted-foreground mt-0.5">Duration: {selectedPackage.duration}</p>}
+                {selectedPackage.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{selectedPackage.description}</p>}
+              </div>
+              <p className="text-lg font-bold text-[#8B1538] flex-shrink-0">₹{Number(selectedPackage.price).toLocaleString()}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── STEP 1: Calendar ────────────────────────────────────────── */}
         {step === 'calendar' && (
@@ -479,15 +495,16 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
 
             {/* Amount */}
             <div className="space-y-1.5">
-              <Label className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" />Offered Amount (₹) *</Label>
+              <Label className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" />{selectedPackage ? 'Package Price (₹)' : 'Offered Amount (₹) *'}</Label>
               <Input type="number" min={provider.price_min || 0}
                 placeholder={`Min: ₹${provider.price_min?.toLocaleString() || '0'}`}
-                value={amount} onChange={e => { setAmount(e.target.value); if (validationErrors.amount) setValidationErrors(prev => ({ ...prev, amount: undefined })); }}
-                className={`border-border focus:border-gold ${validationErrors.amount ? 'border-red-500 focus:border-red-500' : ''}`} />
+                value={amount} onChange={e => { if (!selectedPackage) { setAmount(e.target.value); if (validationErrors.amount) setValidationErrors(prev => ({ ...prev, amount: undefined })); } }}
+                readOnly={!!selectedPackage}
+                className={`border-border focus:border-gold ${validationErrors.amount ? 'border-red-500 focus:border-red-500' : ''} ${selectedPackage ? 'bg-muted cursor-not-allowed' : ''}`} />
               {validationErrors.amount && (
                 <p className="text-xs text-red-500 mt-1">{validationErrors.amount}</p>
               )}
-              {provider.price_min && provider.price_max && (
+              {!selectedPackage && provider.price_min && provider.price_max && (
                 <p className="text-xs text-muted-foreground">
                   Suggested: ₹{provider.price_min.toLocaleString()} – ₹{provider.price_max.toLocaleString()}
                 </p>
@@ -511,6 +528,7 @@ const BookingModal = ({ isOpen, onClose, provider, providerName }: BookingModalP
               <h3 className="font-semibold text-foreground">Booking Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Artist</span><span className="font-medium text-right min-w-0 break-words">{providerName}</span></div>
+                {selectedPackage && <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Package</span><span className="font-medium text-right min-w-0 break-words">{selectedPackage.name}</span></div>}
                 <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span className="font-medium">{fmtDate(eventDate)}</span></div>
                 {eventTime && <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-medium">{eventTime} ({duration} hrs)</span></div>}
                 {eventTypeName && <div className="flex items-start justify-between gap-4"><span className="text-muted-foreground flex-shrink-0">Event</span><span className="font-medium text-right min-w-0 break-words">{eventTypeName}</span></div>}

@@ -196,7 +196,8 @@ const ProviderProfile = () => {
     }
   };
 
-  const handleBookNow = () => { if (!user) { toast.error("Please login"); navigate("/auth"); return; } setShowBooking(true); };
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const handleBookNow = (pkg?: any) => { if (!user) { toast.error("Please login"); navigate("/auth"); return; } setSelectedPackage(pkg || null); setShowBooking(true); };
 
   const submitReview = async () => {
     if (!user) { toast.error("Login to review"); return; }
@@ -416,7 +417,7 @@ const ProviderProfile = () => {
                           <p className="text-2xl font-bold text-foreground">{fmt(provider.price_min || 0)}{provider.price_max ? ` – ${fmt(provider.price_max)}` : "+"}</p>
                           <p className="text-xs text-muted-foreground mt-1">Starting price</p>
                         </div>
-                        <button onClick={handleBookNow} className="btn-gold text-sm py-2.5">Book Package</button>
+                        <button onClick={() => handleBookNow()} className="btn-gold text-sm py-2.5">Book Package</button>
                       </div>
                     ) : <p className="text-sm text-muted-foreground text-center py-8">Pricing available on request.</p>
                   ) : (
@@ -435,7 +436,7 @@ const ProviderProfile = () => {
                               ))}
                             </ul>
                           )}
-                          <button onClick={handleBookNow} className={cn("w-full py-2.5 rounded-xl text-xs font-semibold", i === 1 ? "btn-gold" : "btn-outline")}>
+                          <button onClick={() => handleBookNow(pkg)} className={cn("w-full py-2.5 rounded-xl text-xs font-semibold", i === 1 ? "btn-gold" : "btn-outline")}>
                             Book Package
                           </button>
                         </div>
@@ -586,7 +587,7 @@ const ProviderProfile = () => {
         </div>
       </main>
 
-      {provider && profile && <BookingModal isOpen={showBooking} onClose={() => setShowBooking(false)} provider={{ id: provider.id, price_min: provider.price_min || 0, price_max: provider.price_max || 0 }} providerName={profile.full_name} />}
+      {provider && profile && <BookingModal isOpen={showBooking} onClose={() => { setShowBooking(false); setSelectedPackage(null); }} provider={{ id: provider.id, price_min: provider.price_min || 0, price_max: provider.price_max || 0 }} providerName={profile.full_name} selectedPackage={selectedPackage} />}
 
       {activeGallery && (
         <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={() => setActiveGallery(null)}>
