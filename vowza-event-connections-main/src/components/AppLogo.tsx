@@ -47,9 +47,9 @@ export interface AppLogoProps {
 }
 
 const MARK_SIZE: Record<Size, string> = {
-  sm: 'w-7 h-7',
-  md: 'w-8 h-8',
-  lg: 'w-8 h-8 md:w-9 md:h-9',
+  sm: 'w-6 h-6',
+  md: 'w-7 h-7',
+  lg: 'w-7 h-7 md:w-8 md:h-8',
 };
 
 const ICON_SIZE: Record<Size, string> = {
@@ -94,18 +94,8 @@ const AppLogo = memo(function AppLogo({
 
   const content = (
     <>
-      {/* Mark */}
-      <span
-        className={cn(
-          'rounded-xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37]',
-          'flex items-center justify-center flex-shrink-0',
-          'shadow-sm transition-shadow duration-[250ms]',
-          !isStatic && 'group-hover:shadow-md',
-          MARK_SIZE[size],
-        )}
-      >
-        <VowzaIcon className={cn('text-white', ICON_SIZE[size])} aria-hidden="true" />
-      </span>
+      {/* Mark — raw V icon, no container */}
+      <VowzaIcon className={cn('flex-shrink-0', MARK_SIZE[size])} />
 
       {/* Wordmark */}
       {showText && (

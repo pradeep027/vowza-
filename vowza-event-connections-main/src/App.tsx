@@ -88,11 +88,7 @@ const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"))
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-4">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-gold flex items-center justify-center shadow-gold animate-pulse">
-        <svg className="w-6 h-6 text-foreground" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none" />
-        </svg>
-      </div>
+      <img src="/favicon.svg" alt="Vowza" className="w-12 h-12 animate-pulse" />
       <div className="flex gap-1.5">
         {[0,1,2].map(i => (
           <div key={i} className="w-2 h-2 rounded-full bg-gold animate-bounce"

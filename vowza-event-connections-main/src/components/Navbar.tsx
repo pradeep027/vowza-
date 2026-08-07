@@ -604,9 +604,7 @@ const Navbar = () => {
                 to="/ai-planner"
                 className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-gold/10 to-maroon/5 border border-gold/20 text-sm font-semibold text-foreground hover:from-gold/15 transition-colors"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-gold flex items-center justify-center">
-                  <VowzaIcon className="w-4 h-4 text-white" />
-                </div>
+                <VowzaIcon className="w-7 h-7 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-sm">Vowza AI Planner</p>
                   <p className="text-xs text-muted-foreground">Plan your full event with AI</p>

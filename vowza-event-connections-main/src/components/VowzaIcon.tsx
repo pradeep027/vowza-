@@ -1,24 +1,22 @@
-// ─── VowzaIcon — Reusable Vowza "V" logo component ───────────────────────────
-// Replaces all Sparkles/star icons across the app with the official Vowza logo.
-// Single source of truth: update this file to change the icon everywhere.
+// ─── VowzaIcon — Raw "V" mark only, no background/container ──────────────────
+// Renders ONLY the gold V letterform on a transparent background.
+// No rounded square, no blue background, no border, no wrapper.
+// Used as a direct inline icon replacement throughout the app.
 
 interface VowzaIconProps {
   className?: string;
-  size?: number;
 }
 
-const VowzaIcon = ({ className = "w-4 h-4", size }: VowzaIconProps) => (
+const VowzaIcon = ({ className = "w-4 h-4" }: VowzaIconProps) => (
   <svg
-    viewBox="0 0 512 512"
+    viewBox="0 0 400 360"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className={className}
-    style={size ? { width: size, height: size } : undefined}
     aria-hidden="true"
   >
-    <rect width="512" height="512" rx="96" fill="#1B4FE8" />
-    <path d="M108 80L256 432L404 80H320L256 260L192 80H108Z" fill="#EFBF04" />
-    <path d="M256 260L286 180L320 80H286L256 160L256 260Z" fill="#D4A800" opacity="0.55" />
+    <path d="M20 10L200 350L380 10H296L200 220L104 10H20Z" fill="#EFBF04" />
+    <path d="M200 220L240 130L296 10H256L200 130V220Z" fill="#D4A800" opacity="0.6" />
   </svg>
 );
 

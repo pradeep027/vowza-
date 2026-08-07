@@ -22,9 +22,7 @@ function AdminLoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-maroon flex items-center justify-center shadow-maroon animate-pulse">
-          <VowzaIcon className="w-7 h-7 text-white" />
-        </div>
+        <VowzaIcon className="w-12 h-12 animate-pulse" />
         <div className="flex gap-1.5">
           {[0, 1, 2].map(i => (
             <div
@@ -44,9 +42,7 @@ function GeneralLoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-gold animate-pulse flex items-center justify-center">
-          <VowzaIcon className="w-5 h-5 text-foreground" />
-        </div>
+        <VowzaIcon className="w-10 h-10 animate-pulse" />
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     </div>
