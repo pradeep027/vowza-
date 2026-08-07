@@ -475,29 +475,62 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
     queryFn: async () => {
       if (!vendorId) return [];
 
-      let q = supabase.from('bookings')
+      // Map UI status → DB values
+      const statusMap: Record<string, string[]> = {
+        requested: ['requested', 'pending'],
+        confirmed: ['confirmed', 'accepted'],
+        completed: ['completed'],
+        cancelled: ['cancelled', 'rejected'],
+      };
+      const statusValues = status ? (statusMap[status] ?? [status]) : undefined;
+
+      // Query 1: Generic bookings table
+      let q1 = supabase.from('bookings')
         .select('*')
         .eq('provider_id', vendorId)
         .order('created_at', { ascending: false });
+      if (statusValues) q1 = q1.in('status', statusValues);
+      const { data: genericBookings } = await q1;
 
-      if (status) {
-        // Map UI status → DB values
-        const map: Record<string, string[]> = {
-          requested: ['requested', 'pending'],
-          confirmed: ['confirmed', 'accepted'],
-          completed: ['completed'],
-          cancelled: ['cancelled', 'rejected'],
-        };
-        q = q.in('status', map[status] ?? [status]);
-      }
+      // Query 2: Photography package bookings table
+      let q2 = supabase.from('photography_package_bookings' as any)
+        .select('*, photography_packages(name, photography_type)')
+        .eq('photographer_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q2 = q2.in('status', statusValues);
+      const { data: photoBookings } = await q2;
 
-      const { data, error } = await q;
-      if (error) throw error;
-      const bookings = (data ?? []) as any[];
-      if (bookings.length === 0) return [];
+      // Normalize photography bookings to match generic booking shape
+      const normalizedPhotoBookings = (photoBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.photographer_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        venue_address: b.venue,
+        venue_city: b.venue?.split(',').pop()?.trim() || '',
+        requirements: b.notes,
+        amount: b.total_amount,
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.photography_packages?.name || 'Photography Package',
+        photography_type: b.photography_packages?.photography_type,
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        album_amount: b.album_amount,
+        _source: 'photography',
+      }));
+
+      // Combine both lists
+      const allBookings = [
+        ...(genericBookings ?? []).map((b: any) => ({ ...b, _source: 'generic' })),
+        ...normalizedPhotoBookings,
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      if (allBookings.length === 0) return [];
 
       // Enrich with customer profiles
-      const customerIds = [...new Set(bookings.map(b => b.customer_id).filter(Boolean))];
+      const customerIds = [...new Set(allBookings.map(b => b.customer_id).filter(Boolean))];
       const profileMap = new Map<string, any>();
       if (customerIds.length > 0) {
         const { data: profiles } = await supabase.from('profiles')
@@ -506,8 +539,8 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
       }
 
-      // Enrich with package names
-      const pkgIds = [...new Set(bookings.map(b => b.package_id).filter(Boolean))];
+      // Enrich generic bookings with package names
+      const pkgIds = [...new Set(allBookings.filter(b => b._source === 'generic' && b.package_id).map(b => b.package_id))];
       const pkgMap = new Map<string, any>();
       if (pkgIds.length > 0) {
         const { data: pkgs } = await supabase.from('pricing_packages' as any)
@@ -516,10 +549,10 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         (pkgs ?? []).forEach((p: any) => pkgMap.set(p.id, p));
       }
 
-      return bookings.map(b => ({
+      return allBookings.map(b => ({
         ...b,
         customer: profileMap.get(b.customer_id) ?? null,
-        package_name: pkgMap.get(b.package_id)?.name ?? null,
+        package_name: b.package_name || pkgMap.get(b.package_id)?.name || null,
       }));
     },
     enabled: !!vendorId,

@@ -47,12 +47,14 @@ export default function VendorBookings() {
     setBusy(booking.id);
     // Map UI status to valid database enum values
     const dbStatus = newStatus === 'confirmed' ? 'accepted' : 'cancelled';
+
+    // Determine which table to update based on booking source
+    const table = booking._source === 'photography' ? 'photography_package_bookings' : 'bookings';
+    const updatePayload: any = { status: dbStatus };
+    if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
     const { error } = await supabase
-      .from('bookings')
-      .update({
-        status: dbStatus,
-        updated_at: new Date().toISOString(),
-      } as any)
+      .from(table as any)
+      .update(updatePayload)
       .eq('id', booking.id);
 
     if (error) {
