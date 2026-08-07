@@ -165,8 +165,9 @@ const Artists = () => {
   const [searchParams] = useSearchParams();
   const navigate        = useNavigate();
   const categoryParam   = searchParams.get("category") || "";
+  const eventParam      = searchParams.get("event") || "";
 
-  const [search,      setSearch]      = useState(searchParams.get("search") || "");
+  const [search,      setSearch]      = useState(searchParams.get("search") || eventParam || "");
   const [city,        setCity]        = useState(searchParams.get("city")   || "");
   const [budget,      setBudget]      = useState("");
   const [rating,      setRating]      = useState("");
