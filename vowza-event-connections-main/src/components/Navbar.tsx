@@ -9,7 +9,7 @@ import {
   ChevronDown, User, LogOut, LayoutDashboard, BookOpen,
   Camera, Music, Disc3, Palette, Mic2, Users, Utensils,
   Wand2, Star, Zap, MapPin, CalendarDays, ArrowRight,
-  BadgeCheck, UserPlus,
+  BadgeCheck, UserPlus, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useDashboardLink } from "@/hooks/useDashboardLink";
 import AppLogo from "@/components/AppLogo";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 // ── Mega menu data ─────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ const Navbar = () => {
   const [searchOpen,   setSearchOpen]   = useState(false);
   const [searchQuery,  setSearchQuery]  = useState("");
   const [profileOpen,  setProfileOpen]  = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const { user, signOut, isProvider, rolesLoaded } = useAuth();
   const { dashboardLink } = useDashboardLink();
@@ -110,6 +113,66 @@ const Navbar = () => {
   }, []);
 
   const isActive = (path: string) => location.pathname === path;
+
+  // ── Debounced live search ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const q = searchQuery.trim().toLowerCase();
+        const { data: providers } = await supabase
+          .from('provider_profiles')
+          .select('id, user_id, profession, stage_name, average_rating, is_verified, bio')
+          .in('verification_status', ['approved', 'verified'])
+          .eq('is_published', true)
+          .limit(8);
+
+        if (!providers || providers.length === 0) {
+          setSearchResults([]);
+          setSearching(false);
+          return;
+        }
+
+        const userIds = providers.map(p => p.user_id).filter(Boolean);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, city')
+          .in('id', userIds);
+
+        const profileMap = new Map((profiles ?? []).map(p => [p.id, p]));
+
+        const results = providers.map(p => ({
+          id: p.id,
+          name: (profileMap.get(p.user_id) as any)?.full_name || p.stage_name || 'Artist',
+          avatar: (profileMap.get(p.user_id) as any)?.avatar_url || null,
+          city: (profileMap.get(p.user_id) as any)?.city || '',
+          profession: p.profession,
+          rating: p.average_rating || 0,
+          verified: p.is_verified,
+          bio: p.bio || '',
+          stage_name: p.stage_name || '',
+        })).filter(r =>
+          r.name.toLowerCase().includes(q) ||
+          r.profession.toLowerCase().includes(q) ||
+          r.city.toLowerCase().includes(q) ||
+          r.bio.toLowerCase().includes(q) ||
+          r.stage_name.toLowerCase().includes(q) ||
+          r.profession.replace(/_/g, ' ').toLowerCase().includes(q)
+        );
+
+        setSearchResults(results);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleSearch = useCallback((q: string) => {
     if (!q.trim()) return;
@@ -302,18 +365,68 @@ const Navbar = () => {
                         </button>
                       )}
                     </div>
-                    <div className="p-3">
-                      <p className="text-xs text-muted-foreground font-medium px-2 mb-2 uppercase tracking-wide">Quick searches</p>
-                      {quickSuggestions.map(s => (
-                        <button
-                          key={s}
-                          onClick={() => handleSearch(s)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors text-left"
-                        >
-                          <Search className="w-3.5 h-3.5 flex-shrink-0" />
-                          {s}
-                        </button>
-                      ))}
+                    <div className="p-3 max-h-[400px] overflow-y-auto">
+                      {/* Loading spinner */}
+                      {searching && (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+
+                      {/* Live search results */}
+                      {!searching && searchQuery.length >= 2 && searchResults.length > 0 && (
+                        <>
+                          <p className="text-xs text-muted-foreground font-medium px-2 mb-2 uppercase tracking-wide">Results</p>
+                          {searchResults.map(r => (
+                            <button
+                              key={r.id}
+                              onClick={() => { navigate(`/artist/${r.id}`); setSearchOpen(false); setSearchQuery(''); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary transition-colors text-left"
+                            >
+                              <div className="w-9 h-9 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                                {r.avatar ? <img src={r.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-muted-foreground">{r.name.charAt(0)}</div>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm font-medium text-foreground truncate">{r.name}</span>
+                                  {r.verified && <BadgeCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span className="capitalize">{r.profession.replace(/_/g, ' ')}</span>
+                                  {r.city && <><span>·</span><span>{r.city}</span></>}
+                                  {r.rating > 0 && <><span>·</span><span className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{r.rating.toFixed(1)}</span></>}
+                                </div>
+                              </div>
+                              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            </button>
+                          ))}
+                        </>
+                      )}
+
+                      {/* No results state */}
+                      {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+                        <div className="py-6 text-center">
+                          <p className="text-sm text-muted-foreground mb-1">No artists found for "{searchQuery}"</p>
+                          <p className="text-xs text-muted-foreground">Try a different keyword or <button onClick={() => { navigate('/artists'); setSearchOpen(false); setSearchQuery(''); }} className="text-maroon font-medium hover:underline">browse all artists</button></p>
+                        </div>
+                      )}
+
+                      {/* Quick searches — shown only when no active search */}
+                      {(!searchQuery || searchQuery.length < 2) && (
+                        <>
+                          <p className="text-xs text-muted-foreground font-medium px-2 mb-2 uppercase tracking-wide">Quick searches</p>
+                          {quickSuggestions.map(s => (
+                            <button
+                              key={s}
+                              onClick={() => handleSearch(s)}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors text-left"
+                            >
+                              <Search className="w-3.5 h-3.5 flex-shrink-0" />
+                              {s}
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                     <div className="px-4 py-2.5 border-t border-border/40">
                       <button
