@@ -4,12 +4,64 @@ import { Camera, Check, ShoppingCart, X } from 'lucide-react'; import { useNavig
 type Selection = { addons: string[]; albumId: string | null };
 export default function PhotographerPackages({ provider, profile }: { provider: any; profile: any }) {
  const { user } = useAuth(); const nav = useNavigate(); const qc = useQueryClient(); const [selection, setSelection] = useState<Record<string, Selection>>({}); const [detail, setDetail] = useState<any>(null); const [busy, setBusy] = useState<string | null>(null);
+ const [cartCount, setCartCount] = useState(0);
+ useEffect(() => {
+  if (!user) return;
+  supabase.from('photography_carts' as any).select('id, photography_cart_items(id)').eq('customer_id', user.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle().then(({ data }) => {
+    setCartCount(data?.photography_cart_items?.length ?? 0);
+  });
+ }, [user, provider.id, busy]);
  const { data: rows = [], isLoading } = useQuery({ queryKey: ['public-photography-packages', provider.id], queryFn: async () => { const r = await supabase.from('photography_packages' as any).select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)').eq('photographer_id', provider.id).eq('is_active', true).eq('is_visible', true).eq('status', 'published').order('created_at'); if (r.error) throw r.error; return r.data ?? []; } });
  useEffect(() => { const c = supabase.channel(`public-photography-${provider.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_packages', filter: `photographer_id=eq.${provider.id}` }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_package_images' }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_albums' }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).subscribe(); return () => { supabase.removeChannel(c); }; }, [provider.id]);
  const choose = (p: any) => selection[p.id] ?? { addons: [], albumId: null }; const setChoose = (p: any, value: Selection) => setSelection(s => ({ ...s, [p.id]: value }));
- const add = async (p: any, checkout = false) => { if (!user) { toast.error('Please log in to continue'); return nav('/auth'); } setBusy(p.id); const s = choose(p); const { data: cartId, error } = await supabase.rpc('add_photography_cart_item' as any, { p_package_id: p.id, p_addon_ids: s.addons, p_album_id: s.albumId }); setBusy(null); if (error) return toast.error(error.message); sessionStorage.setItem('vowza_photography_checkout', JSON.stringify({ cartId, providerName: profile.full_name })); toast.success(checkout ? 'Ready for secure checkout.' : 'Added to your photography cart.'); if (checkout) nav('/checkout?photography=1'); };
+ const add = async (p: any, checkout = false) => {
+  if (!user) { toast.error('Please log in to continue'); return nav('/auth'); }
+  setBusy(p.id);
+  const s = choose(p);
+
+  if (checkout) {
+    // BOOK NOW: Clear existing cart items first, then add only this package
+    const { data: existingCart } = await supabase
+      .from('photography_carts' as any)
+      .select('id')
+      .eq('customer_id', user.id)
+      .eq('photographer_id', provider.id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (existingCart) {
+      // Delete all items from existing cart
+      await supabase.from('photography_cart_items' as any).delete().eq('cart_id', existingCart.id);
+    }
+  }
+
+  const { data: cartId, error } = await supabase.rpc('add_photography_cart_item' as any, { p_package_id: p.id, p_addon_ids: s.addons, p_album_id: s.albumId });
+  setBusy(null);
+  if (error) return toast.error(error.message);
+  sessionStorage.setItem('vowza_photography_checkout', JSON.stringify({ cartId, providerName: profile.full_name }));
+
+  if (checkout) {
+    toast.success('Proceeding to checkout...');
+    nav('/checkout?photography=1');
+  } else {
+    toast.success('Added to cart! View cart from the menu to checkout.');
+  }
+ };
  if (isLoading) return <div className="h-48 animate-pulse rounded-2xl bg-muted" />; if (!rows.length) return <div className="rounded-2xl border bg-surface-1 p-10 text-center text-sm text-muted-foreground">This photographer has not published packages yet.</div>;
- return <div className="space-y-5"><div><h2 className="text-xl font-bold">Photography Packages</h2><p className="text-sm text-muted-foreground">Choose coverage, then add optional albums and extras before booking.</p></div><div className="grid gap-4 md:grid-cols-2">{rows.map((p: any) => <Card key={p.id} p={p} value={choose(p)} setValue={(v: Selection) => setChoose(p, v)} view={() => setDetail(p)} add={() => add(p)} book={() => add(p, true)} busy={busy === p.id} />)}</div>{detail && <Detail p={detail} value={choose(detail)} setValue={(v: Selection) => setChoose(detail, v)} close={() => setDetail(null)} add={() => add(detail)} book={() => add(detail, true)} busy={busy === detail.id} />}</div>;
+ return <div className="space-y-5"><div><h2 className="text-xl font-bold">Photography Packages</h2><p className="text-sm text-muted-foreground">Choose coverage, then add optional albums and extras before booking.</p></div><div className="grid gap-4 md:grid-cols-2">{rows.map((p: any) => <Card key={p.id} p={p} value={choose(p)} setValue={(v: Selection) => setChoose(p, v)} view={() => setDetail(p)} add={() => add(p)} book={() => add(p, true)} busy={busy === p.id} />)}</div>{cartCount > 0 && (
+  <div className="sticky bottom-4 z-40 flex justify-center">
+    <button onClick={async () => {
+      const { data } = await supabase.from('photography_carts' as any).select('id').eq('customer_id', user!.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle();
+      if (data) {
+        sessionStorage.setItem('vowza_photography_checkout', JSON.stringify({ cartId: data.id, providerName: profile.full_name }));
+        nav('/checkout?photography=1');
+      }
+    }} className="flex items-center gap-2 rounded-2xl bg-[#8B1538] px-6 py-3.5 text-sm font-bold text-white shadow-2xl hover:bg-[#70102d] transition-colors">
+      <ShoppingCart className="h-4 w-4" />
+      View Cart ({cartCount} {cartCount === 1 ? 'package' : 'packages'}) — Checkout
+    </button>
+  </div>
+)}{detail && <Detail p={detail} value={choose(detail)} setValue={(v: Selection) => setChoose(detail, v)} close={() => setDetail(null)} add={() => add(detail)} book={() => add(detail, true)} busy={busy === detail.id} />}</div>;
 }
 const total = (p: any, s: Selection) => Number(p.price) + (p.photography_package_addons ?? []).filter((a: any) => s.addons.includes(a.id)).reduce((n: number, a: any) => n + Number(a.price), 0) + Number((p.photography_albums ?? []).find((a: any) => a.id === s.albumId)?.price ?? 0);
 function Options({ p, value, setValue }: any) { const activeAlbums = (p.photography_albums ?? []).filter((a: any) => a.is_active); return <div className="mt-3 space-y-2 text-xs">{activeAlbums.length > 0 && <fieldset><legend className="mb-1 font-semibold">Optional album</legend><label className="mr-3"><input type="radio" checked={!value.albumId} onChange={() => setValue({ ...value, albumId: null })} /> No album</label>{activeAlbums.map((a: any) => <label key={a.id} className="mr-3 inline-block"><input type="radio" checked={value.albumId === a.id} onChange={() => setValue({ ...value, albumId: a.id })} /> {a.type} · {a.size} · {a.pages} pages (+₹{Number(a.price).toLocaleString('en-IN')})</label>)}</fieldset>}{(p.photography_package_addons ?? []).filter((a: any) => a.is_active).map((a: any) => <label key={a.id} className="flex justify-between rounded-lg bg-secondary p-2"><span><input type="checkbox" checked={value.addons.includes(a.id)} onChange={() => setValue({ ...value, addons: value.addons.includes(a.id) ? value.addons.filter((id: string) => id !== a.id) : [...value.addons, a.id] })} /> <b>{a.name}</b>{a.description && ` — ${a.description}`}</span><b>+₹{Number(a.price).toLocaleString('en-IN')}</b></label>)}</div>; }
