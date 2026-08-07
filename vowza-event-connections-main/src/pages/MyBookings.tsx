@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AvailabilityCalendar from '@/components/booking/AvailabilityCalendar';
 import { checkDateAvailable } from '@/hooks/useAvailability';
+import AppLogo from '@/components/AppLogo';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Calendar, Clock, MapPin, Sparkles,
