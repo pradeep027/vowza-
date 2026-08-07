@@ -468,6 +468,112 @@
   /* Text balance */
   .text-balance { text-wrap: balance; }
   .text-pretty  { text-wrap: pretty; }
+
+  /* ── Premium Micro-Interactions ──────────────────────────────────────── */
+
+  /* Golden shimmer sweep — for AI Planner and premium CTAs */
+  @keyframes golden-shimmer {
+    0%, 85%  { background-position: -200% 0; }
+    100%     { background-position: 200% 0; }
+  }
+  .shimmer-gold {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer-gold::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      hsl(40 95% 62% / 0.12) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: golden-shimmer 7s ease-in-out infinite;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Slow glow pulse (10-12s) for hero background orbs */
+  @keyframes glow-pulse-slow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 0.8; transform: scale(1.06); }
+  }
+  .animate-glow-pulse-slow { animation: glow-pulse-slow 11s ease-in-out infinite; }
+
+  /* Premium card hover — lift + scale + shadow */
+  .hover-lift {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  .hover-lift:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 0 20px 50px -12px hsl(0 0% 0% / 0.15),
+                0 8px 20px -8px hsl(0 0% 0% / 0.1);
+  }
+
+  /* Button hover — subtle scale with gradient brightness */
+  .hover-btn {
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+                filter 0.25s ease;
+    will-change: transform;
+  }
+  .hover-btn:hover {
+    transform: scale(1.02);
+    filter: brightness(1.05);
+  }
+  .hover-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Chip hover — lift with border glow */
+  .hover-chip {
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.3s ease,
+                border-color 0.3s ease;
+    will-change: transform;
+  }
+  .hover-chip:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 16px -4px hsl(40 95% 52% / 0.3);
+    border-color: hsl(40 95% 52% / 0.4);
+  }
+
+  /* Float subtle — for cards/elements that need gentle floating */
+  @keyframes float-subtle {
+    0%, 100% { transform: translateY(0px); }
+    50%      { transform: translateY(-7px); }
+  }
+  .animate-float-6s  { animation: float-subtle 6s ease-in-out infinite; }
+  .animate-float-7s  { animation: float-subtle 7s ease-in-out infinite; }
+  .animate-float-8s  { animation: float-subtle 8s ease-in-out infinite; }
+
+  /* Search section entrance — fade + slide + scale */
+  @keyframes search-entrance {
+    from { opacity: 0; transform: translateY(20px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-search-entrance {
+    animation: search-entrance 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ── Accessibility: Respect reduced motion ──────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .animate-float, .animate-float-6s, .animate-float-7s, .animate-float-8s,
+    .animate-glow-pulse, .animate-glow-pulse-slow, .animate-particle-drift,
+    .shimmer-gold::after {
+      animation: none !important;
+    }
+  }
 }
 
 /* ── Component overrides ──────────────────────────────────────────────────── */
