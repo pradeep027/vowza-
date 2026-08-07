@@ -5,8 +5,8 @@
 // Supports: no role check (just auth), single role, multiple roles.
 
 import { Navigate, useLocation } from 'react-router-dom';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sparkles } from 'lucide-react';
 
 // Re-export for backward compatibility with approvalService
 export { invalidateRoleCache, _roleCache as roleCache } from '@/contexts/AuthContext';
@@ -23,7 +23,7 @@ function AdminLoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
       <div className="flex flex-col items-center gap-4">
         <div className="w-14 h-14 rounded-2xl bg-gradient-maroon flex items-center justify-center shadow-maroon animate-pulse">
-          <Sparkles className="w-7 h-7 text-white" />
+          <VowzaIcon className="w-7 h-7 text-white" />
         </div>
         <div className="flex gap-1.5">
           {[0, 1, 2].map(i => (
@@ -45,7 +45,7 @@ function GeneralLoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 rounded-2xl bg-gradient-gold animate-pulse flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-foreground" />
+          <VowzaIcon className="w-5 h-5 text-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>

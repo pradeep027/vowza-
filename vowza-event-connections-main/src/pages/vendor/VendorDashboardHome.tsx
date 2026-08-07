@@ -1,23 +1,23 @@
 // VendorDashboardHome — 100% data-driven. Every value comes from Supabase.
 // Zero hardcoded, mock, sample or placeholder data.
 import { useState } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   IndianRupee, TrendingUp, CalendarDays, Star, Eye, Users,
-  Clock, Repeat, Image as ImageIcon, Package, Zap, Share2,
-  Sparkles, Plus, ChevronLeft, ChevronRight, Inbox, AlertCircle,
-  Landmark, BadgeCheck, Building2,
+  Clock, Repeat, Image as ImageIcon, Package, Zap, Share2, Plus, ChevronLeft, ChevronRight, Inbox, AlertCircle,
+  Landmark, BadgeCheck, Building2
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, Legend,
+  ResponsiveContainer, BarChart, Bar, Legend
 } from 'recharts';
 import {
   useVendorId, useVendorRealtime, useVendorKPIs, useVendorAnalytics,
   useVendorRevenueChart, useVendorBookingsChart, useVendorPortfolio,
   useVendorPackages, useVendorAvailability, useVendorInsights,
-  useVendorProfileCompletion, useVendorBankDetails,
+  useVendorProfileCompletion, useVendorBankDetails
 } from '@/hooks/useVendorData';
 import type { Period, BankDetails } from '@/hooks/useVendorData';
 
@@ -441,7 +441,7 @@ export default function VendorDashboardHome() {
                 navigator.clipboard.writeText(`${window.location.origin}/artist/${provider.id}`);
               }
             }} />
-            <QuickAction icon={Sparkles}     label="AI Assistant"     onClick={() => navigate('/vendor/ai-assistant')} />
+            <QuickAction icon={VowzaIcon}     label="AI Assistant"     onClick={() => navigate('/vendor/ai-assistant')} />
           </div>
         </div>
 
@@ -465,7 +465,7 @@ export default function VendorDashboardHome() {
       <div className="bg-gradient-to-r from-[#8B1538]/5 to-[#D4AF37]/5 rounded-2xl border border-[#8B1538]/10 p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37] flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+            <VowzaIcon className="w-4 h-4 text-white" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-foreground">AI Business Insights</h3>

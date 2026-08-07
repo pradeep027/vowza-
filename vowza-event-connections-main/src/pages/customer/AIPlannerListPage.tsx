@@ -2,18 +2,19 @@
 // Reuses conversationRepository directly (same data source as the floating
 // ConversationSidebar widget). Maintains Vowza AI branding.
 import { useState, useEffect, useCallback } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   listConversations, deleteConversation, duplicateConversation, loadMessages,
-  exportConversationAsFile,
+  exportConversationAsFile
 } from '@/lib/conversationRepository';
 import type { ConversationRow } from '@/lib/conversationTypes';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
-  Sparkles, Copy, Trash2, Download, MessageSquarePlus, PlusCircle,
+  Copy, Trash2, Download, MessageSquarePlus, PlusCircle
 } from 'lucide-react';
 
 const CONV_KEY = 'vowza_ai_conv_id';
@@ -98,7 +99,7 @@ export default function AIPlannerListPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-[#D4AF37]" /> Vowza AI Planner
+            <VowzaIcon className="w-6 h-6 text-[#D4AF37]" /> Vowza AI Planner
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Your saved event planning conversations.</p>
         </div>
@@ -124,7 +125,7 @@ export default function AIPlannerListPage() {
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37] flex items-center justify-center shrink-0">
-                    <Sparkles className="w-5 h-5 text-white" />
+                    <VowzaIcon className="w-5 h-5 text-white" />
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-foreground truncate">{conv.title}</h3>
@@ -185,7 +186,7 @@ function EmptyState({ onNewPlan }: { onNewPlan: () => void }) {
         Start a conversation with Vowza AI Planner to get personalized event planning suggestions.
       </p>
       <Button onClick={onNewPlan} className="bg-gradient-to-r from-[#8B1538] to-[#A31E42] hover:opacity-90">
-        <Sparkles className="w-4 h-4 mr-1.5" /> Generate New Plan
+        <VowzaIcon className="w-4 h-4 mr-1.5" /> Generate New Plan
       </Button>
     </motion.div>
   );

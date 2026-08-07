@@ -1,5 +1,6 @@
 // MyBookingsPage — customer dashboard bookings list (real data only)
 import { useState, useEffect, useMemo } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,12 +9,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { NotificationService } from '@/services/notificationService';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Calendar, Clock, MapPin, XCircle, Download, Eye,
-  CalendarX, Sparkles,
+  CalendarX
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -339,7 +340,7 @@ function EmptyState() {
       </p>
       <Link to="/browse">
         <Button className="bg-gradient-to-r from-[#8B1538] to-[#A31E42] hover:opacity-90">
-          <Sparkles className="w-4 h-4 mr-1.5" /> Browse Artists
+          <VowzaIcon className="w-4 h-4 mr-1.5" /> Browse Artists
         </Button>
       </Link>
     </motion.div>

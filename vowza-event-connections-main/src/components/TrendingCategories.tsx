@@ -4,6 +4,7 @@
 // Uses live DB counts when available; gracefully shows static list as fallback.
 
 import { memo } from "react";
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,7 +17,7 @@ import {
   PersonStanding,  // Dancers
   Users,           // Choreographers
   Paintbrush,      // Decorators
-  Sparkles,        // Makeup Artists
+  // Makeup Artists
   Hand,            // Mehendi Artists
   Wand2,           // Magicians
   MonitorPlay,     // Anchors & Hosts + Drone
@@ -127,7 +128,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     id:    "makeup_artist",
     name:  "Makeup Artists",
-    icon:  Sparkles,
+    icon: VowzaIcon,
     color: "bg-orange-50 dark:bg-orange-950/40",
     text:  "text-orange-600 dark:text-orange-400",
     ring:  "ring-orange-200 dark:ring-orange-800",

@@ -4,9 +4,10 @@
 // particles, faint grid, a floating glass "bento" composition of vendor
 // categories, and Framer Motion micro-interactions throughout.
 import { useState, useRef, useEffect, useCallback, memo } from "react";
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, MapPin, Sparkles, TrendingUp, ChevronDown, X,
+  Search, MapPin, TrendingUp, ChevronDown, X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import MobileHero from "./MobileHero";
@@ -336,7 +337,7 @@ const DesktopHero = () => {
                   initial="hidden" animate="show" variants={fadeUp} custom={0}
                   className="inline-flex items-center gap-1.5 mb-5 px-3.5 py-1.5 rounded-full glass-premium"
                 >
-                  <Sparkles className="w-3 h-3 text-gold" />
+                  <VowzaIcon className="w-3 h-3 text-gold" />
                   <span className="text-[11px] font-semibold text-white/70 tracking-wide">India's Premium Event Marketplace</span>
                 </motion.div>
 
@@ -391,7 +392,7 @@ const DesktopHero = () => {
                         transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 2.5, ease: "easeInOut" }}
                         className="inline-flex"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <VowzaIcon className="w-3.5 h-3.5" />
                       </motion.span>
                       Vowza AI Planner
                       <span className="ml-0.5 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold tracking-wide"
@@ -436,7 +437,7 @@ const DesktopHero = () => {
                       {/* DESKTOP: single horizontal row */}
                       <div className="hidden md:flex" style={{ alignItems:"stretch" }}>
                         <SearchField
-                          icon={<Sparkles style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)" }} />}
+                          icon={<VowzaIcon style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)" }} />}
                           label="Event Type"
                           style={{ borderRadius:"18px 0 0 18px", borderRight:"1px solid #e5e7eb" }}
                         >
@@ -475,7 +476,7 @@ const DesktopHero = () => {
                       {/* MOBILE: stacked */}
                       <div className="flex flex-col gap-1.5 md:hidden">
                         <SearchField
-                          icon={<Sparkles style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)" }} />}
+                          icon={<VowzaIcon style={{ width:"15px", height:"15px", color:"hsl(345 72% 36%)" }} />}
                           label="Event Type"
                           style={{ borderRadius:"14px" }}
                         >
@@ -521,7 +522,7 @@ const DesktopHero = () => {
                       <motion.div whileHover={{ y: -3 }}
                         style={{ borderRadius:"20px", padding:"7px", display:"flex", gap:"6px", background:"hsl(0 0% 100% / 0.98)", boxShadow:"0 0 0 1px hsl(40 95% 52% / 0.15), 0 20px 60px -10px hsl(0 0% 0% / 0.5)", transition:"box-shadow 0.3s ease" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"10px", flex:1, padding:"13px 18px", borderRadius:"16px", background:"hsl(220 14% 97%)", minWidth:0 }}>
-                          <Sparkles style={{ width:"15px", height:"15px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
+                          <VowzaIcon style={{ width:"15px", height:"15px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
                           <input type="text" value={plannerQuery}
                             onChange={e => { setQuery(e.target.value); setShowSuggest(true); }}
                             onFocus={() => setShowSuggest(true)}
@@ -539,7 +540,7 @@ const DesktopHero = () => {
                           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                           className="btn-ripple flex items-center gap-2 flex-shrink-0"
                           style={{ padding:"0 22px", borderRadius:"16px", background:"linear-gradient(135deg,hsl(40 95% 58%),hsl(36 85% 46%))", color:"#111", fontWeight:700, fontSize:"13px", border:"none", cursor:"pointer", boxShadow:"0 6px 20px -4px hsl(40 95% 52% / 0.5)", whiteSpace:"nowrap" }}>
-                          <Sparkles style={{ width:"14px", height:"14px" }} />
+                          <VowzaIcon style={{ width:"14px", height:"14px" }} />
                           Plan My Event
                         </motion.button>
                       </motion.div>
@@ -556,7 +557,7 @@ const DesktopHero = () => {
                               style={{ width:"100%", textAlign:"left", display:"flex", alignItems:"center", gap:"12px", padding:"10px 16px", background:"none", border:"none", cursor:"pointer", fontSize:"13px", color:"#374151", transition:"background 0.12s" }}
                               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background="#f9fafb"; }}
                               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background="none"; }}>
-                              <Sparkles style={{ width:"13px", height:"13px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
+                              <VowzaIcon style={{ width:"13px", height:"13px", color:"hsl(40 90% 46%)", flexShrink:0 }} />
                               {q}
                             </button>
                           ))}

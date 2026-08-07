@@ -1,9 +1,10 @@
 // ─── Admin AI Planner Management ─────────────────────────────────────────────
 import { useEffect, useState } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { supabase } from '@/integrations/supabase/client';
 import { generateAllEmbeddings } from '@/lib/embeddingGenerator';
 import { toast } from 'sonner';
-import { Sparkles, RefreshCw, MessageSquare, TrendingUp, Database, CheckCircle } from 'lucide-react';
+import { RefreshCw, MessageSquare, TrendingUp, Database, CheckCircle } from 'lucide-react';
 
 export default function AdminAIPlanner() {
   const [stats, setStats]         = useState({ total: 0, today: 0, avgMessages: 0 });
@@ -63,7 +64,7 @@ export default function AdminAIPlanner() {
         {[
           { label: 'Total Conversations', value: stats.total,       icon: MessageSquare, color: 'bg-violet-500' },
           { label: "Today's Sessions",    value: stats.today,       icon: TrendingUp,    color: 'bg-emerald-500' },
-          { label: 'Avg Msgs/Session',    value: stats.avgMessages, icon: Sparkles,      color: 'bg-amber-500'   },
+          { label: 'Avg Msgs/Session',    value: stats.avgMessages, icon: VowzaIcon,      color: 'bg-amber-500'   },
         ].map(s => (
           <div key={s.label} className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5">
             <div className={`w-10 h-10 rounded-xl ${s.color} flex items-center justify-center mb-3`}>
@@ -135,7 +136,7 @@ export default function AdminAIPlanner() {
           <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-10 rounded" />)}</div>
         ) : conversations.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <VowzaIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">No AI conversations yet</p>
             <p className="text-xs mt-1">Conversations appear once users interact with Vowza AI Planner</p>
           </div>
@@ -145,7 +146,7 @@ export default function AdminAIPlanner() {
               <div key={c.id} className="py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-950/30 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-violet-500" />
+                    <VowzaIcon className="w-4 h-4 text-violet-500" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-foreground">Session #{c.id?.slice(0, 8)}</p>
@@ -161,7 +162,7 @@ export default function AdminAIPlanner() {
 
       {/* Config info */}
       <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 rounded-2xl p-5 flex gap-3">
-        <Sparkles className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+        <VowzaIcon className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Vowza AI Planner — RAG Architecture</p>
           <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">

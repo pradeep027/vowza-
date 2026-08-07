@@ -1,5 +1,6 @@
 // WishlistPage — saved artists, real backend data only
 import { useMemo } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useFavorites, useToggleFavorite } from '@/hooks/useArtists';
@@ -7,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Heart, MapPin, Star, HeartCrack, Sparkles } from 'lucide-react';
+import { Heart, MapPin, Star, HeartCrack } from 'lucide-react';
 
 export default function WishlistPage() {
   const { data: favoriteIds = [], isLoading: idsLoading } = useFavorites();
@@ -92,7 +93,7 @@ export default function WishlistPage() {
                     <img src={artist.avatar_url} alt={artist.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles className="w-10 h-10 text-[#8B1538]/30" />
+                      <VowzaIcon className="w-10 h-10 text-[#8B1538]/30" />
                     </div>
                   )}
                   <button
@@ -154,7 +155,7 @@ function EmptyState() {
       </p>
       <Link to="/browse">
         <Button className="bg-gradient-to-r from-[#8B1538] to-[#A31E42] hover:opacity-90">
-          <Sparkles className="w-4 h-4 mr-1.5" /> Discover Artists
+          <VowzaIcon className="w-4 h-4 mr-1.5" /> Discover Artists
         </Button>
       </Link>
     </motion.div>

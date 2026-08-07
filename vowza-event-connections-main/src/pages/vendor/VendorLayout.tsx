@@ -1,11 +1,11 @@
 // VendorLayout — Premium sidebar + topbar layout for the artist/vendor dashboard
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import VendorSidebar from './VendorSidebar';
 import VendorTopbar from './VendorTopbar';
-import { Sparkles } from 'lucide-react';
 
 export default function VendorLayout() {
   const { user, loading, roles, rolesLoaded, isProvider } = useAuth();
@@ -23,7 +23,7 @@ export default function VendorLayout() {
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37] flex items-center justify-center animate-pulse">
-            <Sparkles className="w-7 h-7 text-white" />
+            <VowzaIcon className="w-7 h-7 text-white" />
           </div>
           <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         </div>

@@ -4,14 +4,15 @@
 // Real-time role subscription is handled in AuthContext.
 
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/AppLogo';
 import { cn } from '@/lib/utils';
-import { Sparkles, LogOut, ChevronLeft, Menu, Activity,
+import { LogOut, ChevronLeft, Menu, Activity,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
   Tag, Star, Megaphone, Bell, BarChart3, Ticket, FileText,
-  Globe, HeadphonesIcon, Settings, Shield, ClipboardList,
+  Globe, HeadphonesIcon, Settings, Shield, ClipboardList
 } from 'lucide-react';
 
 const NAV = [
@@ -28,7 +29,7 @@ const NAV = [
   { label: 'Coupons',        icon: Ticket,          path: '/admin/coupons'        },
   { label: 'Reports',        icon: FileText,        path: '/admin/reports'        },
   { label: 'Support',        icon: HeadphonesIcon,  path: '/admin/support'        },
-  { label: 'Vowza AI Planner', icon: Sparkles,        path: '/admin/ai-planner'     },
+  { label: 'Vowza AI Planner', icon: VowzaIcon,        path: '/admin/ai-planner'     },
   { label: 'CMS',            icon: Globe,           path: '/admin/cms'            },
   { label: 'Settings',       icon: Settings,        path: '/admin/settings'       },
   { label: 'Admins',         icon: Shield,          path: '/admin/admins'         },
@@ -143,7 +144,7 @@ export default function AdminLayout() {
       <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-maroon flex items-center justify-center animate-pulse">
-            <Sparkles className="w-5 h-5 text-white" />
+            <VowzaIcon className="w-5 h-5 text-white" />
           </div>
           <p className="text-sm text-white/50">Verifying access…</p>
         </div>

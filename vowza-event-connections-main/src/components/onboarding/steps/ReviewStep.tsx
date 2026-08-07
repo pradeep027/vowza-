@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import VowzaIcon from '@/components/VowzaIcon';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { 
@@ -9,8 +10,7 @@ import {
   IndianRupee, 
   Bell,
   Camera,
-  Edit,
-  Sparkles
+  Edit
 } from 'lucide-react';
 import { artistCategories } from '@/data/artistCategories';
 
@@ -168,7 +168,7 @@ export const ReviewStep = ({ data, onNotificationChange, onEdit }: ReviewStepPro
         </Section>
 
         {/* Category */}
-        <Section title="Category" icon={Sparkles} step={1}>
+        <Section title="Category" icon={VowzaIcon} step={1}>
           <div className="flex items-center gap-2">
             {category && (
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${category.color}`}>

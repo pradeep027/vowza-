@@ -3,8 +3,9 @@
 // Self-contained — mounts in App.tsx alongside the router.
 
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import AIChatPanel from './AIChatPanel';
 
 // ─── Tooltip label that appears beside the FAB ───────────────────────────────
@@ -109,7 +110,7 @@ const AIFloatingButton = () => {
                 animate={{ rotate: 0, opacity: 1 }}
                 exit={{ rotate: -90, opacity: 0 }}
                 transition={{ duration: 0.18 }}>
-                <Sparkles className="w-[18px] h-[18px] md:w-5 md:h-5 text-foreground" />
+                <VowzaIcon className="w-[18px] h-[18px] md:w-5 md:h-5 text-foreground" />
               </motion.div>
             )}
           </AnimatePresence>

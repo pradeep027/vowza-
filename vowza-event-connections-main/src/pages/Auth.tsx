@@ -9,6 +9,7 @@
 // so React reuses the existing DOM nodes and focus is preserved.
 
 import { useState, useEffect, memo } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,8 +17,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import AppLogo from '@/components/AppLogo';
 import {
-  Sparkles, Lock, Eye, EyeOff, ArrowLeft, Mail,
-  User, Phone, CheckCircle, ArrowRight,
+  Lock, Eye, EyeOff, ArrowLeft, Mail,
+  User, Phone, CheckCircle, ArrowRight
 } from 'lucide-react';
 
 // ── Layout shell — MODULE scope (never re-created on parent re-render) ────────

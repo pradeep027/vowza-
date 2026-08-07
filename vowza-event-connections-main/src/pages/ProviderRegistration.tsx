@@ -4,21 +4,22 @@
 // Steps: Basic Info → Professional Info → Portfolio → Verification Docs → Review
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  CheckCircle, ArrowLeft, ArrowRight, Sparkles, User,
+  CheckCircle, ArrowLeft, ArrowRight, User,
   Briefcase, Image as ImageIcon, Shield, Eye,
   Camera, X, Upload, RefreshCw, Phone, Mail,
   MapPin, Languages, ChevronDown, Loader2,
-  FileText, Instagram, Globe, Star,
+  FileText, Instagram, Globe, Star
 } from 'lucide-react';
 import {
   useProviderRegistration,
-  type Step1, type Step2, type Step3, type Step4,
+  type Step1, type Step2, type Step3, type Step4
 } from '@/contexts/ProviderRegistrationContext';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -344,7 +345,7 @@ export default function ProviderRegistration() {
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-maroon flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
+              <VowzaIcon className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="text-sm font-display font-bold text-foreground">Join Vowza</span>
           </div>

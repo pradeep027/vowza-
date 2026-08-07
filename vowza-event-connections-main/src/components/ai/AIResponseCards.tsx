@@ -2,17 +2,18 @@
 // Renders rich structured data: budget table, timeline, vendor cards, checklists
 
 import { useState } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { Link } from 'react-router-dom';
 import {
   CheckSquare, Square, ChevronDown, ChevronUp, ExternalLink,
   AlertCircle, TrendingDown, ShieldAlert, Star,
   Sun, Sunset, Calendar, Users, MapPin, IndianRupee,
-  Clock, Sparkles, CheckCircle2, ChevronRight, BadgeCheck,
-  Image as ImageIcon, Briefcase,
+  Clock, CheckCircle2, ChevronRight, BadgeCheck,
+  Image as ImageIcon, Briefcase
 } from 'lucide-react';
 import type {
   AIResponse, ChecklistItem, RiskItem, DBVendor,
-  WeddingPlan, DayPlan, TimeSlot,
+  WeddingPlan, DayPlan, TimeSlot
 } from '@/lib/aiPlannerTypes';
 
 interface Props { response: AIResponse; }
@@ -778,7 +779,7 @@ const DayCard = ({ day, index }: { day: DayPlan; index: number }) => {
               <div className="space-y-2">
                 {day.aiTips.map((tip, i) => (
                   <div key={i} className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-gold/5 border border-gold/15">
-                    <Sparkles className="w-3.5 h-3.5 text-gold flex-shrink-0 mt-0.5" />
+                    <VowzaIcon className="w-3.5 h-3.5 text-gold flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-foreground/90 leading-relaxed">{tip}</p>
                   </div>
                 ))}
@@ -808,7 +809,7 @@ const WeddingPlanCard = ({ response }: { response: AIResponse }) => {
       {/* ── Wedding Overview Card ───────────────────────────────────── */}
       <div className="rounded-2xl border border-gold/30 bg-gradient-to-br from-card to-gold/5 overflow-hidden">
         <div className="px-4 py-3 bg-gradient-gold/10 border-b border-gold/20 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-gold" />
+          <VowzaIcon className="w-4 h-4 text-gold" />
           <p className="font-display font-semibold text-sm text-foreground">Wedding Overview</p>
         </div>
         <div className="p-4">
@@ -819,7 +820,7 @@ const WeddingPlanCard = ({ response }: { response: AIResponse }) => {
               { icon: <IndianRupee className="w-3.5 h-3.5" />,   label: "Total Budget", value: fmtAmt(overview.totalBudget) },
               { icon: <Users className="w-3.5 h-3.5" />,         label: "Guests",       value: `${overview.guestCount}` },
               { icon: <MapPin className="w-3.5 h-3.5" />,        label: "Location",     value: overview.location },
-              { icon: <Sparkles className="w-3.5 h-3.5" />,      label: "Style",        value: overview.style },
+              { icon: <VowzaIcon className="w-3.5 h-3.5" />,      label: "Style",        value: overview.style },
               { icon: <Sun className="w-3.5 h-3.5" />,           label: "Season",       value: overview.season },
             ].map(stat => (
               <div key={stat.label} className="bg-card rounded-xl p-2.5 border border-border/40">
@@ -901,7 +902,7 @@ const WeddingPlanCard = ({ response }: { response: AIResponse }) => {
       {/* ── Global AI Suggestions ────────────────────────────────────── */}
       <div className="rounded-2xl border border-gold/20 bg-gold/5 overflow-hidden">
         <div className="px-4 py-3 border-b border-gold/15 flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-gold" />
+          <VowzaIcon className="w-3.5 h-3.5 text-gold" />
           <p className="font-semibold text-xs text-foreground">AI Suggestions for Your Entire Wedding</p>
         </div>
         <div className="p-3 space-y-2">

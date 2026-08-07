@@ -2,10 +2,11 @@
 // Sticky, shrinks on scroll, mega menu for Browse, instant search, all actions
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import VowzaIcon from '@/components/VowzaIcon';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Menu, X, Search, Sparkles, ShoppingBag, Bell, Heart,
+  Menu, X, Search, ShoppingBag, Bell, Heart,
   ChevronDown, User, LogOut, LayoutDashboard, BookOpen,
   Camera, Music, Disc3, Palette, Mic2, Users, Utensils,
   Wand2, Star, Zap, MapPin, CalendarDays, ArrowRight,
@@ -299,7 +300,7 @@ const Navbar = () => {
                   isActive("/ai-planner") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
                 )}
               >
-                <Sparkles className="w-3.5 h-3.5 text-gold" />
+                <VowzaIcon className="w-3.5 h-3.5 text-gold" />
                 Vowza AI Planner
                 <span className={cn(
                   "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-gold origin-left transition-transform duration-250 ease-out",
@@ -604,7 +605,7 @@ const Navbar = () => {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-gold/10 to-maroon/5 border border-gold/20 text-sm font-semibold text-foreground hover:from-gold/15 transition-colors"
               >
                 <div className="w-8 h-8 rounded-lg bg-gradient-gold flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
+                  <VowzaIcon className="w-4 h-4 text-white" />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">Vowza AI Planner</p>

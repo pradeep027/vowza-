@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
 import AppLogo from '@/components/AppLogo';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { BasicInfoStep } from '@/components/onboarding/steps/BasicInfoStep';
@@ -461,7 +462,7 @@ const ArtistOnboarding = () => {
                     {isSubmitting ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Creating Profile…</>
                     ) : (
-                      <><Sparkles className="w-4 h-4" /> Complete Registration</>
+                      <><VowzaIcon className="w-4 h-4" /> Complete Registration</>
                     )}
                   </button>
                 )}

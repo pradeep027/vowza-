@@ -1,9 +1,10 @@
 // CustomerSidebar — fixed left navigation for the customer dashboard
 import { NavLink } from 'react-router-dom';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, CalendarCheck, Heart, Bell, User, CreditCard,
-  Star, Sparkles, Settings, ChevronLeft, ChevronRight, X, LogOut,
+  Star, Settings, ChevronLeft, ChevronRight, X, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/AppLogo';
@@ -24,7 +25,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/profile', label: 'My Profile', icon: User },
   { to: '/dashboard/payments', label: 'Payment History', icon: CreditCard },
   { to: '/dashboard/reviews', label: 'My Reviews', icon: Star },
-  { to: '/dashboard/ai-planner', label: 'Vowza AI Planner', icon: Sparkles },
+  { to: '/dashboard/ai-planner', label: 'Vowza AI Planner', icon: VowzaIcon },
   { to: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/AppLogo';
@@ -19,7 +20,6 @@ import {
   Camera,
   Palette,
   Users,
-  Sparkles,
   LogOut,
   Calendar,
   User,
@@ -55,7 +55,7 @@ const professionIcons: Record<string, React.ReactNode> = {
   normal_band: <Music className="w-4 h-4" />, maharashtra_band: <Music className="w-4 h-4" />,
   musician: <Music className="w-4 h-4" />, music_band: <Music className="w-4 h-4" />,
   traditional_band: <Music className="w-4 h-4" />, singer: <Mic2 className="w-4 h-4" />,
-  dj: <Sparkles className="w-4 h-4" />, instrumental_artist: <Music className="w-4 h-4" />,
+  dj: <VowzaIcon className="w-4 h-4" />, instrumental_artist: <Music className="w-4 h-4" />,
   classical_musician: <Music className="w-4 h-4" />,
   photographer: <Camera className="w-4 h-4" />, videographer: <Camera className="w-4 h-4" />,
   cinematographer: <Camera className="w-4 h-4" />, drone_operator: <Camera className="w-4 h-4" />,
@@ -64,12 +64,12 @@ const professionIcons: Record<string, React.ReactNode> = {
   dancer: <Users className="w-4 h-4" />, choreographer: <Users className="w-4 h-4" />,
   kuchipudi_dancer: <Users className="w-4 h-4" />, classical_dancer: <Users className="w-4 h-4" />,
   western_dancer: <Users className="w-4 h-4" />,
-  makeup_artist: <Sparkles className="w-4 h-4" />, mehendi_artist: <Sparkles className="w-4 h-4" />,
+  makeup_artist: <VowzaIcon className="w-4 h-4" />, mehendi_artist: <VowzaIcon className="w-4 h-4" />,
   anchor: <Mic2 className="w-4 h-4" />, host: <Mic2 className="w-4 h-4" />,
-  magician: <Sparkles className="w-4 h-4" />, stand_up_comedian: <Mic2 className="w-4 h-4" />,
-  celebrity_artist: <Sparkles className="w-4 h-4" />, live_performer: <Music className="w-4 h-4" />,
+  magician: <VowzaIcon className="w-4 h-4" />, stand_up_comedian: <Mic2 className="w-4 h-4" />,
+  celebrity_artist: <VowzaIcon className="w-4 h-4" />, live_performer: <Music className="w-4 h-4" />,
   folk_artist: <Music className="w-4 h-4" />,
-  lighting_services: <Sparkles className="w-4 h-4" />, sound_services: <Music className="w-4 h-4" />,
+  lighting_services: <VowzaIcon className="w-4 h-4" />, sound_services: <Music className="w-4 h-4" />,
   event_planner: <Calendar className="w-4 h-4" />, wedding_planner: <Calendar className="w-4 h-4" />,
   catering_services: <Users className="w-4 h-4" />,
   event_support: <Users className="w-4 h-4" />, event_support_staff: <Users className="w-4 h-4" />,

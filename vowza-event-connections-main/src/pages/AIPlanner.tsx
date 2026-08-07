@@ -3,12 +3,13 @@
 // Premium ChatGPT-style experience, centered layout, mobile responsive.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Send, Mic, MicOff, Sparkles, RotateCcw,
+  ArrowLeft, Send, Mic, MicOff, RotateCcw,
   ChevronDown, Check, Copy, Pencil, RefreshCw, PanelLeft,
-  ThumbsUp, ThumbsDown, Share2,
+  ThumbsUp, ThumbsDown, Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAIChat } from '@/components/ai/useAIChat';
@@ -83,7 +84,7 @@ const MessageBubble = ({
       {/* Avatar */}
       <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-1
         ${isUser ? 'bg-royal/20 text-royal' : 'bg-gradient-gold shadow-gold text-foreground'}`}>
-        {isUser ? <span className="text-xs font-bold">U</span> : <Sparkles className="w-4 h-4" />}
+        {isUser ? <span className="text-xs font-bold">U</span> : <VowzaIcon className="w-4 h-4" />}
       </div>
 
       <div className={`flex flex-col gap-1.5 min-w-0 flex-1 ${isUser ? 'items-end' : 'items-start'}`}>
@@ -338,7 +339,7 @@ const AIPlanner = () => {
             )}
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-gradient-gold flex items-center justify-center shadow-gold">
-                <Sparkles className="w-4 h-4 text-foreground" />
+                <VowzaIcon className="w-4 h-4 text-foreground" />
               </div>
               <div>
                 <p className="text-sm font-display font-semibold text-foreground leading-tight">✨ Vowza Planner</p>
@@ -393,7 +394,7 @@ const AIPlanner = () => {
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col items-center justify-center text-center gap-6 py-16">
                 <div className="w-20 h-20 rounded-3xl bg-gradient-gold flex items-center justify-center shadow-gold">
-                  <Sparkles className="w-10 h-10 text-foreground" />
+                  <VowzaIcon className="w-10 h-10 text-foreground" />
                 </div>
                 <div className="max-w-md">
                   <h1 className="text-2xl font-display font-bold text-foreground mb-2">✨ Vowza Planner</h1>
@@ -446,7 +447,7 @@ const AIPlanner = () => {
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 className="flex gap-3 max-w-3xl mr-auto min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-gradient-gold flex items-center justify-center flex-shrink-0 mt-1 shadow-gold">
-                  <Sparkles className="w-4 h-4 text-foreground" />
+                  <VowzaIcon className="w-4 h-4 text-foreground" />
                 </div>
                 <div className="flex flex-col gap-1.5 min-w-0">
                   <span className="text-[11px] font-semibold text-muted-foreground px-1">✨ Vowza Planner</span>

@@ -1,8 +1,9 @@
 // DashboardHome — Welcome section + real-data summary cards
 import { motion } from 'framer-motion';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarCheck, CheckCircle2, Heart, Bell, ArrowRight, Sparkles } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, Heart, Bell, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBookings } from '@/hooks/useBookings';
 import { useFavorites } from '@/hooks/useArtists';
@@ -85,7 +86,7 @@ export default function DashboardHome() {
         <div className="absolute bottom-0 left-1/3 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
         <div className="relative z-10 flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+            <VowzaIcon className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <span className="text-sm font-medium text-white/80">Your dashboard</span>
         </div>

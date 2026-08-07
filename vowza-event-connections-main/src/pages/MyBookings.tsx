@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBookings } from '@/hooks/useBookings';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogDescription,
-  DialogHeader, DialogTitle,
+  DialogHeader, DialogTitle
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +19,8 @@ import { checkDateAvailable } from '@/hooks/useAvailability';
 import AppLogo from '@/components/AppLogo';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Calendar, Clock, MapPin, Sparkles,
-  XCircle, MessageCircle, RefreshCw, AlertCircle,
+  ArrowLeft, Calendar, Clock, MapPin,
+  XCircle, MessageCircle, RefreshCw, AlertCircle
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 

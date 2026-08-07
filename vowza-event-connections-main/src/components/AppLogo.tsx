@@ -10,8 +10,8 @@
 //   • Uses useNavigate() — never window.location
 
 import { memo, useCallback } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -104,7 +104,7 @@ const AppLogo = memo(function AppLogo({
           MARK_SIZE[size],
         )}
       >
-        <Sparkles className={cn('text-white', ICON_SIZE[size])} aria-hidden="true" />
+        <VowzaIcon className={cn('text-white', ICON_SIZE[size])} aria-hidden="true" />
       </span>
 
       {/* Wordmark */}

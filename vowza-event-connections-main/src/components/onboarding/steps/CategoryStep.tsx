@@ -1,7 +1,7 @@
 import { artistCategories, type ProfessionType } from '@/data/artistCategories';
+import VowzaIcon from '@/components/VowzaIcon';
 import { CategoryCard } from '../CategoryCard';
 import { DynamicFieldRenderer } from '../DynamicFieldRenderer';
-import { Sparkles } from 'lucide-react';
 
 interface CategoryStepProps {
   selectedCategory: ProfessionType | '';
@@ -23,7 +23,7 @@ export const CategoryStep = ({
       {/* Category Selection */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-primary" />
+          <VowzaIcon className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-semibold">Select Your Category *</h3>
         </div>
         <p className="text-sm text-muted-foreground mb-6">

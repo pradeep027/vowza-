@@ -9,11 +9,12 @@
 //  • Context pills (event details remembered)
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Send, Mic, MicOff, Paperclip, Sparkles,
+  X, Send, Mic, MicOff, Paperclip,
   RotateCcw, ChevronDown, Check, Copy, PanelLeft,
-  Pencil, RefreshCw, ThumbsUp, ThumbsDown, Share2,
+  Pencil, RefreshCw, ThumbsUp, ThumbsDown, Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAIChat } from './useAIChat';
@@ -106,7 +107,7 @@ const MessageBubble = ({
         ${isUser
           ? 'bg-royal/20 text-royal'
           : 'bg-gradient-gold text-foreground shadow-gold'}`}>
-        {isUser ? <span className="text-xs font-bold">U</span> : <Sparkles className="w-3.5 h-3.5" />}
+        {isUser ? <span className="text-xs font-bold">U</span> : <VowzaIcon className="w-3.5 h-3.5" />}
       </div>
 
       <div className={`flex flex-col gap-1 max-w-[85%] min-w-0 ${isUser ? 'items-end' : 'items-start'}`}>
@@ -407,7 +408,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                     </button>
                   )}
                   <div className="w-8 h-8 rounded-xl bg-gradient-gold flex items-center justify-center shadow-gold">
-                    <Sparkles className="w-4 h-4 text-foreground" />
+                    <VowzaIcon className="w-4 h-4 text-foreground" />
                   </div>
                   <div>
                     <p className="font-display font-semibold text-sm text-foreground leading-tight">✨ Vowza Planner</p>
@@ -477,7 +478,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                       className="h-full flex flex-col items-center justify-center text-center gap-4 pb-4 min-h-[300px]"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-gradient-gold flex items-center justify-center shadow-gold">
-                        <Sparkles className="w-8 h-8 text-foreground" />
+                        <VowzaIcon className="w-8 h-8 text-foreground" />
                       </div>
                       <div>
                         <h3 className="font-display font-bold text-lg text-foreground">✨ Vowza Planner</h3>
@@ -528,7 +529,7 @@ const AIChatPanel = ({ isOpen, onClose, prefillQuery, onPrefillConsumed }: Props
                       className="flex gap-2.5"
                     >
                       <div className="w-7 h-7 rounded-full bg-gradient-gold flex items-center justify-center flex-shrink-0 mt-0.5 shadow-gold">
-                        <Sparkles className="w-3.5 h-3.5 text-foreground" />
+                        <VowzaIcon className="w-3.5 h-3.5 text-foreground" />
                       </div>
                       <div className="bg-card border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] min-w-0">
                         {streamingText

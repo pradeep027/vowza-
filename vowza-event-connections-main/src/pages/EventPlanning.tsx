@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import VowzaIcon from '@/components/VowzaIcon';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArtists } from '@/hooks/useArtists';
@@ -18,7 +19,6 @@ import {
   Calendar,
   Users,
   IndianRupee,
-  Sparkles,
   TrendingUp,
   Clock,
   CheckCircle,
@@ -26,7 +26,7 @@ import {
   RefreshCw,
   Download,
   Plus,
-  Minus,
+  Minus
 } from 'lucide-react';
 
 interface SelectedArtist {
@@ -395,7 +395,7 @@ const EventPlanning = () => {
             {/* Section Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2">
               {[
-                { id: 'recommended', label: 'Recommended', icon: Sparkles },
+                { id: 'recommended', label: 'Recommended', icon: VowzaIcon },
                 { id: 'available', label: 'Available', icon: Calendar },
                 { id: 'nearby', label: 'Nearby', icon: MapPin },
                 { id: 'featured', label: 'Featured', icon: Star },
@@ -417,7 +417,7 @@ const EventPlanning = () => {
             <Card className="border-gold/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-gold" />
+                  <VowzaIcon className="w-5 h-5 text-gold" />
                   AI Team Builder
                 </CardTitle>
               </CardHeader>
