@@ -355,10 +355,12 @@ const DesktopHero = () => {
                 {/* Description */}
                 <motion.p
                   initial="hidden" animate="show" variants={fadeUp} custom={0.16}
-                  style={{ fontSize:"clamp(0.98rem,1.7vw,1.1rem)", lineHeight:1.75, color:"hsl(0 0% 100% / 0.54)", marginBottom:"clamp(1.75rem,3.5vw,2.5rem)" }}
-                  className="mx-auto lg:mx-0 max-w-[560px]"
+                  style={{ fontSize:"clamp(1.1rem,1.9vw,1.3rem)", lineHeight:2.2, fontWeight:600, color:"hsl(0 0% 100% / 0.62)", marginBottom:"clamp(1.75rem,3.5vw,2.5rem)" }}
+                  className="mx-auto lg:mx-0 max-w-[520px]"
                 >
-                  Find and book verified event professionals across India—from photographers and decorators to DJs, caterers, bands, and entertainers—all in one trusted platform.
+                  One Platform.<br />
+                  Trusted Professionals.<br />
+                  Unforgettable Celebrations.
                 </motion.p>
 
                 {/* Toggle — premium AI planner treatment */}

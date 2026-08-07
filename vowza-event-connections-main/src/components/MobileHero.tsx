@@ -52,8 +52,10 @@ const MobileHero = () => {
             Meets <span className="text-gradient-maroon">Celebration</span>
           </h1>
 
-          <p className="mt-3 w-full max-w-none text-[15px] leading-[1.65] text-white/55">
-            Find and book verified event professionals across India—from photographers and decorators to DJs, caterers, bands, and entertainers—all in one trusted platform.
+          <p className="mt-3 w-full max-w-[480px] text-[clamp(15px,4.2vw,18px)] font-semibold leading-[2.1] text-white/60">
+            One Platform.<br />
+            Trusted Professionals.<br />
+            Unforgettable Celebrations.
           </p>
         </div>
 
