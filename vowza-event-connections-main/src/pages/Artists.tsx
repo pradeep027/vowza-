@@ -181,6 +181,9 @@ const Artists = () => {
   const [view,        setView]        = useState<"grid" | "list">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Event-to-category mapping — must be declared before filters use it
+  const eventCategories = eventParam ? getCategoriesForEvent(eventParam) : null;
+
   const filters: ArtistFilters = {
     category:   categoryParam || undefined,
     categories: (!categoryParam && eventCategories) ? eventCategories : undefined,
@@ -216,7 +219,6 @@ const Artists = () => {
     : "All Artists";
 
   // Get event-specific categories for the sidebar filter
-  const eventCategories = eventParam ? getCategoriesForEvent(eventParam) : null;
   const filteredSidebarCategories = eventCategories
     ? (categories as any[]).filter((c: any) => eventCategories.includes(c.profession_type || c.id))
     : (categories as any[]);
