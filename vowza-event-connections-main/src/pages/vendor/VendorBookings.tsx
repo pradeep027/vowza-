@@ -45,11 +45,13 @@ export default function VendorBookings() {
   // ── Accept / Reject ────────────────────────────────────────────────────────
   const updateStatus = async (booking: any, newStatus: 'confirmed' | 'cancelled') => {
     setBusy(booking.id);
-    // Map UI status to valid database enum values
-    const dbStatus = newStatus === 'confirmed' ? 'accepted' : 'cancelled';
 
     // Determine which table to update based on booking source
     const table = booking._source === 'photography' ? 'photography_package_bookings' : 'bookings';
+    // Photography bookings use 'confirmed'/'cancelled'; generic bookings use 'accepted'/'cancelled'
+    const dbStatus = table === 'photography_package_bookings'
+      ? (newStatus === 'confirmed' ? 'confirmed' : 'cancelled')
+      : (newStatus === 'confirmed' ? 'accepted' : 'cancelled');
     const updatePayload: any = { status: dbStatus };
     if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
     const { error } = await supabase

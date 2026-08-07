@@ -43,15 +43,53 @@ export const useBookings = () => {
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      // Fetch generic bookings
+      const { data: genericData, error: genericError } = await supabase
         .from('bookings')
         .select('*')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (genericError) throw genericError;
 
-      setBookings(data || []);
+      // Fetch photography bookings
+      const { data: photoData } = await supabase
+        .from('photography_package_bookings' as any)
+        .select('*, photography_packages(name, photography_type)')
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      // Normalize photography bookings to match Booking interface
+      const normalizedPhoto = (photoData ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.photographer_id,
+        event_type_id: null,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
+        requirements: b.notes,
+        amount: Number(b.total_amount),
+        platform_fee: Math.round(Number(b.total_amount) * 0.1),
+        status: (b.status === 'confirmed' ? 'accepted' : b.status === 'pending' ? 'requested' : b.status) as BookingStatus,
+        customer_notes: b.notes,
+        provider_notes: null,
+        created_at: b.created_at,
+        updated_at: b.created_at,
+        _source: 'photography',
+        _packageName: b.photography_packages?.name || 'Photography Package',
+      }));
+
+      // Combine and sort by date
+      const combined = [
+        ...(genericData || []).map((b: any) => ({ ...b, _source: 'generic' })),
+        ...normalizedPhoto,
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setBookings(combined as any);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -62,7 +100,7 @@ export const useBookings = () => {
   useEffect(() => {
     fetchBookings();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates for both tables
     const channel = supabase
       .channel('customer-bookings')
       .on(
@@ -71,6 +109,18 @@ export const useBookings = () => {
           event: '*',
           schema: 'public',
           table: 'bookings',
+          filter: `customer_id=eq.${user?.id}`
+        },
+        () => {
+          fetchBookings();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'photography_package_bookings',
           filter: `customer_id=eq.${user?.id}`
         },
         () => {
