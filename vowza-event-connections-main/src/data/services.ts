@@ -178,8 +178,8 @@ export const trendingCategories: TrendingCategory[] = [
 // ─── Event Types (12 events) ──────────────────────────────────────────────────
 
 export const eventTypes: EventType[] = [
-  { id: "wedding", name: "Wedding", icon: "💒", description: "Make your big day unforgettable", artistCount: 1200, gradient: "from-rose-400 to-maroon" },
-  { id: "reception", name: "Reception", icon: "🥂", description: "Celebrate after the ceremony", artistCount: 980, gradient: "from-gold to-amber-600" },
+  { id: "wedding", name: "Wedding", icon: "💐", description: "Make your big day unforgettable", artistCount: 1200, gradient: "from-rose-400 to-maroon" },
+  { id: "reception", name: "Reception", icon: "🎊", description: "Celebrate after the ceremony", artistCount: 980, gradient: "from-gold to-amber-600" },
   { id: "birthday", name: "Birthday", icon: "🎂", description: "Party like it's your day", artistCount: 750, gradient: "from-purple-400 to-royal" },
   { id: "corporate", name: "Corporate", icon: "🏢", description: "Professional events & conferences", artistCount: 620, gradient: "from-slate-400 to-slate-700" },
   { id: "haldi", name: "Haldi Ceremony", icon: "💛", description: "Joyful pre-wedding ritual", artistCount: 430, gradient: "from-yellow-300 to-gold" },
