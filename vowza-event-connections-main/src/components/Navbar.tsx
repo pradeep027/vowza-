@@ -390,17 +390,11 @@ const Navbar = () => {
                           <Link to="/artists?saved=true" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
                             <Heart className="w-4 h-4 text-muted-foreground" /> Saved Artists
                           </Link>
-                          {/* Artist role — show relevant CTA based on whether they're already a registered artist */}
-                          {rolesLoaded && (
-                            isProvider ? (
-                              <Link to="/vendor/dashboard" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
-                                <BadgeCheck className="w-4 h-4 text-gold-dark" /> Artist Dashboard
-                              </Link>
-                            ) : (
-                              <Link to="/provider/register" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
-                                <UserPlus className="w-4 h-4 text-gold-dark" /> Become an Artist
-                              </Link>
-                            )
+                          {/* Show "Become an Artist" only for non-providers */}
+                          {rolesLoaded && !isProvider && (
+                            <Link to="/provider/register" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors">
+                              <UserPlus className="w-4 h-4 text-gold-dark" /> Become an Artist
+                            </Link>
                           )}
                         </div>
                         <div className="p-2 border-t border-border/40">
@@ -529,16 +523,10 @@ const Navbar = () => {
                 <>
                   <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
                   <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
-                  {rolesLoaded && (
-                    isProvider ? (
-                      <Link to="/vendor/dashboard" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                        <BadgeCheck className="w-4 h-4" /> Artist Dashboard
-                      </Link>
-                    ) : (
-                      <Link to="/provider/register" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                        <UserPlus className="w-4 h-4" /> Become an Artist
-                      </Link>
-                    )
+                  {rolesLoaded && !isProvider && (
+                    <Link to="/provider/register" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                      <UserPlus className="w-4 h-4" /> Become an Artist
+                    </Link>
                   )}
                   <div className="h-px bg-border my-2" />
                   <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-destructive hover:bg-destructive/5 transition-colors">
