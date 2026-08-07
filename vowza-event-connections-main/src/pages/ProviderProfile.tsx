@@ -18,10 +18,11 @@ import AppLogo from "@/components/AppLogo";
 import { useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
-import { isPhotographer, isWaterSupplier, isCaterer } from "@/lib/providerCategory";
+import { isPhotographer, isWaterSupplier, isCaterer, isVideographer } from "@/lib/providerCategory";
 import WaterSupplierMenu from "@/components/WaterSupplierMenu";
 import PhotographerPackages from "@/components/PhotographerPackages";
 import CateringMenu from "@/components/CateringMenu";
+import VideographyMenu from "@/components/VideographyMenu";
 
 const fmt = (n: number) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
@@ -408,7 +409,7 @@ const ProviderProfile = () => {
               )}
 
               {/* ── PACKAGES TAB ── */}
-              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplierMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : (
+              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplierMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : isVideographer(provider) ? <VideographyMenu provider={provider} profile={profile} /> : (
                 <div className="bg-surface-1 rounded-2xl border border-border/60 p-6">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Pricing & Packages</h2>
                   {packages.length === 0 ? (
