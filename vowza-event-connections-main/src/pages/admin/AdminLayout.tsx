@@ -1,5 +1,5 @@
 // ─── Admin Layout — Premium Light Sidebar ─────────────────────────────────────
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import VowzaIcon from '@/components/VowzaIcon';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,10 +7,19 @@ import { cn } from '@/lib/utils';
 import { LogOut, ChevronLeft, Menu, Activity, Home,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
   Tag, Star, Megaphone, Bell, BarChart3, Ticket, FileText,
-  Globe, HeadphonesIcon, Settings, Shield, ClipboardList
+  Globe, HeadphonesIcon, Settings, Shield, ClipboardList, Image
 } from 'lucide-react';
 
-const NAV = [
+type NavigationItem = {
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  path: string;
+  section: string;
+  external?: boolean;
+  superOnly?: boolean;
+};
+
+const NAV: NavigationItem[] = [
   { label: 'Home',           icon: Home,            path: '/',                    section: 'MAIN', external: true },
   { label: 'Dashboard',      icon: LayoutDashboard, path: '/admin/dashboard',     section: 'MAIN' },
   { label: 'Artists',        icon: UserCheck,       path: '/admin/artists',       section: 'MAIN' },
@@ -28,6 +37,7 @@ const NAV = [
   { label: 'AI Planner',     icon: VowzaIcon,       path: '/admin/ai-planner',    section: 'SERVICES' },
   { label: 'CMS',            icon: Globe,           path: '/admin/cms',           section: 'SERVICES' },
   { label: 'Settings',       icon: Settings,        path: '/admin/settings',      section: 'SYSTEM' },
+  { label: 'Auth Promotion', icon: Image,           path: '/admin/auth-promotion',section: 'SYSTEM' },
   { label: 'Admins',         icon: Shield,          path: '/admin/admins',        section: 'SYSTEM', superOnly: true },
   { label: 'Audit Logs',     icon: ClipboardList,   path: '/admin/audit-logs',    section: 'SYSTEM' },
   { label: 'System Health',  icon: Activity,        path: '/admin/system-health', section: 'SYSTEM' },
@@ -44,7 +54,7 @@ interface SidebarProps {
 }
 
 function SidebarContent({ collapsed, adminName, adminRole, onSignOut, isSuperAdmin }: SidebarProps) {
-  const filteredNav = NAV.filter(item => !(item as any).superOnly || isSuperAdmin);
+  const filteredNav = NAV.filter(item => !item.superOnly || isSuperAdmin);
 
   return (
     <div className="flex flex-col h-full">
@@ -82,7 +92,7 @@ function SidebarContent({ collapsed, adminName, adminRole, onSignOut, isSuperAdm
                     className={({ isActive }) => cn(
                       'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
                       collapsed && 'justify-center px-2',
-                      (item as any).external ? 'text-gray-600 hover:text-[#8B1538] hover:bg-[#8B1538]/5' :
+                      item.external ? 'text-gray-600 hover:text-[#8B1538] hover:bg-[#8B1538]/5' :
                       isActive
                         ? 'bg-[#8B1538]/8 text-[#8B1538] font-semibold'
                         : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100',
@@ -92,7 +102,7 @@ function SidebarContent({ collapsed, adminName, adminRole, onSignOut, isSuperAdm
                       <>
                         <item.icon className={cn(
                           'flex-shrink-0 w-[18px] h-[18px]',
-                          (item as any).external ? 'text-gray-500' : isActive ? 'text-[#8B1538]' : 'text-gray-500',
+                          item.external ? 'text-gray-500' : isActive ? 'text-[#8B1538]' : 'text-gray-500',
                         )} />
                         {!collapsed && <span>{item.label}</span>}
                       </>

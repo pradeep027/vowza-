@@ -15,6 +15,7 @@ import BookAnArtistFloat from "@/components/BookAnArtistFloat";
 
 const Index                = lazy(() => import("./pages/Index"));
 const Auth                 = lazy(() => import("./pages/Auth"));
+const AuthCallback         = lazy(() => import("./pages/AuthCallback"));
 const AccountTypeSelection = lazy(() => import("./pages/AccountTypeSelection"));
 const ProviderRegistration = lazy(() => import("./pages/ProviderRegistration"));
 const ArtistOnboarding     = lazy(() => import("./pages/ArtistOnboarding"));
@@ -60,6 +61,7 @@ const AdminSettings        = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
 const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
+const AdminAuthPromotionalManager = lazy(() => import("./pages/admin/AdminAuthPromotionalManager"));
 
 // ─── Customer (user dashboard) ────────────────────────────────────────────────
 const CustomerLayout       = lazy(() => import("./pages/customer/CustomerLayout"));
@@ -123,6 +125,7 @@ const AppContent = () => {
           <Route path="/" element={<Index />} />
           <Route path="/test-features" element={<TestFeatures />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/artists" element={<Artists />} />
           <Route path="/event/:eventId" element={<EventPlanning />} />
           <Route path="/ai-planner" element={<AIPlanner />} />
@@ -168,6 +171,7 @@ const AppContent = () => {
             <Route path="admins"       element={<AdminAdmins />} />
             <Route path="audit-logs"   element={<AdminAuditLogs />} />
             <Route path="system-health"element={<AdminSystemHealth />} />
+            <Route path="auth-promotion" element={<AdminAuthPromotionalManager />} />
           </Route>
 
           {/* ── Customer — CustomerLayout handles auth + customer-only role check internally ── */}

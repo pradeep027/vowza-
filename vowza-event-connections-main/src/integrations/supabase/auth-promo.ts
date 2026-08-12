@@ -117,9 +117,13 @@ export const createAuthPromoConfig = async (
   overlayOpacity: number = 0.3
 ): Promise<AuthPromoConfig | null> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be signed in to create a promotional configuration.');
+
     const { data, error } = await supabase
       .from('auth_promotional_config')
       .insert({
+        admin_id: user.id,
         current_image_url: imageUrl,
         image_storage_path: imagePath,
         overlay_opacity: overlayOpacity,

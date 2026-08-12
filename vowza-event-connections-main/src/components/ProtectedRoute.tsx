@@ -9,10 +9,10 @@
  * - Premium loading screens
  */
 
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import VowzaIcon from '@/components/VowzaIcon';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import AuthModal from './AuthModal';
 import useAuthRedirect from '@/hooks/useAuthRedirect';
 
@@ -66,10 +66,21 @@ const ProtectedRoute = ({
 }: Props) => {
   const { user, loading, roles, rolesLoaded } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { setReturnTo, clearReturnTo } = useAuthRedirect();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const isAdminRoute = location.pathname.startsWith('/admin');
+
+  // Persist the intended destination outside render so React can safely re-render
+  // the guard while auth state is being restored.
+  useEffect(() => {
+    if (!loading && rolesLoaded && !user && showAuthModal) {
+      setReturnTo(location.pathname, {
+        state: location.state,
+        query: Object.fromEntries(new URLSearchParams(location.search)),
+      });
+    }
+  }, [loading, location.pathname, location.search, location.state, rolesLoaded, setReturnTo, showAuthModal, user]);
 
   // ── Still resolving auth or roles ────────────────────────────────────────────
   if (loading || !rolesLoaded) {
@@ -79,41 +90,27 @@ const ProtectedRoute = ({
   // ── Not authenticated ─────────────────────────────────────────────────────────
   if (!user) {
     if (showAuthModal) {
-      // Save return-to action
-      setReturnTo(location.pathname, {
-        state: location.state,
-        query: Object.fromEntries(new URLSearchParams(location.search)),
-      });
-      
       return (
         <>
-          {/* Show modal immediately */}
           <AuthModal
-            isOpen={true}
+            isOpen
             onClose={() => {
-              // User closed without authenticating
               clearReturnTo();
-              setAuthModalOpen(false);
-            }}
-            onSuccess={() => {
-              // Auth successful - useAuthRedirect hook handles navigation
-              setAuthModalOpen(false);
+              navigate('/', { replace: true });
             }}
           />
-          
-          {/* Show loading state while modal is open */}
-          <div className="min-h-screen flex items-center justify-center bg-background/50">
+          <div className="min-h-screen flex items-center justify-center bg-background/50" aria-hidden="true">
             <div className="text-center">
               <VowzaIcon className="w-12 h-12 animate-pulse mx-auto mb-4" />
-              <p className="text-muted-foreground">Loading authentication...</p>
+              <p className="text-muted-foreground">Sign in to continue</p>
             </div>
           </div>
         </>
       );
-    } else {
-      // Fallback to redirect if modal not enabled
-      return <Navigate to="/auth" state={{ from: location }} replace />;
     }
+
+    // Fallback to the standalone auth route for routes that intentionally opt out.
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   // ── Email verification (optional) ────────────────────────────────────────────

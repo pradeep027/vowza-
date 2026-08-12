@@ -45,7 +45,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
   defaultTab = 'signin',
 }) => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const [tab, setTab] = useState<'signin' | 'signup'>(defaultTab);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -107,7 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const { error } = await signIn(loginEmail.trim(), loginPassword);
 
     if (error) {
-      const msg = (error as any).message || '';
+      const msg = error instanceof Error ? error.message : '';
       if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid email or password')) {
         toast.error('Incorrect email or password.');
       } else if (msg.toLowerCase().includes('email not confirmed')) {
@@ -120,7 +120,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       toast.success('Welcome back! 🎉');
       setLoginEmail('');
       setLoginPassword('');
-      onClose();
+      // The protected-route guard observes the new session and restores the saved action.
+      // Do not call onClose here: that would clear the saved return destination.
       onSuccess?.();
     }
   };
@@ -159,10 +160,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const { data, error } = await signUp(signupEmail.trim(), signupPassword, signupName.trim(), normalizedPhone);
 
     if (error) {
-      if ((error as any).message?.toLowerCase().includes('already registered')) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.toLowerCase().includes('already registered')) {
         toast.error('This email is already registered. Please log in.');
       } else {
-        toast.error((error as any).message ?? 'Sign up failed. Please try again.');
+        toast.error(message || 'Sign up failed. Please try again.');
       }
       setIsLoading(false);
       return;
@@ -185,12 +187,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    const { error } = await signInWithGoogle();
     if (error) {
       toast.error('Google sign-in failed. Please try again.');
       setIsLoading(false);

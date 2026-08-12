@@ -559,6 +559,42 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_promotional_config: {
+        Row: {
+          admin_id: string
+          created_at: string
+          current_image_url: string | null
+          id: string
+          image_storage_path: string | null
+          is_active: boolean
+          overlay_color: string
+          overlay_opacity: number
+          updated_at: string
+        }
+        Insert: {
+          admin_id?: string
+          created_at?: string
+          current_image_url?: string | null
+          id?: string
+          image_storage_path?: string | null
+          is_active?: boolean
+          overlay_color?: string
+          overlay_opacity?: number
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          current_image_url?: string | null
+          id?: string
+          image_storage_path?: string | null
+          is_active?: boolean
+          overlay_color?: string
+          overlay_opacity?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       worker_profiles: {
         Row: {
           address_proof_url: string | null
@@ -660,7 +696,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "customer" | "provider" | "admin"
+      app_role: "customer" | "provider" | "admin" | "super_admin"
       booking_status:
         | "requested"
         | "accepted"
@@ -836,7 +872,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["customer", "provider", "admin"],
+      app_role: ["customer", "provider", "admin", "super_admin"],
       booking_status: [
         "requested",
         "accepted",

@@ -9,7 +9,7 @@ import React, {
   createContext, useContext, useEffect, useState,
   useCallback, useRef, useMemo,
 } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -41,9 +41,9 @@ export interface AuthContextType {
   rolesLoaded:  boolean;
 
   // Actions
-  signUp:   (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: any }>;
-  signIn:   (email: string, password: string) => Promise<{ error: any }>;
-  signInWithGoogle: () => Promise<{ error: any | null }>;
+  signUp:   (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: AuthError | null }>;
+  signIn:   (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | Error | null }>;
   signOut:  () => Promise<void>;
   refreshRoles: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -233,7 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: email.toLowerCase().trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: { full_name: fullName, phone: phone ?? '' },
       },
     });
@@ -280,7 +280,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (): Promise<{ error: AuthError | Error | null }> => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -289,8 +289,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
       return { error };
-    } catch (e) {
-      return { error: e };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error : new Error('Google sign-in could not be started.'),
+      };
     }
   }, []);
 

@@ -18,13 +18,15 @@ import { toast } from 'sonner';
 
 interface AuthPromoConfig {
   id: string;
+  admin_id: string;
   current_image_url: string | null;
+  image_storage_path: string | null;
   overlay_opacity: number;
   is_active: boolean;
 }
 
 export const AdminAuthPromotionalManager: React.FC = () => {
-  const { isAdmin } = useAdmin();
+  const { isAdmin, userId } = useAdmin();
   const [config, setConfig] = useState<AuthPromoConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -44,7 +46,6 @@ export const AdminAuthPromotionalManager: React.FC = () => {
       const { data, error } = await supabase
         .from('auth_promotional_config')
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -139,9 +140,12 @@ export const AdminAuthPromotionalManager: React.FC = () => {
 
         if (updateError) throw updateError;
       } else {
+        if (!userId) throw new Error('Your administrator session has expired. Please sign in again.');
+
         const { error: insertError } = await supabase
           .from('auth_promotional_config')
           .insert({
+            admin_id: userId,
             current_image_url: publicUrl,
             image_storage_path: storagePath,
             overlay_opacity: overlayOpacity,
@@ -224,6 +228,34 @@ export const AdminAuthPromotionalManager: React.FC = () => {
     }
   };
 
+  const saveOverlay = async () => {
+    if (!config) {
+      toast.error('Upload an image before saving overlay settings.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const { error } = await supabase
+        .from('auth_promotional_config')
+        .update({
+          overlay_opacity: overlayOpacity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', config.id);
+
+      if (error) throw error;
+
+      setConfig({ ...config, overlay_opacity: overlayOpacity });
+      toast.success('Overlay settings saved.');
+    } catch (err) {
+      console.error('[AdminAuthPromo] Overlay update failed:', err);
+      toast.error('Failed to save overlay settings. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="p-8 rounded-lg border border-red-200 bg-red-50 text-red-600">
@@ -284,22 +316,29 @@ export const AdminAuthPromotionalManager: React.FC = () => {
           <div>
             <p className="text-xs text-muted-foreground">Status</p>
             <p className="font-semibold flex items-center gap-2">
-              {isActive ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Active
-                </>
+              {config ? (
+                isActive ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Active
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                    Hidden
+                  </>
+                )
               ) : (
                 <>
                   <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                  Hidden
+                  Default background
                 </>
               )}
             </p>
           </div>
           <button
             onClick={toggleActive}
-            disabled={uploading}
+            disabled={uploading || !config}
             className="btn-secondary text-sm"
           >
             {isActive ? 'Hide' : 'Show'}
@@ -342,6 +381,15 @@ export const AdminAuthPromotionalManager: React.FC = () => {
             style={{ backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})` }}
           />
         </div>
+
+        <button
+          type="button"
+          onClick={saveOverlay}
+          disabled={uploading || !config}
+          className="btn-primary text-sm"
+        >
+          {uploading ? 'Saving…' : 'Save Overlay Settings'}
+        </button>
       </div>
 
       {/* Upload New Image */}
