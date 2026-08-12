@@ -43,6 +43,7 @@ export interface AuthContextType {
   // Actions
   signUp:   (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: any }>;
   signIn:   (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any | null }>;
   signOut:  () => Promise<void>;
   refreshRoles: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -275,7 +276,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       // Hard redirect — works from any context (no useNavigate needed)
       // Forces React Query cache to be reset because the page reloads
-      window.location.href = '/auth';
+      window.location.href = '/';
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      return { error };
+    } catch (e) {
+      return { error: e };
     }
   }, []);
 
@@ -294,10 +309,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     rolesLoaded,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     refreshRoles,
     refreshProfile,
-  }), [user, session, profile, loading, roles, rolesLoaded, signUp, signIn, signOut, refreshRoles, refreshProfile]);
+  }), [user, session, profile, loading, roles, rolesLoaded, signUp, signIn, signInWithGoogle, signOut, refreshRoles, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

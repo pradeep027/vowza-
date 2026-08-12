@@ -1,12 +1,20 @@
-// ─── ProtectedRoute — Role-based route guard ──────────────────────────────────
-// Uses roles from AuthContext (fetched once at login, cached for session).
-// Never duplicates role-fetching logic.
-// Never hardcodes emails or UUIDs.
-// Supports: no role check (just auth), single role, multiple roles.
+/**
+ * ProtectedRoute — Role-based route guard with soft auth modal
+ * 
+ * Features:
+ * - Shows AuthModal instead of blank redirect for unauthenticated users
+ * - Preserves intended action and returns after authentication
+ * - Role-based access control
+ * - Email verification optional
+ * - Premium loading screens
+ */
 
 import { Navigate, useLocation } from 'react-router-dom';
 import VowzaIcon from '@/components/VowzaIcon';
 import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
+import AuthModal from './AuthModal';
+import useAuthRedirect from '@/hooks/useAuthRedirect';
 
 // Re-export for backward compatibility with approvalService
 export { invalidateRoleCache, _roleCache as roleCache } from '@/contexts/AuthContext';
@@ -15,6 +23,7 @@ interface Props {
   children:              React.ReactNode;
   allowedRoles?:         string[];
   requireEmailVerified?: boolean;
+  showAuthModal?:        boolean; // If true, show modal instead of redirect
 }
 
 // ── Premium loading screen — shown while auth/roles are being resolved ─────────
@@ -53,9 +62,12 @@ const ProtectedRoute = ({
   children,
   allowedRoles = [],
   requireEmailVerified = false,
+  showAuthModal = true,
 }: Props) => {
   const { user, loading, roles, rolesLoaded } = useAuth();
   const location = useLocation();
+  const { setReturnTo, clearReturnTo } = useAuthRedirect();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const isAdminRoute = location.pathname.startsWith('/admin');
 
@@ -66,7 +78,42 @@ const ProtectedRoute = ({
 
   // ── Not authenticated ─────────────────────────────────────────────────────────
   if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    if (showAuthModal) {
+      // Save return-to action
+      setReturnTo(location.pathname, {
+        state: location.state,
+        query: Object.fromEntries(new URLSearchParams(location.search)),
+      });
+      
+      return (
+        <>
+          {/* Show modal immediately */}
+          <AuthModal
+            isOpen={true}
+            onClose={() => {
+              // User closed without authenticating
+              clearReturnTo();
+              setAuthModalOpen(false);
+            }}
+            onSuccess={() => {
+              // Auth successful - useAuthRedirect hook handles navigation
+              setAuthModalOpen(false);
+            }}
+          />
+          
+          {/* Show loading state while modal is open */}
+          <div className="min-h-screen flex items-center justify-center bg-background/50">
+            <div className="text-center">
+              <VowzaIcon className="w-12 h-12 animate-pulse mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading authentication...</p>
+            </div>
+          </div>
+        </>
+      );
+    } else {
+      // Fallback to redirect if modal not enabled
+      return <Navigate to="/auth" state={{ from: location }} replace />;
+    }
   }
 
   // ── Email verification (optional) ────────────────────────────────────────────
@@ -80,7 +127,7 @@ const ProtectedRoute = ({
     if (!hasRole) {
       // Redirect to appropriate page based on their actual roles
       if (roles.includes('admin'))    return <Navigate to="/admin/dashboard" replace />;
-      if (roles.includes('provider')) return <Navigate to="/provider/dashboard" replace />;
+      if (roles.includes('provider')) return <Navigate to="/vendor/dashboard" replace />;
       return <Navigate to="/" replace />;
     }
   }
