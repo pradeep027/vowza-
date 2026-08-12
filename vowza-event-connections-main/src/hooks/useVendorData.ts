@@ -538,6 +538,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         accepted_at: b.accepted_at,
         calendar_locked: b.calendar_locked,
         guest_count: null,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'photography',
       }));
 
@@ -568,6 +574,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         calendar_locked: b.calendar_locked,
         guest_count: b.guest_count,
         event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'catering',
       }));
 
@@ -607,6 +619,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         guest_count: null,
         event_type: b.event_type,
         coverage_duration: b.coverage_duration,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'drone',
       }));
 
@@ -645,6 +663,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         calendar_locked: b.calendar_locked,
         guest_count: null,
         event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'videography',
       }));
 
@@ -682,6 +706,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         calendar_locked: b.calendar_locked,
         guest_count: b.expected_audience,
         event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'dj',
       }));
 
@@ -719,6 +749,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         calendar_locked: b.calendar_locked,
         guest_count: null,
         event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'decorator',
       }));
 
@@ -756,6 +792,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         calendar_locked: b.calendar_locked,
         guest_count: null,
         event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'makeup',
       }));
 
@@ -780,6 +822,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'mehendi',
       }));
 
@@ -804,6 +852,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: b.expected_audience, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'anchor',
       }));
 
@@ -828,6 +882,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: b.guest_count, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'banquet',
       }));
 
@@ -852,6 +912,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: b.quantity_required, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'rental',
       }));
 
@@ -876,6 +942,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'priest',
       }));
 
@@ -900,6 +972,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'water',
       }));
 
@@ -924,6 +1002,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'band',
       }));
 
@@ -948,6 +1032,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'singer',
       }));
 
@@ -972,6 +1062,12 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
         accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
         guest_count: null, event_type: b.event_type,
+        // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
         _source: 'dancer',
       }));
 
@@ -981,7 +1077,13 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
           ...b,
           amount: Number(b.amount ?? 0),
           total_amount: Number(b.amount ?? 0),
-          _source: 'generic',
+          // Keep secure Service Start lifecycle fields after category normalization.
+        start_requested_at: b.start_requested_at,
+        otp_verified_at: b.otp_verified_at,
+        work_started_at: b.work_started_at,
+        work_completed_at: b.work_completed_at,
+        settlement_status: b.settlement_status,
+        _source: 'generic',
         })),
         ...normalizedPhotoBookings,
         ...normalizedCateringBookings,

@@ -48,6 +48,9 @@ export default function VendorBookings() {
   const [otpTarget, setOtpTarget] = useState<any>(null);
   const [otpInput, setOtpInput] = useState('');
   const [otpVerifying, setOtpVerifying] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
+  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
+  const [otpFeedback, setOtpFeedback] = useState<{ type: 'info' | 'error'; message: string } | null>(null);
   const [completeTarget, setCompleteTarget] = useState<any>(null);
   const [completing, setCompleting] = useState(false);
 
@@ -56,6 +59,12 @@ export default function VendorBookings() {
   useVendorRealtime(vendorId);
 
   const { data: bookings = [], isLoading } = useVendorBookings(vendorId, tab);
+
+  useEffect(() => {
+    if (resendCooldownSeconds <= 0) return;
+    const timer = window.setTimeout(() => setResendCooldownSeconds(seconds => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendCooldownSeconds]);
 
   // Fetch pending reschedule requests for this vendor
   useEffect(() => {
@@ -227,54 +236,71 @@ export default function VendorBookings() {
     finally { setVendorCancelling(false); }
   };
 
-  // ── Start Service: generate OTP ─────────────────────────────────────────────
+  // ── Start Service: send the customer-only OTP ───────────────────────────────
   const handleStartService = async (b: any) => {
     if (startingService) return;
     setStartingService(true);
-    const customerName = b.customer?.full_name || 'Customer';
-    const total = Number(b.amount ?? b.total_amount ?? 0);
-    const result = await requestStartService(
-      b.id, b._source || 'generic', vendorId!, b.customer_id,
-      customerName, 'Vendor', b.package_name || 'Service'
-    );
+    const result = await requestStartService(b.id, b._source || 'generic');
     setStartingService(false);
+
     if (result.success) {
-      toast.success('Start OTP sent to customer! Ask them to share it with you.');
       setStartTarget(null);
       setOtpTarget(b);
       setOtpInput('');
+      setResendCooldownSeconds(60);
+      setOtpFeedback({ type: 'info', message: 'A verification code has been sent to the customer\'s registered email.' });
+      toast.success('OTP sent to the customer\'s registered email.');
       qc.invalidateQueries({ queryKey: ['vendor-bookings'], refetchType: 'all' });
-    } else {
-      toast.error(result.error || 'Failed to generate OTP');
-      // If OTP already exists, show OTP entry
-      if (result.error?.includes('active OTP')) { setStartTarget(null); setOtpTarget(b); setOtpInput(''); }
+      return;
     }
+
+    if (result.code === 'ACTIVE_OTP_EXISTS') {
+      setStartTarget(null);
+      setOtpTarget(b);
+      setOtpInput('');
+      setOtpFeedback({ type: 'info', message: 'An active OTP already exists. Ask the customer for the code or resend it.' });
+    }
+    toast.error(result.error || 'Email sending failure. Please try again.');
   };
 
   // ── Verify OTP ──────────────────────────────────────────────────────────────
   const handleVerifyOTP = async () => {
     if (!otpTarget || otpInput.length !== 6 || otpVerifying) return;
     setOtpVerifying(true);
-    const result = await verifyStartOTP(otpTarget.id, otpTarget._source || 'generic', otpInput, vendorId!);
+    setOtpFeedback(null);
+    const result = await verifyStartOTP(otpTarget.id, otpTarget._source || 'generic', otpInput);
     setOtpVerifying(false);
+
     if (result.success) {
-      toast.success('OTP verified! Service started.');
-      setOtpTarget(null); setOtpInput('');
+      toast.success('Service Started Successfully');
+      setOtpTarget(null);
+      setOtpInput('');
+      setOtpFeedback(null);
       qc.invalidateQueries({ queryKey: ['vendor-bookings'], refetchType: 'all' });
-    } else {
-      toast.error(result.error || 'Verification failed');
+      return;
     }
+
+    setOtpFeedback({ type: 'error', message: result.error || 'Verification failed. Please try again.' });
+    toast.error(result.error || 'Verification failed');
   };
 
   // ── Resend OTP ──────────────────────────────────────────────────────────────
   const handleResendOTP = async () => {
-    if (!otpTarget) return;
-    const result = await resendStartOTP(
-      otpTarget.id, otpTarget._source || 'generic', vendorId!,
-      otpTarget.customer_id, 'Vendor', otpTarget.package_name || 'Service'
-    );
-    if (result.success) toast.success('New OTP sent to customer!');
-    else toast.error(result.error || 'Failed to resend');
+    if (!otpTarget || resendingOtp) return;
+    setResendingOtp(true);
+    setOtpFeedback(null);
+    const result = await resendStartOTP(otpTarget.id, otpTarget._source || 'generic');
+    setResendingOtp(false);
+
+    if (result.success) {
+      setOtpInput('');
+      setResendCooldownSeconds(60);
+      setOtpFeedback({ type: 'info', message: 'A new verification code has been sent to the customer\'s registered email. The previous code is invalid.' });
+      toast.success('New OTP sent to the customer\'s registered email.');
+    } else {
+      setOtpFeedback({ type: 'error', message: result.error || 'Email sending failure. Please try again.' });
+      toast.error(result.error || 'Failed to resend OTP');
+    }
   };
 
   // ── Complete Service ────────────────────────────────────────────────────────
@@ -538,6 +564,13 @@ export default function VendorBookings() {
                 </p>
               )}
 
+              {b.work_started_at && (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <div className="flex items-center gap-1.5 font-semibold"><CheckCircle2 className="w-3.5 h-3.5" /> Service Started</div>
+                  <p className="mt-1 text-emerald-700">Started at: {new Date(b.work_started_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                </div>
+              )}
+
               {/* Money + actions */}
               <div className="flex items-end justify-between gap-4 pt-4 border-t border-border/40 flex-wrap">
                 <div className="flex items-center gap-5">
@@ -580,30 +613,27 @@ export default function VendorBookings() {
                       </button>
                     </>
                   )}
-                  {(tab === 'confirmed' || tab === 'accepted') && (
+                  {tab === 'confirmed' && (
                     <>
-                      {/* Start Service — only if not started yet */}
-                      {!b.work_started_at && b.advance_paid_at && (
+                      {/* Only a confirmed booking without an active request can start. The backend repeats this check. */}
+                      {!b.work_started_at && b.status === 'confirmed' && !b.start_requested_at && (
                         <button onClick={() => { setStartTarget(b); }}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors">
-                          <Play className="w-3.5 h-3.5" /> Start Service
+                          <Play className="w-3.5 h-3.5" /> Start Work
                         </button>
                       )}
-                      {/* Enter OTP — if start was requested but not verified */}
                       {b.start_requested_at && !b.work_started_at && (
-                        <button onClick={() => { setOtpTarget(b); setOtpInput(''); }}
+                        <button onClick={() => { setOtpTarget(b); setOtpInput(''); setOtpFeedback(null); }}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-semibold hover:bg-blue-600 transition-colors">
                           <ShieldCheck className="w-3.5 h-3.5" /> Enter OTP
                         </button>
                       )}
-                      {/* Complete Service — if work started but not completed */}
                       {b.work_started_at && !b.work_completed_at && (
                         <button onClick={() => setCompleteTarget(b)}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Complete Service
                         </button>
                       )}
-                      {/* Cancel — always available for confirmed */}
                       <button onClick={() => setVendorCancelTarget(b)}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors">
                         <XCircle className="w-3.5 h-3.5" /> Cancel Booking
@@ -626,7 +656,7 @@ export default function VendorBookings() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-border p-6 w-full max-w-md shadow-2xl space-y-4">
             <h2 className="font-bold text-foreground text-lg">Start Service</h2>
-            <p className="text-sm text-muted-foreground">A 6-digit OTP will be sent to the customer. They must share it with you to verify service start.</p>
+            <p className="text-sm text-muted-foreground">A verification code will be sent to the customer’s registered email. They must share it with you to start the service.</p>
             <div className="rounded-xl bg-muted/50 p-3 space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{startTarget.customer?.full_name || 'Customer'}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Event</span><span className="font-medium">{startTarget.event_date ? new Date(startTarget.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}</span></div>
@@ -636,35 +666,43 @@ export default function VendorBookings() {
               <button onClick={() => setStartTarget(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">Cancel</button>
               <button onClick={() => handleStartService(startTarget)} disabled={startingService}
                 className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">
-                {startingService ? <><Loader2 className="w-4 h-4 inline mr-1 animate-spin" />Sending...</> : 'Send Start OTP'}
+                {startingService ? <><Loader2 className="w-4 h-4 inline mr-1 animate-spin" />Sending OTP...</> : 'Send Start OTP'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── OTP Entry Dialog ──────────────────────────────────────────── */}
+      {/* ── Service Start Verification Dialog ─────────────────────────── */}
       {otpTarget && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl space-y-4">
-            <h2 className="font-bold text-foreground text-lg text-center">Enter Customer OTP</h2>
-            <p className="text-xs text-muted-foreground text-center">Ask the customer for the 6-digit start OTP sent to their registered email.</p>
+            <h2 className="font-bold text-foreground text-lg text-center">Service Start Verification</h2>
+            <p className="text-xs text-muted-foreground text-center">A verification code has been sent to the customer's registered email.</p>
+            {otpFeedback && (
+              <div className={cn('rounded-lg px-3 py-2 text-xs', otpFeedback.type === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-blue-200 bg-blue-50 text-blue-700')}>
+                {otpFeedback.message}
+              </div>
+            )}
+            <label htmlFor="service-start-otp" className="block text-sm font-semibold text-foreground">Enter Customer Service Start OTP</label>
             <input
+              id="service-start-otp"
               type="text" inputMode="numeric" maxLength={6}
               value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
               className="w-full text-center text-3xl font-bold tracking-[0.5em] py-4 rounded-xl border-2 border-border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition"
               placeholder="______"
+              autoComplete="one-time-code"
               autoFocus
             />
             <div className="flex gap-3">
-              <button onClick={() => { setOtpTarget(null); setOtpInput(''); }} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">Cancel</button>
-              <button onClick={handleVerifyOTP} disabled={otpInput.length !== 6 || otpVerifying}
+              <button onClick={() => { setOtpTarget(null); setOtpInput(''); setOtpFeedback(null); }} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary">Cancel</button>
+              <button onClick={handleVerifyOTP} disabled={otpInput.length !== 6 || otpVerifying || resendingOtp}
                 className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 disabled:opacity-50">
-                {otpVerifying ? <><Loader2 className="w-4 h-4 inline mr-1 animate-spin" />Verifying...</> : 'Verify & Start'}
+                {otpVerifying ? <><Loader2 className="w-4 h-4 inline mr-1 animate-spin" />Verifying...</> : 'Verify & Start Service'}
               </button>
             </div>
-            <button onClick={handleResendOTP} className="w-full text-xs text-muted-foreground hover:text-foreground text-center py-1">
-              Resend OTP
+            <button onClick={handleResendOTP} disabled={resendingOtp || otpVerifying || resendCooldownSeconds > 0} className="w-full text-xs text-muted-foreground hover:text-foreground text-center py-1 disabled:opacity-50">
+              {resendingOtp ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />Resending OTP...</> : resendCooldownSeconds > 0 ? `Resend OTP in ${resendCooldownSeconds}s` : 'Resend OTP'}
             </button>
           </div>
         </div>
