@@ -90,8 +90,13 @@ export default function DocumentUploadCard({
       // Notify parent of the in-progress state right away
       onVerified(file, { status: 'processing', message: `Checking ${label}...` });
 
-      // ── Run verification ──
-      const result = await verifyDocument(file, documentType, user?.id || 'anonymous');
+      // ── Run verification with live progress messages ──
+      const result = await verifyDocument(
+        file,
+        documentType,
+        user?.id || 'anonymous',
+        (msg) => setLocalMessage(msg)  // update status text during OCR
+      );
 
       setLocalStatus(result.status);
       setLocalMessage(result.message);

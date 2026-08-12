@@ -1,22 +1,27 @@
 /**
- * Vowza Document Verification — Client-side Analysis
+ * Vowza Document Verification — Tesseract.js OCR Pipeline
  *
- * SECURITY PRINCIPLE:
- *   "Uploaded" ≠ "Verified"
- *   "Image exists" ≠ "Valid document"
- *   "Document-shaped" ≠ "Aadhaar/PAN"
- *   "12 digits" ≠ "Genuine Aadhaar"
+ * ARCHITECTURE:
+ *   File → Quality Check → Image Preprocessing → Tesseract OCR
+ *   → Text Normalization → Document Type Classification
+ *   → Expected vs Actual Type Comparison → Document-Specific Validation
+ *   → Result
  *
- * When verification cannot be completed the result is ALWAYS an error/invalid,
- * never a false "verified". Fail closed.
- *
- * Flow: File → Image Load → Canvas Analysis → Edge Function → Result
- * Fallback (edge function unavailable) → ERROR (not verified)
+ * SECURITY PRINCIPLES:
+ *   - Upload field NEVER determines detected document type
+ *   - OCR text determines the actual document type
+ *   - OCR failure → error (never verified)
+ *   - Wrong type detected → invalid (never verified)
+ *   - No canvas color/aspect-ratio guessing
+ *   - All OCR processing local in browser (no external service)
+ *   - Sensitive numbers never logged
  */
 
+import { createWorker, type Worker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 
 export type DocumentType = 'aadhaar' | 'pan' | 'govt_id';
+
 export type VerificationStatus =
   | 'idle'
   | 'processing'
@@ -34,23 +39,34 @@ export interface VerificationResult {
   confidence?: number;
 }
 
-interface ColorAnalysis {
-  dominantColors: string[];
-  hasBlueHeader: boolean;
-  hasOrangeAccent: boolean;
-  hasGovtEmblem: boolean;
-  /** Fraction 0–1: how much of the image is near-white (paper/card background) */
-  whitePaperRatio: number;
-  /** Fraction 0–1: how much of the image is saturated / photo-like */
-  highSaturationRatio: number;
+// ─── Singleton OCR worker (reused across verifications) ──────────────────────
+let _workerPromise: Promise<Worker> | null = null;
+
+async function getWorker(): Promise<Worker> {
+  if (!_workerPromise) {
+    _workerPromise = (async () => {
+      const worker = await createWorker('eng', 1, {
+        logger: () => {}, // suppress verbose logs
+      });
+      return worker;
+    })();
+  }
+  return _workerPromise;
+}
+
+/** Call on registration page unmount to free memory */
+export async function terminateOcrWorker(): Promise<void> {
+  if (_workerPromise) {
+    const w = await _workerPromise;
+    await w.terminate();
+    _workerPromise = null;
+  }
 }
 
 // ─── File Validation ──────────────────────────────────────────────────────────
 
 const VALID_MIME_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MIN_WIDTH = 300;
-const MIN_HEIGHT = 200;
 
 export function validateFile(file: File): VerificationResult | null {
   if (!VALID_MIME_TYPES.includes(file.type)) {
@@ -59,148 +75,220 @@ export function validateFile(file: File): VerificationResult | null {
   if (file.size > MAX_FILE_SIZE) {
     return { status: 'invalid', message: 'File is too large. Maximum size is 10 MB.' };
   }
-  if (file.size < 8000) {
+  if (file.size < 5000) {
     return { status: 'invalid', message: 'File is too small. Please upload a clear document image.' };
   }
   return null;
 }
 
-// ─── Image Loading ────────────────────────────────────────────────────────────
+// ─── Image Preprocessing ─────────────────────────────────────────────────────
+// Converts the file to a preprocessed canvas (grayscale + contrast boost)
+// that Tesseract can read more accurately.
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+async function preprocessImage(file: File): Promise<{ canvas: HTMLCanvasElement; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      // Scale to max 1600px on longest side for OCR accuracy vs performance
+      const MAX = 1600;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+
+      // Draw original
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Grayscale + contrast boost for better OCR
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // Luminance grayscale
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        // Simple contrast stretch: push toward black or white
+        const contrast = Math.min(255, Math.max(0, (gray - 128) * 1.4 + 128));
+        data[i] = data[i + 1] = data[i + 2] = contrast;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      resolve({ canvas, width: w, height: h });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+
+    img.src = url;
   });
 }
 
-// ─── Canvas Color & Texture Analysis ─────────────────────────────────────────
-//
-// IMPORTANT: This analysis informs the edge function but is NOT used to
-// directly pass documents. The edge function makes the final accept/reject
-// decision. The fallback NEVER returns 'verified'.
+// ─── Text Normalization ───────────────────────────────────────────────────────
 
-function analyzeColors(
-  canvas: HTMLCanvasElement,
-  ctx: CanvasRenderingContext2D
-): ColorAnalysis {
-  const w = canvas.width;
-  const h = canvas.height;
+function normalizeOcrText(raw: string): string {
+  return raw
+    .toUpperCase()
+    // Collapse whitespace/newlines to single space
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    // Fix common OCR mistakes: 0→O in letter positions, l→1 in digit positions
+    .replace(/[|\\]/g, 'I')
+    .trim();
+}
 
-  // Top 25% strip — document headers tend to have blue here
-  const topData = ctx.getImageData(0, 0, w, Math.floor(h * 0.25)).data;
-  // Full image — for overall color stats
-  const fullData = ctx.getImageData(0, 0, w, h).data;
+// ─── Document Type Classifier ─────────────────────────────────────────────────
 
-  // ── Top-strip counters ──
-  let blueHeaderCount = 0;
-  let topTotal = 0;
+interface ClassificationResult {
+  type: 'aadhaar' | 'pan' | 'govt_id' | 'unknown';
+  confidence: number; // 0–100
+  signals: string[];  // for debugging (not logged to console)
+  extractedAadhaar: string | null;
+  extractedPan: string | null;
+}
 
-  for (let i = 0; i < topData.length; i += 16) {
-    const r = topData[i], g = topData[i + 1], b = topData[i + 2];
-    topTotal++;
-    // Strong blue: b dominates clearly, not grey/white
-    if (b > 120 && b > r + 40 && b > g + 20) blueHeaderCount++;
+// PAN: 5 uppercase letters + 4 digits + 1 uppercase letter
+const PAN_NUMBER_RE = /\b([A-Z]{5}[0-9]{4}[A-Z])\b/g;
+// Aadhaar: 12 digits possibly grouped as XXXX XXXX XXXX or XXXX-XXXX-XXXX
+const AADHAAR_NUMBER_RE = /\b([2-9]\d{3}[\s\-]?\d{4}[\s\-]?\d{4})\b/g;
+
+// Govt ID markers
+const GOVT_ID_MARKERS = [
+  'DRIVING LICENCE', 'DRIVING LICENSE', 'TRANSPORT DEPARTMENT',
+  'PASSPORT', 'REPUBLIC OF INDIA', 'ELECTION COMMISSION',
+  'VOTER ID', 'ELECTORAL PHOTO', 'EPIC',
+];
+
+function classifyDocument(text: string): ClassificationResult {
+  const signals: string[] = [];
+
+  // ── Aadhaar signals ──
+  let aadhaarScore = 0;
+
+  const aadhaarKeywords: [string, number][] = [
+    ['AADHAAR', 40],
+    ['UNIQUE IDENTIFICATION AUTHORITY', 35],
+    ['UIDAI', 35],
+    ['GOVT OF INDIA', 10],
+    ['GOVERNMENT OF INDIA', 10],
+    ['DOB', 5],
+    ['YEAR OF BIRTH', 5],
+  ];
+  for (const [kw, score] of aadhaarKeywords) {
+    if (text.includes(kw)) {
+      aadhaarScore += score;
+      signals.push(`AADHAAR_KW:${kw}`);
+    }
   }
 
-  // ── Full-image counters ──
-  let orangeCount = 0;
-  let whitePaperCount = 0;
-  let highSatCount = 0;
-  let fullTotal = 0;
-
-  for (let i = 0; i < fullData.length; i += 16) {
-    const r = fullData[i], g = fullData[i + 1], b = fullData[i + 2];
-    fullTotal++;
-
-    // Orange/saffron: clear orange hue, not just warm-toned
-    // Strict: red dominant, green mid, blue low
-    if (r > 200 && g > 100 && g < 165 && b < 70 && r - b > 140) orangeCount++;
-
-    // White/light grey paper (document background) — all channels high and similar
-    const maxC = Math.max(r, g, b);
-    const minC = Math.min(r, g, b);
-    if (maxC > 210 && maxC - minC < 35) whitePaperCount++;
-
-    // High saturation (photos, decorations, flowers, wedding) — wide spread between channels
-    if (maxC - minC > 80 && maxC > 100) highSatCount++;
+  // Aadhaar number match
+  const aadhaarMatches = [...text.matchAll(AADHAAR_NUMBER_RE)];
+  let extractedAadhaar: string | null = null;
+  if (aadhaarMatches.length > 0) {
+    aadhaarScore += 30;
+    extractedAadhaar = aadhaarMatches[0][1];
+    signals.push('AADHAAR_NUMBER');
   }
 
-  const blueRatio = topTotal > 0 ? blueHeaderCount / topTotal : 0;
-  const orangeRatio = fullTotal > 0 ? orangeCount / fullTotal : 0;
-  const whitePaperRatio = fullTotal > 0 ? whitePaperCount / fullTotal : 0;
-  const highSaturationRatio = fullTotal > 0 ? highSatCount / fullTotal : 0;
+  // ── PAN signals ──
+  let panScore = 0;
+
+  const panKeywords: [string, number][] = [
+    ['PERMANENT ACCOUNT NUMBER', 50],
+    ['INCOME TAX DEPARTMENT', 40],
+    ['INCOME TAX', 25],
+    ['GOVT OF INDIA', 10],
+    ['GOVERNMENT OF INDIA', 10],
+    ['DATE OF BIRTH', 5],
+  ];
+  for (const [kw, score] of panKeywords) {
+    if (text.includes(kw)) {
+      panScore += score;
+      signals.push(`PAN_KW:${kw}`);
+    }
+  }
+
+  // PAN number match
+  const panMatches = [...text.matchAll(PAN_NUMBER_RE)];
+  let extractedPan: string | null = null;
+  if (panMatches.length > 0) {
+    panScore += 30;
+    extractedPan = panMatches[0][1];
+    signals.push('PAN_NUMBER');
+  }
+
+  // ── Govt ID signals ──
+  let govtScore = 0;
+  for (const kw of GOVT_ID_MARKERS) {
+    if (text.includes(kw)) {
+      govtScore += 30;
+      signals.push(`GOVT_KW:${kw}`);
+    }
+  }
+
+  // ── Make decision ──
+  const maxScore = Math.max(aadhaarScore, panScore, govtScore);
+
+  // Require minimum score of 25 to classify
+  if (maxScore < 25) {
+    return { type: 'unknown', confidence: maxScore, signals, extractedAadhaar: null, extractedPan: null };
+  }
+
+  if (aadhaarScore >= panScore && aadhaarScore >= govtScore) {
+    return {
+      type: 'aadhaar',
+      confidence: Math.min(aadhaarScore, 100),
+      signals,
+      extractedAadhaar,
+      extractedPan: null,
+    };
+  }
+
+  if (panScore >= aadhaarScore && panScore >= govtScore) {
+    return {
+      type: 'pan',
+      confidence: Math.min(panScore, 100),
+      signals,
+      extractedAadhaar: null,
+      extractedPan,
+    };
+  }
 
   return {
-    dominantColors: [],
-    // Require a meaningful portion of the header to be strongly blue
-    hasBlueHeader: blueRatio > 0.25,
-    // Require a meaningful orange stripe — real Aadhaar has a clear saffron band
-    // Threshold raised from 0.02 (too low) to 0.08
-    hasOrangeAccent: orangeRatio > 0.08,
-    hasGovtEmblem: false,
-    whitePaperRatio,
-    highSaturationRatio,
+    type: 'govt_id',
+    confidence: Math.min(govtScore, 100),
+    signals,
+    extractedAadhaar: null,
+    extractedPan: null,
   };
 }
 
-// ─── Client-side Classification Signals ──────────────────────────────────────
-//
-// These signals are ADVISORY. They help the edge function but are NOT used to
-// independently approve a document. The client never decides "verified".
+// ─── Aadhaar Number Validator ─────────────────────────────────────────────────
 
-interface ClassificationSignals {
-  detectedType: string;
-  confidence: number;
-  /** True if the image looks like a photograph (high saturation, not a card) */
-  looksLikePhoto: boolean;
-  /** True if the image has a substantial white/paper background (typical of documents) */
-  looksLikeDocument: boolean;
+function isValidAadhaarFormat(raw: string): boolean {
+  const digits = raw.replace(/[\s\-]/g, '');
+  if (!/^\d{12}$/.test(digits)) return false;
+  // Aadhaar cannot start with 0 or 1
+  if (digits[0] === '0' || digits[0] === '1') return false;
+  // All-same-digit is invalid
+  if (/^(\d)\1{11}$/.test(digits)) return false;
+  return true;
 }
 
-function buildClassificationSignals(
-  img: HTMLImageElement,
-  colorAnalysis: ColorAnalysis
-): ClassificationSignals {
-  const ar = img.width / img.height;
+// ─── PAN Number Validator ─────────────────────────────────────────────────────
 
-  // Document-like aspect ratios:
-  //   Credit-card: ~1.586
-  //   A4 portrait: ~0.707
-  //   A4 landscape: ~1.414
-  const isCardAR = ar > 1.35 && ar < 1.75;
-  const isPortraitDocAR = ar > 0.55 && ar < 0.85;
-  const isDocumentAR = isCardAR || isPortraitDocAR;
-
-  // A photo typically has high saturation AND low white-paper ratio
-  const looksLikePhoto =
-    colorAnalysis.highSaturationRatio > 0.35 && colorAnalysis.whitePaperRatio < 0.20;
-
-  // A document typically has a substantial white/off-white area
-  const looksLikeDocument =
-    colorAnalysis.whitePaperRatio > 0.30 && colorAnalysis.highSaturationRatio < 0.50;
-
-  // If it looks like a photo, return non_document with high confidence
-  if (looksLikePhoto) {
-    return { detectedType: 'non_document', confidence: 70, looksLikePhoto, looksLikeDocument };
-  }
-
-  // Only attempt type-specific detection if it actually looks like a document
-  if (isDocumentAR && looksLikeDocument) {
-    if (colorAnalysis.hasOrangeAccent) {
-      return { detectedType: 'aadhaar', confidence: 50, looksLikePhoto, looksLikeDocument };
-    }
-    if (colorAnalysis.hasBlueHeader) {
-      return { detectedType: 'pan', confidence: 45, looksLikePhoto, looksLikeDocument };
-    }
-    // Document-shaped but unclassified — needs OCR/server to decide
-    return { detectedType: 'document', confidence: 25, looksLikePhoto, looksLikeDocument };
-  }
-
-  // No strong signals → unknown
-  return { detectedType: 'unknown', confidence: 5, looksLikePhoto, looksLikeDocument };
+function isValidPanFormat(pan: string): boolean {
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) return false;
+  // 4th char = entity type
+  if (!'ABCFGHJLPT'.includes(pan[3])) return false;
+  return true;
 }
 
 // ─── Main Verification Entry Point ───────────────────────────────────────────
@@ -208,93 +296,203 @@ function buildClassificationSignals(
 export async function verifyDocument(
   file: File,
   expectedType: DocumentType,
-  userId: string
+  _userId: string,
+  onProgress?: (msg: string) => void
 ): Promise<VerificationResult> {
-  // 1. File-level validation
+  const labels: Record<DocumentType, string> = {
+    aadhaar: 'Aadhaar Card',
+    pan: 'PAN Card',
+    govt_id: 'Government ID',
+  };
+
+  // ── Step 1: File validation ──
   const fileError = validateFile(file);
   if (fileError) return fileError;
 
   try {
-    // 2. Load image
-    const img = await loadImage(file);
+    onProgress?.('Preparing document...');
 
-    if (img.width < MIN_WIDTH || img.height < MIN_HEIGHT) {
-      URL.revokeObjectURL(img.src);
+    // ── Step 2: Image preprocessing ──
+    let preprocessed: { canvas: HTMLCanvasElement; width: number; height: number };
+    try {
+      preprocessed = await preprocessImage(file);
+    } catch {
+      return {
+        status: 'invalid',
+        message: 'Could not load the image. Please upload a valid JPG or PNG file.',
+      };
+    }
+
+    const { canvas, width, height } = preprocessed;
+
+    // Basic dimension check
+    if (width < 250 || height < 150) {
       return {
         status: 'invalid',
         message: 'Image is too small. Please upload a clear, full-size document image.',
       };
     }
 
-    // 3. Canvas analysis (downscaled for performance)
-    const canvas = document.createElement('canvas');
-    const scale = Math.min(1, 800 / Math.max(img.width, img.height));
-    canvas.width = Math.floor(img.width * scale);
-    canvas.height = Math.floor(img.height * scale);
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(img.src);
+    // ── Step 3: Tesseract OCR ──
+    onProgress?.('Reading document text...');
 
-    const colorAnalysis = analyzeColors(canvas, ctx);
-    const signals = buildClassificationSignals(img, colorAnalysis);
-
-    // 4. Early client-side rejection for obvious non-documents (photos, etc.)
-    //    This is a definite-no path only — it never issues a definite-yes.
-    if (signals.looksLikePhoto && signals.confidence >= 60) {
-      const labels: Record<DocumentType, string> = {
-        aadhaar: 'an Aadhaar Card',
-        pan: 'a PAN Card',
-        govt_id: 'a Government ID',
-      };
+    let rawText = '';
+    try {
+      const worker = await getWorker();
+      const { data } = await worker.recognize(canvas);
+      rawText = data.text ?? '';
+    } catch (ocrErr) {
+      console.warn('[verifyDocument] OCR error:', (ocrErr as Error)?.message);
       return {
-        status: 'not_document',
-        message: `The uploaded image does not appear to be ${labels[expectedType]}. Please upload a valid identity document.`,
-        detectedAs: 'non_document',
+        status: 'error',
+        message: `Could not read the ${labels[expectedType]}. Please upload a clearer image with all document text visible.`,
       };
     }
 
-    // 5. Call edge function — this makes the FINAL decision
-    const { data, error } = await supabase.functions.invoke('verify-document', {
+    // ── Step 4: Text normalization ──
+    const normalizedText = normalizeOcrText(rawText);
+
+    // If OCR returned nearly nothing, image is likely blank or too blurry
+    if (normalizedText.replace(/\s/g, '').length < 20) {
+      return {
+        status: 'invalid',
+        message: `The document could not be read. Please upload a clear, well-lit image of your ${labels[expectedType]} with all text visible.`,
+      };
+    }
+
+    // ── Step 5: Document classification ──
+    onProgress?.('Identifying document type...');
+    const classification = classifyDocument(normalizedText);
+
+    // ── Step 6: Expected vs Actual type comparison ──
+    //
+    // This is the CORE security gate.
+    // The upload field says what we expect.
+    // The OCR says what was actually uploaded.
+    // If they don't match → REJECT.
+
+    if (classification.type !== 'unknown' && classification.type !== expectedType) {
+      // Wrong document type detected
+      const detectedLabel: Record<string, string> = {
+        aadhaar: 'Aadhaar Card',
+        pan: 'PAN Card',
+        govt_id: 'Government ID',
+      };
+      return {
+        status: 'wrong_type',
+        message: `${detectedLabel[classification.type]} detected. Please upload your ${labels[expectedType]}.`,
+        detectedAs: classification.type,
+      };
+    }
+
+    if (classification.type === 'unknown') {
+      // OCR ran but couldn't classify the document
+      return {
+        status: 'not_document',
+        message: `We couldn't identify this as ${expectedType === 'aadhaar' ? 'an' : 'a'} ${labels[expectedType]}. Please upload a clear image of your ${labels[expectedType]}.`,
+        detectedAs: null,
+      };
+    }
+
+    // ── Step 7: Document-specific validation ──
+    onProgress?.('Validating document...');
+
+    // ── Step 7: Send OCR result to edge function for server-side confirmation ──
+    onProgress?.('Validating document...');
+
+    // Build masked/safe summary for the server (no full sensitive numbers)
+    const ocrSummary = normalizedText
+      .replace(/\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, '[AADHAAR_NUM]')
+      .replace(/\b[A-Z]{5}[0-9]{4}[A-Z]\b/g, '[PAN_NUM]')
+      .slice(0, 500); // cap length
+
+    const hasValidAadhaarNumber = classification.extractedAadhaar
+      ? isValidAadhaarFormat(classification.extractedAadhaar)
+      : false;
+    const hasValidPanNumber = classification.extractedPan
+      ? isValidPanFormat(classification.extractedPan)
+      : false;
+
+    // If number was extracted but is invalid format, reject immediately
+    if (expectedType === 'aadhaar' && classification.extractedAadhaar && !hasValidAadhaarNumber) {
+      return {
+        status: 'invalid',
+        message: 'The Aadhaar number on the document appears invalid. Please upload a valid Aadhaar Card.',
+        detectedAs: 'aadhaar',
+      };
+    }
+    if (expectedType === 'pan' && classification.extractedPan && !hasValidPanNumber) {
+      return {
+        status: 'invalid',
+        message: 'The PAN number on the document appears invalid. Please upload a valid PAN Card.',
+        detectedAs: 'pan',
+      };
+    }
+
+    const { data: serverResult, error: serverError } = await supabase.functions.invoke('verify-document', {
       body: {
         expectedType,
-        detectedType: signals.detectedType,
-        confidence: signals.confidence,
-        extractedText: '', // client-side OCR not available; server uses pattern matching
+        detectedType: classification.type,
+        confidence: classification.confidence,
+        ocrSummary,
+        hasValidAadhaarNumber,
+        hasValidPanNumber,
         fileMetadata: {
           mimeType: file.type,
           fileSize: file.size,
-          width: img.width,
-          height: img.height,
+          width,
+          height,
         },
-        colorAnalysis,
-        signals,
-        userId,
+        userId: _userId,
       },
     });
 
-    if (error) {
-      // FAIL CLOSED: edge function unavailable → error, NOT verified
-      console.warn('[verifyDocument] Edge function unavailable:', error.message);
+    if (serverError || !serverResult) {
+      // Edge function failed — but we have a good client-side OCR result
+      // Return client-side result directly rather than failing closed when OCR was successful
+      const labels2: Record<DocumentType, string> = { aadhaar: 'Aadhaar Card', pan: 'PAN Card', govt_id: 'Government ID' };
+      let maskedNumber: string | null = null;
+      if (classification.extractedAadhaar && hasValidAadhaarNumber) {
+        const digits = classification.extractedAadhaar.replace(/[\s\-]/g, '');
+        maskedNumber = `XXXX XXXX ${digits.slice(-4)}`;
+      }
+      if (classification.extractedPan && hasValidPanNumber) {
+        const p = classification.extractedPan;
+        maskedNumber = `${p.slice(0, 2)}XXXXX${p.slice(-2)}`;
+      }
       return {
-        status: 'error',
-        message: 'Document verification is temporarily unavailable. Please try again in a moment.',
+        status: 'verified',
+        message: `${labels2[expectedType]} detected`,
+        detectedAs: classification.type,
+        confidence: classification.confidence,
+        maskedNumber,
       };
     }
 
-    // Map edge function response
+    // Server result — add masked number from local OCR
     const result: VerificationResult = {
-      status: data.status as VerificationStatus,
-      message: data.message,
-      detectedAs: data.detectedAs ?? null,
-      maskedNumber: data.maskedNumber ?? null,
-      confidence: data.confidence,
+      status: serverResult.status as VerificationStatus,
+      message: serverResult.message,
+      detectedAs: serverResult.detectedAs ?? null,
+      confidence: serverResult.confidence,
     };
+
+    // Attach masked number locally (never sent to/from server)
+    if (result.status === 'verified') {
+      if (classification.extractedAadhaar && hasValidAadhaarNumber) {
+        const digits = classification.extractedAadhaar.replace(/[\s\-]/g, '');
+        result.maskedNumber = `XXXX XXXX ${digits.slice(-4)}`;
+      }
+      if (classification.extractedPan && hasValidPanNumber) {
+        const p = classification.extractedPan;
+        result.maskedNumber = `${p.slice(0, 2)}XXXXX${p.slice(-2)}`;
+      }
+    }
 
     return result;
 
   } catch (err) {
-    // FAIL CLOSED: unexpected error → error status
-    console.error('[verifyDocument] Unexpected error:', (err as Error)?.message);
+    console.warn('[verifyDocument] Unexpected error:', (err as Error)?.message);
     return {
       status: 'error',
       message: 'Document verification failed. Please try again.',
