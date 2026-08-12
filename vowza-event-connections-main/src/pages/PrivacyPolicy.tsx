@@ -36,7 +36,7 @@ const sections = [
   {
     title: "7. Contact Us",
     content:
-      "For privacy-related questions, email us at privacy@vowza.com or write to Vowza Technologies Pvt. Ltd., Mumbai, India.",
+      "For privacy-related questions, email us at vowza.services@gmail.com or write to Vowza Technologies Pvt. Ltd., Hyderabad, India.",
   },
 ];
 

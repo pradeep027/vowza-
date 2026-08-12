@@ -127,8 +127,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
-    /* Prevent layout shift from scrollbar appearance */
     overflow-y: scroll;
+    border-top: 0;
+    border-color: transparent;
   }
 
   body {
@@ -136,6 +137,8 @@
     font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     letter-spacing: -0.01em;
+    border-top: 0;
+    outline: none;
     /* Fluid base: 15px mobile → 16px desktop */
     font-size: clamp(0.9375rem, 1vw + 0.75rem, 1rem);
   }
@@ -650,4 +653,10 @@
   #root {
     overflow-x: hidden;
   }
+}
+
+/* Remove any accidental top border/line on the page */
+html, body, #root {
+  border-top: 0;
+  outline: 0;
 }

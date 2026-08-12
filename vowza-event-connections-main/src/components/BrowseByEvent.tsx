@@ -124,13 +124,8 @@ const BrowseByEvent = () => {
                   {event.description}
                 </p>
 
-                {/* Artist count */}
-                <div className="flex items-center justify-between mt-auto">
-                  <span className="text-xs text-muted-foreground">
-                    {event.artistCount > 0
-                      ? `${event.artistCount.toLocaleString()}+ artists`
-                      : "Find artists"}
-                  </span>
+                {/* Arrow on hover */}
+                <div className="flex items-center justify-end mt-auto">
                   <ArrowRight className="w-3.5 h-3.5 text-maroon opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                 </div>
               </button>

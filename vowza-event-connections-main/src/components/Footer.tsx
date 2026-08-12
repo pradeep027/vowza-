@@ -1,21 +1,11 @@
 // ─── Footer — Corporate Premium Edition ──────────────────────────────────────
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Instagram, Facebook, Twitter, Youtube, Mail, Phone, MapPin, Shield, BadgeCheck, ArrowRight, Smartphone } from "lucide-react";
-import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
 
 const Footer = () => {
-  const [email, setEmail] = useState("");
   const location = useLocation();
-
-  const handleNewsletter = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !email.includes("@")) { toast.error("Please enter a valid email."); return; }
-    toast.success("Subscribed! 🎉 Watch for exclusive deals.");
-    setEmail("");
-  };
 
   const cols = [
     {
@@ -65,41 +55,7 @@ const Footer = () => {
       {/* Ambient glow — ties footer visually to the Hero's premium dark theme */}
       <div aria-hidden className="glow-orb pointer-events-none" style={{ top: "-10%", left: "50%", transform: "translateX(-50%)", width: 700, height: 400, background: "radial-gradient(ellipse at center, hsl(345 72% 30% / 0.18) 0%, transparent 70%)" }} />
 
-      {/* ── Newsletter ────────────────────────────────────────────────── */}
-      <div className="relative border-b border-white/8">
-        <div className="container px-4 py-12 md:py-14">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8 p-6 md:p-8 rounded-3xl glass-premium"
-          >
-            <div className="max-w-md">
-              <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-2">
-                Get exclusive deals & artist picks
-              </h3>
-              <p className="text-white/45 text-sm">Get weekly inspiration, planning tips, and exclusive offers.</p>
-            </div>
-            <form onSubmit={handleNewsletter} className="flex flex-col sm:flex-row w-full md:w-auto gap-2 min-w-0 md:min-w-[360px]">
-              <input
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl bg-white/8 border border-white/12 text-white placeholder:text-white/35 text-sm focus:outline-none focus:border-gold/40 transition-colors"
-              />
-              <motion.button
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                type="submit"
-                className="w-full sm:w-auto justify-center px-5 py-3 rounded-xl bg-gradient-gold text-gray-900 font-semibold text-sm shadow-gold hover:opacity-90 transition-all flex-shrink-0 flex items-center gap-1.5"
-              >
-                Subscribe <ArrowRight className="w-3.5 h-3.5" />
-              </motion.button>
-            </form>
-          </motion.div>
-        </div>
-      </div>
+
 
       {/* ── Main grid ─────────────────────────────────────────────────── */}
       <div className="relative container px-4 py-12 md:py-20">
@@ -171,14 +127,23 @@ const Footer = () => {
         {/* Contact + App row */}
         <div className="mt-14 pt-10 border-t border-white/8 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           <div className="flex flex-wrap gap-5">
-            <a href="mailto:hello@vowza.com" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
-              <Mail className="w-3.5 h-3.5" /> hello@vowza.com
+            <a href="mailto:vowza.services@gmail.com" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              <Mail className="w-3.5 h-3.5" /> vowza.services@gmail.com
             </a>
-            <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
-              <Phone className="w-3.5 h-3.5" /> +91 98765 43210
+            <a href="tel:+918712321751" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              <Phone className="w-3.5 h-3.5" /> +91 87123 21751
+            </a>
+            <a href="tel:+918919073577" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              +91 89190 73577
+            </a>
+            <a href="tel:+919032951931" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              +91 90329 51931
+            </a>
+            <a href="tel:+917569364703" className="flex items-center gap-2 text-sm text-white/40 hover:text-white transition-colors">
+              +91 75693 64703
             </a>
             <div className="flex items-center gap-2 text-sm text-white/40">
-              <MapPin className="w-3.5 h-3.5" /> Mumbai, India
+              <MapPin className="w-3.5 h-3.5" /> Hyderabad, India
             </div>
           </div>
           <div className="flex items-center gap-2">

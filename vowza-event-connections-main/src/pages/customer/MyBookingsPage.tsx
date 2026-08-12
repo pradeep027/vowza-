@@ -24,6 +24,9 @@ type PaymentStatus = Database['public']['Enums']['payment_status'];
 interface ProviderInfo {
   full_name: string;
   profession: string;
+  phone: string | null;
+  email: string | null;
+  whatsapp: string | null;
 }
 
 const statusStyles: Record<BookingStatus, string> = {
@@ -36,9 +39,9 @@ const statusStyles: Record<BookingStatus, string> = {
 };
 
 const statusLabels: Record<BookingStatus, string> = {
-  requested: 'Pending',
-  accepted: 'Confirmed',
-  in_progress: 'In Progress',
+  requested: 'Pending Artist Response',
+  accepted: 'Accepted — Pay 20% Advance',
+  in_progress: 'Confirmed',
   completed: 'Completed',
   cancelled: 'Cancelled',
   rejected: 'Declined',
@@ -53,7 +56,7 @@ const paymentStyles: Record<PaymentStatus, string> = {
 
 export default function MyBookingsPage() {
   const { user } = useAuth();
-  const { bookings, isLoading, cancelBooking } = useBookings();
+  const { bookings, isLoading, cancelBooking, refetch } = useBookings();
   const [providers, setProviders] = useState<Map<string, ProviderInfo>>(new Map());
   const [eventTypes, setEventTypes] = useState<Map<string, string>>(new Map());
   const [paymentStatuses, setPaymentStatuses] = useState<Map<string, PaymentStatus>>(new Map());
@@ -70,7 +73,7 @@ export default function MyBookingsPage() {
       const bookingIds = bookings.map(b => b.id);
 
       const [{ data: providersData }, { data: eventTypesData }, { data: paymentsData }] = await Promise.all([
-        supabase.from('provider_profiles').select('id, user_id, profession').in('id', providerIds),
+        supabase.from('provider_profiles').select('id, user_id, profession, whatsapp').in('id', providerIds),
         eventTypeIds.length
           ? supabase.from('event_types').select('id, name').in('id', eventTypeIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
@@ -80,12 +83,18 @@ export default function MyBookingsPage() {
       if (providersData) {
         const userIds = providersData.map(p => p.user_id);
         const { data: profilesData } = await supabase
-          .from('profiles').select('id, full_name').in('id', userIds);
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p.full_name]) ?? []);
-        setProviders(new Map(providersData.map(p => [p.id, {
-          full_name: profilesMap.get(p.user_id) || 'Unknown Artist',
-          profession: p.profession,
-        }])));
+          .from('profiles').select('id, full_name, phone, email').in('id', userIds);
+        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) ?? []);
+        setProviders(new Map(providersData.map(p => {
+          const prof = profilesMap.get(p.user_id) as any;
+          return [p.id, {
+            full_name: prof?.full_name || 'Unknown Artist',
+            profession: p.profession,
+            phone: prof?.phone || null,
+            email: prof?.email || null,
+            whatsapp: (p as any).whatsapp || prof?.phone || null,
+          }];
+        })));
       }
 
       setEventTypes(new Map((eventTypesData ?? []).map(e => [e.id, e.name])));
@@ -126,7 +135,6 @@ export default function MyBookingsPage() {
           <tr><th>Event Date</th><td>${new Date(booking.event_date).toLocaleDateString('en-IN')}</td></tr>
           <tr><th>Venue</th><td>${booking.venue_address}, ${booking.venue_city}</td></tr>
           <tr><th>Amount</th><td>₹${booking.amount.toLocaleString()}</td></tr>
-          <tr><th>Platform Fee</th><td>₹${(booking.platform_fee ?? 0).toLocaleString()}</td></tr>
           <tr><th>Status</th><td>${statusLabels[booking.status]}</td></tr>
         </table>
       </body></html>`;
@@ -174,6 +182,7 @@ export default function MyBookingsPage() {
                     providerName={providers.get(booking.provider_id)?.full_name ?? 'Unknown Artist'}
                     eventTypeName={booking.event_type_id ? eventTypes.get(booking.event_type_id) ?? 'Event' : 'Event'}
                     paymentStatus={paymentStatuses.get(booking.id)}
+                    providerContact={providers.get(booking.provider_id) ?? undefined}
                     onView={() => setDetailBooking(booking.id)}
                     onCancel={() => setCancelTarget(booking.id)}
                     onDownload={() => handleDownloadInvoice(booking)}
@@ -195,6 +204,7 @@ export default function MyBookingsPage() {
                     providerName={providers.get(booking.provider_id)?.full_name ?? 'Unknown Artist'}
                     eventTypeName={booking.event_type_id ? eventTypes.get(booking.event_type_id) ?? 'Event' : 'Event'}
                     paymentStatus={paymentStatuses.get(booking.id)}
+                    providerContact={providers.get(booking.provider_id) ?? undefined}
                     onView={() => setDetailBooking(booking.id)}
                     onDownload={() => handleDownloadInvoice(booking)}
                   />
@@ -258,7 +268,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function BookingCard({
-  booking, index, providerName, eventTypeName, paymentStatus, onView, onCancel, onDownload,
+  booking, index, providerName, eventTypeName, paymentStatus, onView, onCancel, onDownload, providerContact,
 }: {
   booking: any;
   index: number;
@@ -268,7 +278,9 @@ function BookingCard({
   onView: () => void;
   onCancel?: () => void;
   onDownload: () => void;
+  providerContact?: { phone: string | null; email: string | null; whatsapp: string | null };
 }) {
+  const advancePaid = booking.status === 'in_progress' || booking.status === 'completed';
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -293,6 +305,13 @@ function BookingCard({
           </div>
           <h3 className="font-semibold text-foreground truncate">{providerName}</h3>
           <p className="text-sm text-muted-foreground">{eventTypeName}</p>
+          {/* Payment info for accepted bookings */}
+          {booking.status === 'accepted' && (
+            <div className="mt-2 rounded-xl bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 leading-relaxed">
+              Your booking has been accepted. Please pay the 20% advance (₹{Math.round(booking.amount * 0.2).toLocaleString()}) to confirm.
+              Your payment will be securely held by Vowza until the service is successfully completed.
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
@@ -312,10 +331,65 @@ function BookingCard({
           <Button variant="outline" size="sm" onClick={onDownload}>
             <Download className="w-4 h-4 mr-1" /> Invoice
           </Button>
-          {onCancel && booking.status === 'requested' && (
+          {onCancel && (booking.status === 'requested' || booking.status === 'accepted') && (
             <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50" onClick={onCancel}>
               <XCircle className="w-4 h-4 mr-1" /> Cancel
             </Button>
+          )}
+          {booking.status === 'accepted' && (
+            <Button size="sm" className="bg-[#8B1538] hover:bg-[#70102d] text-white"
+              onClick={() => {
+                toast.promise(
+                  (async () => {
+                    const table = booking._source === 'photography' ? 'photography_package_bookings' : booking._source === 'catering' ? 'catering_bookings' : booking._source === 'drone' ? 'drone_bookings' : booking._source === 'videography' ? 'videography_bookings' : booking._source === 'dj' ? 'dj_bookings' : booking._source === 'decorator' ? 'decorator_bookings' : booking._source === 'makeup' ? 'makeup_bookings' : booking._source === 'mehendi' ? 'mehendi_bookings' : booking._source === 'anchor' ? 'anchor_bookings' : booking._source === 'banquet' ? 'banquet_bookings' : booking._source === 'rental' ? 'rental_bookings' : booking._source === 'priest' ? 'priest_bookings' : booking._source === 'water' ? 'water_bookings' : booking._source === 'band' ? 'band_bookings' : booking._source === 'singer' ? 'singer_bookings' : booking._source === 'dancer' ? 'dancer_bookings' : 'bookings';
+                    const advanceAmt = Math.round(booking.amount * 0.2);
+                    await supabase.from(table as any).update({
+                      advance_paid_at: new Date().toISOString(),
+                      confirmed_at: new Date().toISOString(),
+                      calendar_locked: true,
+                      status: 'in_progress',
+                    }).eq('id', booking.id);
+                    await NotificationService.notifyAdvancePaymentSuccess(booking.customer_id, booking.provider_id, booking.id, advanceAmt);
+                    // Immediately refetch to update UI
+                    setTimeout(() => refetch(), 500);
+                  })(),
+                  { loading: 'Processing payment to Vowza...', success: 'Advance paid! Booking confirmed. Payment is securely held by Vowza.', error: 'Payment failed' }
+                );
+              }}>
+              Pay 20% Advance
+            </Button>
+          )}
+          {/* Communication Section */}
+          {booking.status === 'accepted' && !advancePaid && (
+            <div className="mt-3 rounded-xl bg-stone-50 border border-stone-200 p-3">
+              <p className="text-xs font-semibold text-stone-500 flex items-center gap-1.5">🔒 Communication Locked</p>
+              <p className="text-[10px] text-stone-400 mt-1">Pay the advance to unlock artist contact details.</p>
+            </div>
+          )}
+          {advancePaid && providerContact && (
+            <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-2">
+              <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">✓ Communication Unlocked</p>
+              <div className="flex flex-wrap gap-2">
+                {providerContact.phone && (
+                  <a href={`tel:${providerContact.phone}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-200 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition">
+                    📞 Call
+                  </a>
+                )}
+                {providerContact.whatsapp && (
+                  <a href={`https://wa.me/${providerContact.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-200 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition">
+                    💬 WhatsApp
+                  </a>
+                )}
+                {providerContact.email && (
+                  <a href={`mailto:${providerContact.email}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-200 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition">
+                    ✉️ Email
+                  </a>
+                )}
+                {providerContact.phone && (
+                  <span className="text-[10px] text-emerald-600 font-mono">{providerContact.phone}</span>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

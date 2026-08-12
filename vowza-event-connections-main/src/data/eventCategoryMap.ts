@@ -20,7 +20,7 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
       'music_band', 'normal_band', 'maharashtra_band', 'traditional_band',
       'dj', 'singer', 'classical_musician', 'instrumental_artist',
       'catering_services', 'banquet_hall', 'anchor', 'host',
-      'lighting_services', 'sound_services', 'pandit',
+      'pandit',
     ],
   },
   {
@@ -30,7 +30,7 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
       'photographer', 'videographer', 'cinematographer', 'drone_operator',
       'wedding_decorator', 'stage_decorator', 'event_decorator',
       'music_band', 'normal_band', 'dj', 'singer', 'instrumental_artist',
-      'anchor', 'host', 'lighting_services', 'sound_services',
+      'anchor', 'host',
       'catering_services', 'banquet_hall',
     ],
   },
@@ -38,7 +38,7 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
     eventId: 'birthday',
     eventName: 'Birthday',
     categories: [
-      'magician', 'photographer', 'videographer',
+      'photographer', 'videographer',
       'event_decorator', 'dj', 'anchor', 'host',
       'catering_services', 'singer', 'dancer',
     ],
@@ -49,7 +49,7 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
     categories: [
       'photographer', 'videographer', 'cinematographer',
       'anchor', 'host', 'music_band', 'instrumental_artist',
-      'lighting_services', 'sound_services', 'stage_decorator',
+      'stage_decorator',
       'event_planner', 'catering_services', 'banquet_hall',
     ],
   },
@@ -66,9 +66,9 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
     eventId: 'sangeet',
     eventName: 'Sangeet Night',
     categories: [
-      'choreographer', 'dancer', 'kuchipudi_dancer', 'classical_dancer', 'western_dancer',
+      'dancer', 'kuchipudi_dancer', 'classical_dancer', 'western_dancer',
       'dj', 'music_band', 'singer', 'normal_band',
-      'photographer', 'videographer', 'lighting_services', 'sound_services',
+      'photographer', 'videographer',
       'event_decorator', 'stage_decorator',
     ],
   },
@@ -103,8 +103,8 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
     eventName: 'College Fest',
     categories: [
       'music_band', 'normal_band', 'dj', 'singer',
-      'dancer', 'choreographer', 'anchor', 'host',
-      'photographer', 'videographer', 'lighting_services', 'sound_services',
+      'dancer', 'anchor', 'host',
+      'photographer', 'videographer',
     ],
   },
   {
@@ -120,15 +120,47 @@ export const EVENT_CATEGORY_MAP: EventCategoryMapping[] = [
     eventName: 'Private Party',
     categories: [
       'dj', 'music_band', 'singer', 'photographer', 'videographer',
-      'event_decorator', 'lighting_services', 'sound_services',
-      'catering_services', 'anchor', 'magician',
+      'event_decorator',
+      'catering_services', 'anchor',
+    ],
+  },
+  {
+    eventId: 'anniversary',
+    eventName: 'Anniversary',
+    categories: [
+      'photographer', 'videographer', 'cinematographer',
+      'wedding_decorator', 'event_decorator',
+      'dj', 'singer', 'music_band',
+      'catering_services', 'anchor', 'makeup_artist',
     ],
   },
 ];
 
-/** Get the categories for a given event ID */
+/** Get the categories for a given event ID or event name (case-insensitive, fuzzy) */
 export function getCategoriesForEvent(eventId: string): string[] | null {
-  const mapping = EVENT_CATEGORY_MAP.find(m => m.eventId === eventId);
+  if (!eventId) return null;
+  const lower = eventId.toLowerCase().trim();
+  const normalized = lower.replace(/[^a-z0-9]/g, '');
+
+  // Exact match first
+  let mapping = EVENT_CATEGORY_MAP.find(m => m.eventId === lower || m.eventId === normalized);
+  if (mapping) return mapping.categories;
+
+  // Match by eventName (case-insensitive)
+  mapping = EVENT_CATEGORY_MAP.find(m => m.eventName.toLowerCase() === lower);
+  if (mapping) return mapping.categories;
+
+  // Fuzzy: normalized input starts with eventId or eventId starts with normalized
+  mapping = EVENT_CATEGORY_MAP.find(m =>
+    normalized.startsWith(m.eventId) || m.eventId.startsWith(normalized)
+  );
+  if (mapping) return mapping.categories;
+
+  // Fuzzy: normalized eventName matches
+  mapping = EVENT_CATEGORY_MAP.find(m =>
+    m.eventName.toLowerCase().replace(/[^a-z0-9]/g, '').startsWith(normalized) ||
+    normalized.startsWith(m.eventName.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  );
   return mapping ? mapping.categories : null;
 }
 

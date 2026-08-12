@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { validateFullName, validateEmail, isGarbageText } from "@/utils/validation";
 
 export default function Contact() {
   const [name,    setName]    = useState("");
@@ -14,10 +15,13 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !message.trim()) {
-      toast.error("Please fill in all required fields.");
-      return;
-    }
+    const nameCheck = validateFullName(name);
+    if (!nameCheck.valid) { toast.error(nameCheck.error!); return; }
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) { toast.error(emailCheck.error!); return; }
+    if (!message.trim()) { toast.error("Please enter your message."); return; }
+    if (message.trim().length < 10) { toast.error("Message must be at least 10 characters."); return; }
+    if (isGarbageText(message)) { toast.error("Please enter a meaningful message."); return; }
     setSending(true);
     // Simulated send — wire to email service or Supabase in production
     await new Promise(r => setTimeout(r, 1200));
@@ -49,11 +53,14 @@ export default function Contact() {
               {/* Contact info */}
               <div className="space-y-5">
                 {[
-                  { icon: Mail,     label: "Email",    value: "hello@vowza.com",    href: "mailto:hello@vowza.com" },
-                  { icon: Phone,    label: "Phone",    value: "+91 98765 43210",    href: "tel:+919876543210" },
-                  { icon: MapPin,   label: "Address",  value: "Mumbai, Maharashtra, India", href: undefined },
+                  { icon: Mail,     label: "Email",    value: "vowza.services@gmail.com",    href: "mailto:vowza.services@gmail.com" },
+                  { icon: Phone,    label: "Phone",    value: "+91 87123 21751",    href: "tel:+918712321751" },
+                  { icon: Phone,    label: "Phone 2",  value: "+91 89190 73577",    href: "tel:+918919073577" },
+                  { icon: Phone,    label: "Phone 3",  value: "+91 90329 51931",    href: "tel:+919032951931" },
+                  { icon: Phone,    label: "Phone 4",  value: "+91 75693 64703",    href: "tel:+917569364703" },
+                  { icon: MapPin,   label: "Address",  value: "Hyderabad, India", href: undefined },
                   { icon: Clock,    label: "Hours",    value: "Mon–Sat, 9 AM – 7 PM IST", href: undefined },
-                  { icon: MessageCircle, label: "Support",  value: "support@vowza.com",    href: "mailto:support@vowza.com" },
+                  { icon: MessageCircle, label: "Support",  value: "vowza.services@gmail.com",    href: "mailto:vowza.services@gmail.com" },
                 ].map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4 p-5 bg-surface-1 rounded-2xl border border-border/60">
                     <div className="w-10 h-10 rounded-xl bg-maroon/8 flex items-center justify-center flex-shrink-0">

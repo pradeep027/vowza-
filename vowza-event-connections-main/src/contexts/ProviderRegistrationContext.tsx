@@ -18,8 +18,9 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 
 export interface Step1 {
   fullName: string; phone: string; otpSent: boolean; otpVerified: boolean;
-  otp: string; email: string; state: string; city: string; area: string;
-  address: string; profession: string; languages: string[];
+  otp: string; email: string; state: string; district: string; city: string; area: string;
+  address: string; pincode: string; latitude: number | null; longitude: number | null;
+  profession: string; languages: string[];
 }
 export interface Step2 {
   experience: string; about: string; serviceAreas: string[];
@@ -29,17 +30,18 @@ export interface Step3 {
   portfolioFiles: { file: File; preview: string; type: 'image' | 'video' }[];
   instagram: string; website: string;
 }
+export type DocVerifyStatus = 'idle' | 'processing' | 'verified' | 'invalid' | 'wrong_type' | 'not_document' | 'error';
 export interface Step4 {
-  aadhaarFile: File | null; aadhaarPreview: string;
-  govtIdFile:  File | null; govtIdPreview:  string;
-  panFile:     File | null; panPreview:     string;
+  aadhaarFile: File | null; aadhaarPreview: string; aadhaarStatus: DocVerifyStatus; aadhaarMessage: string;
+  panFile:     File | null; panPreview:     string; panStatus: DocVerifyStatus; panMessage: string;
+  govtIdFile:  File | null; govtIdPreview:  string; govtIdStatus: DocVerifyStatus; govtIdMessage: string;
   termsAccepted: boolean;
 }
 
-const EMPTY_S1: Step1 = { fullName:'', phone:'', otpSent:false, otpVerified:false, otp:'', email:'', state:'', city:'', area:'', address:'', profession:'', languages:[] };
+const EMPTY_S1: Step1 = { fullName:'', phone:'', otpSent:false, otpVerified:false, otp:'', email:'', state:'', district:'', city:'', area:'', address:'', pincode:'', latitude:null, longitude:null, profession:'', languages:[] };
 const EMPTY_S2: Step2 = { experience:'', about:'', serviceAreas:[], selfieUrl:null, selfieBlob:null };
 const EMPTY_S3: Step3 = { portfolioFiles:[], instagram:'', website:'' };
-const EMPTY_S4: Step4 = { aadhaarFile:null, aadhaarPreview:'', govtIdFile:null, govtIdPreview:'', panFile:null, panPreview:'', termsAccepted:false };
+const EMPTY_S4: Step4 = { aadhaarFile:null, aadhaarPreview:'', aadhaarStatus:'idle', aadhaarMessage:'', panFile:null, panPreview:'', panStatus:'idle', panMessage:'', govtIdFile:null, govtIdPreview:'', govtIdStatus:'idle', govtIdMessage:'', termsAccepted:false };
 
 const STEP_KEY = 'vowza_reg_step';
 const S1_KEY   = 'vowza_reg_s1';

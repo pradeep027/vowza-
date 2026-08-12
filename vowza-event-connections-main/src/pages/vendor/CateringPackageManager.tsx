@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Plus, Pencil, Copy, Trash2, Eye, EyeOff, Utensils, Users, X,
+  Plus, Pencil, Trash2, Eye, EyeOff, Utensils, Users, X,
   Check, ChevronRight, ChevronLeft, GripVertical, Star, Leaf, Upload,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -289,20 +289,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
     }
   };
 
-  /* ─── Duplicate / Toggle / Remove ──────────────────────────────────────── */
-  const duplicate = async (pkg: any) => {
-    const payload: any = {
-      provider_id: provider.id, name: `${pkg.name} (Copy)`, price_per_plate: pkg.price_per_plate,
-      cuisine_types: pkg.cuisine_types, service_types: pkg.service_types,
-      meal_types: pkg.meal_types, serving_styles: pkg.serving_styles,
-      min_guests: pkg.min_guests, max_guests: pkg.max_guests,
-      is_veg: pkg.is_veg, is_nonveg: pkg.is_nonveg, is_jain: pkg.is_jain,
-      status: 'draft', cancellation_policy: pkg.cancellation_policy,
-    };
-    await supabase.from('catering_packages' as any).insert(payload);
-    refresh();
-    toast.success('Package duplicated');
-  };
+  /* ─── Toggle / Remove ────────────────────────────────────────────────── */
 
   const toggleStatus = async (pkg: any) => {
     const newStatus = pkg.status === 'active' ? 'draft' : 'active';
@@ -412,7 +399,6 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
                   <button onClick={() => edit(pkg)} className="flex-1 rounded-lg border border-[#e7d9c4] py-2 text-xs font-medium text-[#3d1924] transition hover:bg-[#fffaf3]">
                     <Pencil className="mr-1 inline h-3 w-3" />Edit
                   </button>
-                  <button onClick={() => duplicate(pkg)} className="rounded-lg border border-[#e7d9c4] p-2 transition hover:bg-[#fffaf3]" title="Duplicate"><Copy className="h-3.5 w-3.5 text-stone-600" /></button>
                   <button onClick={() => toggleStatus(pkg)} className="rounded-lg border border-[#e7d9c4] p-2 transition hover:bg-[#fffaf3]" title="Toggle status">
                     {pkg.status === 'active' ? <EyeOff className="h-3.5 w-3.5 text-stone-600" /> : <Eye className="h-3.5 w-3.5 text-stone-600" />}
                   </button>

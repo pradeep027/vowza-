@@ -18,11 +18,23 @@ import AppLogo from "@/components/AppLogo";
 import { useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
-import { isPhotographer, isWaterSupplier, isCaterer, isVideographer } from "@/lib/providerCategory";
-import WaterSupplierMenu from "@/components/WaterSupplierMenu";
+import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isDancer, isSinger } from "@/lib/providerCategory";
+import WaterSupplyMenu from "@/components/WaterSupplyMenu";
 import PhotographerPackages from "@/components/PhotographerPackages";
 import CateringMenu from "@/components/CateringMenu";
 import VideographyMenu from "@/components/VideographyMenu";
+import DroneMenu from "@/components/DroneMenu";
+import DJMenu from "@/components/DJMenu";
+import DecoratorMenu from "@/components/DecoratorMenu";
+import MakeupMenu from "@/components/MakeupMenu";
+import MehendiMenu from "@/components/MehendiMenu";
+import AnchorMenu from "@/components/AnchorMenu";
+import BanquetHallMenu from "@/components/BanquetHallMenu";
+import RentalMenu from "@/components/RentalMenu";
+import PriestMenu from "@/components/PriestMenu";
+import BandMenu from "@/components/BandMenu";
+import DancerMenu from "@/components/DancerMenu";
+import SingerMenu from "@/components/SingerMenu";
 
 const fmt = (n: number) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
@@ -396,7 +408,10 @@ const ProviderProfile = () => {
                       {portfolio.map((item: any) => (
                         <button key={item.id} onClick={() => setActiveGallery(item.media_url)} className="relative group aspect-square rounded-xl overflow-hidden bg-muted">
                           {item.media_type === "video" ? (
-                            <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-8 h-8 text-muted-foreground" /></div>
+                            <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                              <VideoIcon className="w-8 h-8 text-white/60" />
+                              <span className="absolute bottom-2 left-2 text-[9px] font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">▶ VIDEO</span>
+                            </div>
                           ) : (
                             <img src={item.media_url} alt={item.title || ""} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           )}
@@ -409,7 +424,7 @@ const ProviderProfile = () => {
               )}
 
               {/* ── PACKAGES TAB ── */}
-              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplierMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : isVideographer(provider) ? <VideographyMenu provider={provider} profile={profile} /> : (
+              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplyMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : isVideographer(provider) ? <VideographyMenu provider={provider} profile={profile} /> : isDroneOperator(provider) ? <DroneMenu provider={provider} profile={profile} /> : isDJ(provider) ? <DJMenu provider={provider} profile={profile} /> : isDecorator(provider) ? <DecoratorMenu provider={provider} profile={profile} /> : isMakeupArtist(provider) ? <MakeupMenu provider={provider} profile={profile} /> : isMehendiArtist(provider) ? <MehendiMenu provider={provider} profile={profile} /> : isAnchor(provider) ? <AnchorMenu provider={provider} profile={profile} /> : isBanquetHall(provider) ? <BanquetHallMenu provider={provider} profile={profile} /> : isRentalService(provider) ? <RentalMenu provider={provider} profile={profile} /> : isPriest(provider) ? <PriestMenu provider={provider} profile={profile} /> : isBand(provider) ? <BandMenu provider={provider} profile={profile} /> : isDancer(provider) ? <DancerMenu provider={provider} profile={profile} /> : isSinger(provider) ? <SingerMenu provider={provider} profile={profile} /> : (
                 <div className="bg-surface-1 rounded-2xl border border-border/60 p-6">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Pricing & Packages</h2>
                   {packages.length === 0 ? (
@@ -594,7 +609,11 @@ const ProviderProfile = () => {
       {activeGallery && (
         <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={() => setActiveGallery(null)}>
           <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"><X className="w-5 h-5" /></button>
-          <img src={activeGallery} alt="Gallery" className="max-w-full max-h-[90vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+          {activeGallery.match(/\.(mp4|webm|mov|avi|mkv)$/i) || portfolio.find((p: any) => p.media_url === activeGallery)?.media_type === 'video' ? (
+            <video src={activeGallery} controls autoPlay className="max-w-full max-h-[90vh] rounded-2xl" onClick={e => e.stopPropagation()} />
+          ) : (
+            <img src={activeGallery} alt="Gallery" className="max-w-full max-h-[90vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+          )}
         </div>
       )}
 

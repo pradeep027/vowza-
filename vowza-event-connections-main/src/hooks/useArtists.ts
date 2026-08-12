@@ -76,10 +76,17 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       let query = supabase
         .from('provider_profiles')
         .select('*')
-        .in('verification_status', ['approved', 'verified'])
-        .eq('is_published' as any, true);
+        .in('verification_status', ['approved', 'verified']);
+
+      // Only add is_published filter if not filtering by categories (event mode fetches all then filters)
+      if (!filters.categories || filters.categories.length === 0) {
+        query = query.eq('is_published' as any, true);
+      }
 
       if (filters.category)  query = query.eq('profession', filters.category as any);
+      if (filters.categories && filters.categories.length > 0) {
+        query = query.in('profession', filters.categories as any);
+      }
       if (filters.budgetMin !== undefined) query = query.gte('price_min', filters.budgetMin);
       if (filters.budgetMax !== undefined) query = query.lte('price_max', filters.budgetMax);
       if (filters.verified  !== undefined) query = query.eq('is_verified', filters.verified);
@@ -87,7 +94,10 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       if (filters.featured  !== undefined) query = query.eq('is_featured' as any, filters.featured);
 
       const { data: providers, error: pErr } = await query;
-      if (pErr) throw pErr;
+      if (pErr) {
+        console.error('[useArtists] Query error:', pErr.message);
+        return [];
+      }
       if (!providers || providers.length === 0) return [];
 
       // Step 2 — Fetch matching profiles
@@ -139,11 +149,6 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       });
 
       // Step 4 — Client-side filters
-      // Filter by multiple allowed professions (event-based filtering)
-      if (filters.categories && filters.categories.length > 0) {
-        artists = artists.filter(a => filters.categories!.includes(a.profession));
-      }
-
       if (filters.search) {
         const q = filters.search.toLowerCase();
         artists = artists.filter(a =>

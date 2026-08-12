@@ -20,6 +20,7 @@ import {
   Lock, Eye, EyeOff, ArrowLeft, Mail,
   User, Phone, CheckCircle, ArrowRight
 } from 'lucide-react';
+import { validateFullName, validateEmail, validateIndianPhone } from '@/utils/validation';
 
 // ── Layout shell — MODULE scope (never re-created on parent re-render) ────────
 const AuthLayout = memo(({ children }: { children: React.ReactNode }) => (
@@ -145,17 +146,44 @@ const Auth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signupName.trim()) { toast.error('Please enter your full name'); return; }
+    // Validate name
+    const nameCheck = validateFullName(signupName);
+    if (!nameCheck.valid) { toast.error(nameCheck.error!); return; }
+    // Validate email
+    const emailCheck = validateEmail(signupEmail);
+    if (!emailCheck.valid) { toast.error(emailCheck.error!); return; }
+    // Phone validation — required, must be valid Indian number
+    const phoneCheck = validateIndianPhone(signupPhone);
+    if (!phoneCheck.valid) { toast.error(phoneCheck.error!); return; }
+    const phoneClean = signupPhone.trim().replace(/[\s\-()]/g, '');
+    const phoneDigits = phoneClean.replace(/^\+91/, '').replace(/^91/, '').replace(/^0/, '');
     if (signupPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     setIsLoading(true);
-    const { error } = await signUp(signupEmail.trim(), signupPassword, signupName.trim(), signupPhone.trim() || undefined);
+    const normalizedPhone = '+91' + phoneDigits;
+    const { data, error } = await signUp(signupEmail.trim(), signupPassword, signupName.trim(), normalizedPhone);
     if (error) {
+      console.error('[Auth] signUp error:', error.message, error);
       if (error.message?.toLowerCase().includes('already registered'))
         toast.error('This email is already registered. Please log in.');
       else toast.error(error.message ?? 'Sign up failed. Please try again.');
-    } else {
-      setSignupDone(true);
+      setIsLoading(false);
+      return;
     }
+
+    // Check if user was actually created (identities = 0 means email already exists but unconfirmed)
+    if (data?.user && data.user.identities && data.user.identities.length === 0) {
+      toast.error('This email is already registered. Please log in or check your email for verification.');
+      setIsLoading(false);
+      return;
+    }
+
+    console.log('[Auth] Signup completed, confirmation email should be sent by Supabase via Brevo SMTP');
+    console.log('[Auth] User created:', data?.user?.id, '| Email:', signupEmail.trim());
+    console.log('[Auth] Session:', data?.session ? 'exists (will be unconfirmed)' : 'none (email confirmation required)');
+
+    // Do NOT sign out — with "Confirm email" enabled, no active session is created
+    // Supabase handles sending the confirmation email via configured SMTP (Brevo)
+    setSignupDone(true);
     setIsLoading(false);
   };
 
@@ -196,21 +224,116 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  // ── Render: signup done ─────────────────────────────────────────────────────
+  // ── OTP verification state ───────────────────────────────────────────────────
+  const [otpCode, setOtpCode] = useState('');
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpResending, setOtpResending] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const t = setTimeout(() => setOtpCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpCooldown]);
+
+  // ── Verify signup OTP ───────────────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) { toast.error('Please enter the 6-digit verification code'); return; }
+    setOtpVerifying(true);
+    const email = signupEmail.trim().toLowerCase();
+    console.log('[Auth] Verifying OTP for:', email, '| Code length:', otpCode.length);
+
+    // Try 'email' type first (standard for email OTP in Supabase v2)
+    let result = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode.trim(),
+      type: 'email',
+    });
+
+    // If 'email' type fails, try 'signup' type as fallback
+    if (result.error) {
+      console.log('[Auth] verifyOtp type=email failed:', result.error.message, '| Trying type=signup...');
+      result = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode.trim(),
+        type: 'signup',
+      });
+    }
+
+    if (result.error) {
+      console.error('[Auth] verifyOtp failed:', result.error.message, result.error);
+      toast.error(result.error.message || 'Invalid or expired code. Please try again.');
+    } else {
+      console.log('[Auth] OTP verified successfully! Session:', !!result.data.session);
+      toast.success('Email verified! Welcome to Vowza! 🎉');
+      // User is now logged in — redirect will happen via useEffect
+    }
+    setOtpVerifying(false);
+  };
+
+  // ── Resend signup OTP ───────────────────────────────────────────────────────
+  const handleResendOtp = async () => {
+    if (otpCooldown > 0) return;
+    setOtpResending(true);
+    const email = signupEmail.trim().toLowerCase();
+    console.log('[Auth] Resending confirmation email to:', email);
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) {
+      console.error('[Auth] Resend failed:', error.message, error);
+      toast.error(error.message || 'Failed to resend code. Please try again.');
+    } else {
+      console.log('[Auth] Resend successful');
+      toast.success('New verification code sent! Check your email.');
+      setOtpCooldown(60);
+    }
+    setOtpResending(false);
+  };
+
+  // ── Render: signup OTP verification ─────────────────────────────────────────
   if (signupDone) return (
     <AuthLayout>
       <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-5">
-          <CheckCircle className="w-8 h-8 text-emerald-500" />
+        <div className="w-16 h-16 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto mb-5">
+          <Mail className="w-8 h-8 text-gold-dark" />
         </div>
-        <h2 className="text-2xl font-display font-bold text-foreground mb-2">Check Your Email</h2>
-        <p className="text-muted-foreground text-sm mb-1">We sent a confirmation link to</p>
+        <h2 className="text-2xl font-display font-bold text-foreground mb-2">Verify Your Email</h2>
+        <p className="text-muted-foreground text-sm mb-1">Enter the 6-digit code sent to</p>
         <p className="font-semibold text-foreground text-sm mb-6">{signupEmail}</p>
-        <p className="text-xs text-muted-foreground mb-6">
-          Click the link to activate your account, then log in. Check spam if you don't see it.
-        </p>
-        <button onClick={() => setSignupDone(false)} className="btn-primary w-full justify-center">
-          Back to Login
+
+        <div className="mb-5">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={otpCode}
+            onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="• • • • • •"
+            className="w-full text-center text-3xl font-bold tracking-[0.5em] py-4 rounded-xl border-2 border-border focus:border-gold focus:ring-2 focus:ring-gold/20 outline-none transition"
+            autoFocus
+          />
+        </div>
+
+        <button
+          onClick={handleVerifyOtp}
+          disabled={otpCode.length !== 6 || otpVerifying}
+          className="btn-primary w-full justify-center py-3 mb-4"
+        >
+          {otpVerifying ? 'Verifying...' : 'Verify & Continue'}
+        </button>
+
+        <button
+          onClick={handleResendOtp}
+          disabled={otpCooldown > 0 || otpResending}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {otpCooldown > 0 ? `Resend code in ${otpCooldown}s` : otpResending ? 'Sending...' : "Didn't receive the code? Resend"}
+        </button>
+
+        <p className="text-xs text-muted-foreground mt-4">Check your spam folder if you don't see the email.</p>
+
+        <button onClick={() => { setSignupDone(false); setOtpCode(''); }} className="text-xs text-muted-foreground hover:text-foreground mt-4 block mx-auto underline">
+          Use a different email
         </button>
       </div>
     </AuthLayout>
@@ -428,16 +551,17 @@ const Auth = () => {
 
               <div>
                 <label htmlFor="signup-phone" className="text-xs font-semibold text-foreground block mb-1.5">
-                  Phone <span className="text-muted-foreground font-normal">(optional)</span>
+                  Phone *
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                   <input
                     id="signup-phone"
                     type="tel"
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 87123 XXXXX"
                     value={signupPhone}
                     onChange={e => setSignupPhone(e.target.value)}
+                    required
                     autoComplete="tel"
                     className="input-premium pl-10 w-full"
                   />

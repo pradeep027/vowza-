@@ -16,14 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 // ── Role → Home route ─────────────────────────────────────────────────────────
-// Pure function so it can be reused and unit-tested independently of React.
-// Accepts both naming conventions ('provider'/'vendor', 'super_admin'/'superadmin').
-export function resolveHome(roles: string[] = []): string {
-  if (roles.includes('super_admin') || roles.includes('superadmin')) return '/super-admin/dashboard';
-  if (roles.includes('admin'))                                        return '/admin/dashboard';
-  if (roles.includes('provider') || roles.includes('vendor'))         return '/vendor/dashboard';
-  if (roles.length > 0) return '/dashboard'; // authenticated customer
-  return '/'; // unauthenticated
+// Always navigates to the main Vowza home page.
+export function resolveHome(_roles: string[] = []): string {
+  return '/';
 }
 
 type Theme = 'light' | 'dark';

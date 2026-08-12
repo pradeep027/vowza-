@@ -1,6 +1,6 @@
 import {
   Music, Disc3, Camera, Video, Palette, Users, Mic2, Sparkles,
-  Utensils, CalendarDays, Lightbulb, Volume2, Star, Heart, Plane
+  Utensils, CalendarDays, Star, Heart, Plane
 } from 'lucide-react';
 
 // ─── All 34 profession types matching Supabase enum + V2 extension ────────────
@@ -21,7 +21,6 @@ export type ProfessionType =
   | 'cinematographer'
   | 'drone_operator'
   | 'dancer'
-  | 'choreographer'
   | 'kuchipudi_dancer'
   | 'classical_dancer'
   | 'western_dancer'
@@ -32,13 +31,10 @@ export type ProfessionType =
   | 'mehendi_artist'
   | 'anchor'
   | 'host'
-  | 'magician'
   | 'stand_up_comedian'
   | 'celebrity_artist'
   | 'live_performer'
   | 'folk_artist'
-  | 'lighting_services'
-  | 'sound_services'
   | 'event_planner'
   | 'wedding_planner'
   | 'catering_services'
@@ -191,14 +187,6 @@ export const artistCategories: ArtistCategory[] = [
     ],
   },
   {
-    value: 'choreographer', label: 'Choreographer', description: 'Dance choreography and training',
-    icon: Users, color: 'from-fuchsia-500 to-pink-600',
-    dynamicFields: [
-      { name: 'specialization', label: 'Specialization', type: 'text', placeholder: 'Wedding choreography, Flash mob...' },
-      { name: 'training_days', label: 'Training Sessions (days)', type: 'number', placeholder: '10' },
-    ],
-  },
-  {
     value: 'kuchipudi_dancer', label: 'Kuchipudi Dancer', description: 'Traditional Kuchipudi classical dance',
     icon: Users, color: 'from-amber-500 to-yellow-600',
     dynamicFields: [
@@ -292,17 +280,6 @@ export const artistCategories: ArtistCategory[] = [
     ],
   },
   {
-    value: 'magician', label: 'Magician', description: 'Magic show performers for all events',
-    icon: Sparkles, color: 'from-violet-600 to-purple-700',
-    dynamicFields: [
-      { name: 'show_duration', label: 'Show Duration (mins)', type: 'number', placeholder: '60' },
-      { name: 'audience_type', label: 'Audience Type', type: 'select', options: [
-        { value: 'kids', label: 'Kids' }, { value: 'adults', label: 'Adults' },
-        { value: 'all_ages', label: 'All Ages' },
-      ]},
-    ],
-  },
-  {
     value: 'stand_up_comedian', label: 'Stand-up Comedian', description: 'Comedy entertainers',
     icon: Mic2, color: 'from-yellow-500 to-amber-500',
     dynamicFields: [
@@ -331,22 +308,6 @@ export const artistCategories: ArtistCategory[] = [
     dynamicFields: [
       { name: 'folk_form', label: 'Folk Art Form', type: 'text', required: true, placeholder: 'Lavani, Bhangra, Garba...' },
       { name: 'group_size', label: 'Group Size', type: 'number', placeholder: '6' },
-    ],
-  },
-  {
-    value: 'lighting_services', label: 'Lighting Services', description: 'Event lighting and effects',
-    icon: Lightbulb, color: 'from-yellow-400 to-orange-500',
-    dynamicFields: [
-      { name: 'lighting_types', label: 'Lighting Types', type: 'text', placeholder: 'LED, Laser, Truss, Spotlights...' },
-      { name: 'team_size', label: 'Team Size', type: 'number', placeholder: '3' },
-    ],
-  },
-  {
-    value: 'sound_services', label: 'Sound Engineer', description: 'Sound system and audio services',
-    icon: Volume2, color: 'from-slate-500 to-zinc-600',
-    dynamicFields: [
-      { name: 'equipment', label: 'Equipment Brands', type: 'text', placeholder: 'JBL, QSC, Yamaha...' },
-      { name: 'max_capacity', label: 'Max Audience Capacity', type: 'number', placeholder: '1000' },
     ],
   },
   {

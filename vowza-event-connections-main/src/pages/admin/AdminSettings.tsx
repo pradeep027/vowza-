@@ -1,8 +1,8 @@
 // ─── Admin Settings ───────────────────────────────────────────────────────────
-// Section and Field are at MODULE scope so inputs never lose focus on keystroke.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Save, Globe, IndianRupee, Mail, Key } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Save, Globe, IndianRupee, Mail, Key, Percent } from 'lucide-react';
 
 // ── Reusable setting card — module scope (stable reference) ──────────────────
 function Section({
@@ -76,6 +76,40 @@ export default function AdminSettings() {
   const [openaiKey,     setOpenaiKey]     = useState('');
   const [supabaseKey,   setSupabaseKey]   = useState('');
 
+  // Platform Fee state (real DB-backed)
+  const [feeType, setFeeType] = useState<'percentage' | 'fixed'>('percentage');
+  const [feeRate, setFeeRate] = useState('5');
+  const [feeEnabled, setFeeEnabled] = useState(true);
+  const [feeSaving, setFeeSaving] = useState(false);
+
+  // Load platform fee from DB on mount
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('platform_settings' as any).select('value').eq('key', 'platform_fee').maybeSingle();
+      if (data) {
+        const val = (data as any).value;
+        setFeeType(val?.type || 'percentage');
+        setFeeRate(String(val?.rate ?? 5));
+        setFeeEnabled(val?.enabled !== false);
+      }
+    })();
+  }, []);
+
+  // Save platform fee to DB
+  const savePlatformFee = async () => {
+    const rate = Number(feeRate);
+    if (isNaN(rate) || rate < 0 || (feeType === 'percentage' && rate > 100)) {
+      toast.error('Invalid fee value'); return;
+    }
+    setFeeSaving(true);
+    const { error } = await supabase.from('platform_settings' as any).update({
+      value: { type: feeType, rate, enabled: feeEnabled },
+      updated_at: new Date().toISOString(),
+    }).eq('key', 'platform_fee');
+    setFeeSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Platform fee updated successfully');
+  };
   const save = (section: string) =>
     toast.success(`${section} settings saved (connect DB to persist)`);
 
@@ -87,11 +121,35 @@ export default function AdminSettings() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* ── Platform Fee (real DB-backed) ──────────────────────────────── */}
+        <Section title="Platform Fee" icon={Percent} onSave={savePlatformFee}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1.5">Fee Type</label>
+              <select value={feeType} onChange={e => setFeeType(e.target.value as any)} className="input-premium text-sm w-full">
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed">Fixed Amount (₹)</option>
+              </select>
+            </div>
+            <Field id="fee-rate" label={feeType === 'percentage' ? 'Fee Percentage (%)' : 'Fee Amount (₹)'} value={feeRate} onChange={setFeeRate} type="number" placeholder={feeType === 'percentage' ? '5' : '500'} />
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="fee-enabled" checked={feeEnabled} onChange={e => setFeeEnabled(e.target.checked)} className="w-4 h-4 rounded border-border" />
+              <label htmlFor="fee-enabled" className="text-xs font-medium text-muted-foreground">Fee Enabled</label>
+            </div>
+            {feeEnabled && (
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-700">
+                Current: {feeType === 'percentage' ? `${feeRate}% of subtotal` : `₹${Number(feeRate).toLocaleString()} flat fee`} — applies to all categories
+              </div>
+            )}
+            {feeSaving && <p className="text-xs text-muted-foreground animate-pulse">Saving...</p>}
+          </div>
+        </Section>
+
         <Section title="Platform" icon={Globe} onSave={() => save('Platform')}>
           <div className="space-y-3">
             <Field id="platform-name"  label="Platform Name"  value={platformName}  onChange={setPlatformName}  placeholder="Vowza" />
             <Field id="support-email"  label="Support Email"  value={supportEmail}  onChange={setSupportEmail}  placeholder="support@vowza.com" />
-            <Field id="contact-phone"  label="Contact Phone"  value={contactPhone}  onChange={setContactPhone}  placeholder="+91 98765 43210" />
+            <Field id="contact-phone"  label="Contact Phone"  value={contactPhone}  onChange={setContactPhone}  placeholder="+91 87123 21751" />
           </div>
         </Section>
 

@@ -163,12 +163,19 @@ export default function CategoryPage() {
     try {
       let q = supabase.from("provider_profiles").select("*", { count: "exact" })
         .in("profession", category.professionTypes)
-        .eq("verification_status", "approved")
+        .in("verification_status", ["approved", "verified"])
         .eq("is_published", true)
         .order("average_rating", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (subcat !== "all") q = q.eq("subcategory", subcat);
+      if (subcat !== "all") {
+        // For bands, filter by band_category column; for others use subcategory
+        if (slug === 'music_band') {
+          q = q.eq("band_category", subcat);
+        } else {
+          q = q.eq("subcategory", subcat);
+        }
+      }
       if (verifiedOnly)     q = q.eq("is_verified", true);
 
       if (sortBy === "rating")     q = q.order("average_rating", { ascending: false });
@@ -201,7 +208,8 @@ export default function CategoryPage() {
         merged = merged.filter(v =>
           v.full_name?.toLowerCase().includes(q) ||
           v.stage_name?.toLowerCase().includes(q) ||
-          v.subcategory?.toLowerCase().includes(q)
+          v.subcategory?.toLowerCase().includes(q) ||
+          (v as any).band_category?.toLowerCase().includes(q)
         );
       }
       if (city.trim()) {

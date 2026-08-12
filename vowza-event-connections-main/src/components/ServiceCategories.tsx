@@ -7,7 +7,7 @@ const iconMap: Record<string, React.ReactNode> = {
   Music: <Music className="w-8 h-8" />,
   Mic2: <Mic2 className="w-8 h-8" />,
   Disc3: <Disc3 className="w-8 h-8" />,
-  Camera: <Camera className="w-8 h-8" />,
+  Camera: <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photographers" className="w-full h-full object-cover rounded-2xl" />,
   Users: <Users className="w-8 h-8" />,
   Palette: <Palette className="w-8 h-8" />,
 };

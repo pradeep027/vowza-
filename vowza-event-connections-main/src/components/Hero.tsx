@@ -49,12 +49,12 @@ const TRENDING = [
 // overlay for legibility, glassmorphism border, category icon, title and
 // subtitle. Positions/sizes tuned per-card for an organic "floating" feel.
 const VISUAL_CARDS = [
-  { icon: null,     label: "Wedding Photography", sub: null,                  img: "/images/wedding-photography.jpg", pos: "top-0 left-8 w-[172px] h-[208px]",     rotate: -3, delay: 0    },
-  { icon: null,     label: "DJ & Music",          sub: "Professional DJs & Live Entertainment", img: "/images/dj-music.jpg", pos: "top-6 right-0 w-[146px] h-[154px]",    rotate: 2,  delay: 0.4  },
-  { icon: null,     label: "Wedding Decoration",  sub: "Luxury Wedding Decor", img: "/images/wedding-decoration.jpg", pos: "bottom-28 left-0 w-[154px] h-[154px]", rotate: -2, delay: 0.8 },
-  { icon: null,     label: "Bridal Makeup",       sub: "Professional Bridal Makeup", img: "/images/bridal-makeup.jpg", pos: "bottom-0 left-24 w-[156px] h-[168px]", rotate: 3,  delay: 1.2 },
-  { icon: null,     label: "Catering",            sub: null,                  img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=75&auto=format&fit=crop", pos: "bottom-6 right-2 w-[154px] h-[144px]", rotate: -2, delay: 1.6 },
-  { icon: null,     label: "Live Band",           sub: "Professional Live Performers", img: "/images/live-band.jpg", pos: "top-32 right-16 w-[132px] h-[132px]",  rotate: 2,  delay: 2.0 },
+  { icon: null,     label: "Wedding Photography", sub: null,                  img: "/images/wedding-photography.jpg", pos: "", rotate: -3, delay: 0    },
+  { icon: null,     label: "Wedding Decoration",  sub: "Luxury Wedding Decor", img: "/images/wedding-decoration.jpg", pos: "", rotate: -2, delay: 0.4 },
+  { icon: null,     label: "DJ & Music",          sub: "Professional DJs & Live Entertainment", img: "/images/dj-music.jpg", pos: "", rotate: 2,  delay: 0.8  },
+  { icon: null,     label: "Live Band",           sub: "Professional Live Performers", img: "/images/live-band.jpg", pos: "",  rotate: 2,  delay: 1.2 },
+  { icon: null,     label: "Bridal Makeup",       sub: "Professional Bridal Makeup", img: "/images/bridal-makeup.jpg", pos: "", rotate: 3,  delay: 1.6 },
+  { icon: null,     label: "Catering",            sub: null,                  img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=75&auto=format&fit=crop", pos: "", rotate: -2, delay: 2.0 },
 ] as const;
 
 // ── Deterministic ambient particle field (computed once at module scope) ─────
@@ -161,11 +161,38 @@ const VisualCard = memo(({ card, idx }: { card: typeof VISUAL_CARDS[number]; idx
 VisualCard.displayName = "VisualCard";
 
 const HeroVisual = memo(() => (
-  <div className="relative hidden lg:block" style={{ height: 460 }}>
-    {/* Backdrop glow anchoring the composition */}
+  <div className="relative hidden lg:block" style={{ height: 420, marginTop: -8 }}>
+    {/* Backdrop glow */}
     <div aria-hidden className="glow-orb animate-glow-pulse"
-      style={{ top: "20%", left: "10%", width: 380, height: 380, background: "radial-gradient(circle, hsl(40 95% 52% / 0.18) 0%, transparent 70%)" }} />
-    {VISUAL_CARDS.map((card, i) => <VisualCard key={card.label} card={card} idx={i} />)}
+      style={{ top: "10%", left: "8%", width: 300, height: 300, background: "radial-gradient(circle, hsl(40 95% 52% / 0.10) 0%, transparent 70%)" }} />
+    {/* 3×2 Grid */}
+    <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-3 pl-6 pr-4 pt-0 pb-4" style={{ maxHeight: 390 }}>
+      {VISUAL_CARDS.map((card, i) => (
+        <motion.div
+          key={card.label}
+          className="relative rounded-2xl overflow-hidden shadow-xl group"
+          style={{ border: "1px solid hsl(40 85% 55% / 0.28)" }}
+          initial={{ opacity: 0, y: 20, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.3 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+          whileHover={{ y: -6, scale: 1.04, transition: { duration: 0.25 } }}
+        >
+          <motion.div
+            className="w-full h-full relative"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 6 + i * 0.5, repeat: Infinity, ease: "easeInOut", delay: card.delay }}
+          >
+            <img src={card.img} alt={card.label} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover brightness-[1.15]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/18 to-transparent" />
+            <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ boxShadow: "inset 0 0 0 1.5px hsl(40 95% 62% / 0.55), 0 0 18px 2px hsl(40 95% 56% / 0.18)" }} />
+            <div className="relative z-10 h-full flex flex-col justify-end p-3.5">
+              <p className="text-white text-[12.5px] font-semibold leading-tight drop-shadow-md">{card.label}</p>
+              {card.sub && <p className="text-white/70 text-[10.5px] font-medium leading-tight mt-0.5">{card.sub}</p>}
+            </div>
+          </motion.div>
+        </motion.div>
+      ))}
+    </div>
   </div>
 ));
 HeroVisual.displayName = "HeroVisual";
@@ -320,7 +347,7 @@ const DesktopHero = () => {
   }, [navigate]);
 
   return (
-    <section className="relative overflow-hidden" style={{ background:"#07060d" }}>
+    <section className="relative overflow-hidden" style={{ background:"#0c0b14" }}>
       <HeroBg />
 
       <div className="relative z-10" style={{ paddingTop:"clamp(4.5rem,9vw,7rem)", paddingBottom:"clamp(3.5rem,7vw,5.5rem)" }}>
@@ -338,7 +365,7 @@ const DesktopHero = () => {
                   className="inline-flex items-center gap-1.5 mb-5 px-3.5 py-1.5 rounded-full glass-premium"
                 >
                   <VowzaIcon className="w-3 h-3 text-gold" />
-                  <span className="text-[11px] font-semibold text-white/70 tracking-wide">India's Premium Event Marketplace</span>
+                  <span className="text-[11px] font-semibold text-white/80 tracking-wide">India's Premium Event Marketplace</span>
                 </motion.div>
 
                 {/* Heading — significantly larger, smoother spacing */}
@@ -356,12 +383,12 @@ const DesktopHero = () => {
                 {/* Description */}
                 <motion.p
                   initial="hidden" animate="show" variants={fadeUp} custom={0.16}
-                  style={{ fontSize:"clamp(1.1rem,1.9vw,1.3rem)", lineHeight:2.2, fontWeight:600, color:"hsl(0 0% 100% / 0.62)", marginBottom:"clamp(1.75rem,3.5vw,2.5rem)" }}
+                  style={{ fontSize:"clamp(1.05rem,1.8vw,1.25rem)", lineHeight:2, fontWeight:600, color:"hsl(0 0% 100% / 0.72)", marginBottom:"clamp(1.5rem,3vw,2.2rem)" }}
                   className="mx-auto lg:mx-0 max-w-[520px]"
                 >
-                  One Platform.<br />
-                  Trusted Professionals.<br />
-                  Unforgettable Celebrations.
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:"8px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(40 90% 56%)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>One Platform.</span><br />
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:"8px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(40 90% 56%)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Trusted Professionals.</span><br />
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:"8px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(40 90% 56%)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>Unforgettable Celebrations.</span>
                 </motion.p>
 
                 {/* Toggle — premium AI planner treatment */}
@@ -571,15 +598,15 @@ const DesktopHero = () => {
               {/* Trending chips */}
               <motion.div initial="hidden" animate="show" variants={fadeUp} custom={0.4}
                 className="lg:max-w-[600px] mx-auto lg:mx-0 flex items-center justify-center lg:justify-start gap-2 overflow-x-auto no-scrollbar"
-                style={{ marginTop:"clamp(1.2rem,2.4vw,1.7rem)", paddingBottom:"2px" }}>
-                <span style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"10.5px", fontWeight:600, color:"hsl(0 0% 100% / 0.27)", flexShrink:0, whiteSpace:"nowrap" }}>
+                style={{ marginTop:"clamp(1.2rem,2.4vw,1.7rem)", paddingBottom:"clamp(0.75rem,1.5vw,1.2rem)" }}>
+                <span style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"10.5px", fontWeight:600, color:"hsl(0 0% 100% / 0.35)", flexShrink:0, whiteSpace:"nowrap" }}>
                   <TrendingUp style={{ width:"11px", height:"11px" }} /> Trending
                 </span>
                 {TRENDING.map((term, i) => (
                   <motion.button key={term} type="button"
                     whileHover={{ y: -2, scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     onClick={() => navigate(`/artists?search=${encodeURIComponent(term)}`)}
-                    style={{ padding:"6px 14px", borderRadius:"100px", fontSize:"11px", fontWeight:500, cursor:"pointer", border:"1px solid hsl(0 0% 100% / 0.09)", background:"hsl(0 0% 100% / 0.055)", color:"hsl(0 0% 100% / 0.55)", flexShrink:0, whiteSpace:"nowrap", transition:"background 0.2s, border-color 0.2s, color 0.2s" }}
+                    style={{ padding:"6px 14px", borderRadius:"100px", fontSize:"11px", fontWeight:500, cursor:"pointer", border:"1px solid hsl(0 0% 100% / 0.12)", background:"hsl(0 0% 100% / 0.06)", color:"hsl(0 0% 100% / 0.6)", flexShrink:0, whiteSpace:"nowrap", transition:"background 0.2s, border-color 0.2s, color 0.2s" }}
                     className="hover:!bg-white/10 hover:!border-white/20 hover:!text-white/90"
                   >
                     {term}

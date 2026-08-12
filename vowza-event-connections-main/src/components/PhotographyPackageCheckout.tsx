@@ -3,11 +3,14 @@ import { ArrowLeft, Calendar, Clock, MapPin, Users, FileText, CheckCircle2, Load
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePlatformFee, calculatePlatformFee } from '@/hooks/usePlatformFee';
+import LocationPicker, { type LocationData, validateLocationData, emptyLocationData } from '@/components/booking/LocationPicker';
 
 const EVENT_TYPES = ['Wedding', 'Reception', 'Birthday', 'Engagement', 'Corporate', 'Haldi', 'Sangeet', 'Baby Shower', 'Housewarming', 'College Fest', 'Private Party', 'Anniversary', 'Other'] as const;
 
 export default function PhotographyPackageCheckout({ payload }: { payload: any }) {
   const nav = useNavigate();
+  const { data: feeConfig } = usePlatformFee();
   const [cart, setCart] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -23,13 +26,17 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
   const [venueCity, setVenueCity] = useState('');
   const [venueState, setVenueState] = useState('');
   const [pincode, setPincode] = useState('');
+  const [location, setLocation] = useState<LocationData>(emptyLocationData);
   const [notes, setNotes] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const load = () => supabase.from('photography_carts' as any).select('*, photography_cart_items(*, photography_packages(name,price,photography_type,duration,team_size,photography_package_addons(id,name,price), photography_albums(id,type,size,pages,price)))').eq('id', payload.cartId).single().then(({ data, error }) => { if (error) toast.error(error.message); else setCart(data); });
+  const load = () => {
+    if (!payload.cartId) return;
+    supabase.from('photography_carts' as any).select('*, photography_cart_items(*, photography_packages(name,price,photography_type,duration,team_size,photography_package_addons(id,name,price), photography_albums(id,type,size,pages,price)))').eq('id', payload.cartId).single().then(({ data, error }) => { if (error) { console.error('[PhotographyCheckout] cart load error:', error.message); toast.error('Could not load cart. Please go back and try again.'); } else setCart(data); });
+  };
 
   useEffect(() => { if (!payload.cartId) return; load(); }, [payload.cartId]);
 
@@ -37,8 +44,6 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
     const e: Record<string, string> = {};
     if (!date) e.date = 'Event date is required';
     if (!time) e.time = 'Event time is required';
-    if (!venueAddress.trim()) e.venueAddress = 'Venue address is required';
-    if (!venueCity.trim()) e.venueCity = 'City is required';
     if (!termsAccepted) e.terms = 'Please accept the terms';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -47,15 +52,24 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
   const book = async () => {
     if (!validate()) return;
     if (!payload.cartId) return toast.error('Cart is missing. Please choose a package again.');
+    const locErr = validateLocationData(location);
+    if (locErr) { toast.error(locErr); setStep(1); return; }
     setBusy(true);
-    const venueStr = [venueName, venueAddress, venueCity, venueState, pincode].filter(Boolean).join(', ');
+    const venueStr = [location.venue_name, location.locality, location.town_city, location.district, location.state, location.pincode].filter(Boolean).join(', ');
     const notesStr = [notes, eventType && `Event: ${eventType}`, guestCount && `Guests: ${guestCount}`, duration && `Duration: ${duration}`].filter(Boolean).join(' | ');
     const { error } = await supabase.rpc('checkout_photography_cart' as any, { p_cart_id: payload.cartId, p_event_date: date, p_event_time: time || null, p_venue: venueStr || null, p_notes: notesStr || null });
     setBusy(false);
     if (error) return toast.error(error.message);
+    // Save structured location to booking_locations
+    await supabase.from('booking_locations' as any).insert({
+      booking_table: 'photography_package_bookings', booking_id: payload.cartId,
+      state: location.state, district: location.district, town_city: location.town_city,
+      exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
+      pincode: location.pincode, landmark: location.address_line || null,
+      latitude: location.latitude, longitude: location.longitude,
+    });
     sessionStorage.removeItem('vowza_photography_checkout');
     // Navigate to booking success
-    const platformFee = Math.round(total * 0.1);
     sessionStorage.setItem('vowza_booking_success', JSON.stringify({
       bookingId: payload.cartId.slice(0, 8),
       artistName: payload.providerName,
@@ -64,7 +78,6 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
       duration: duration || 'Full Day',
       venue: venueStr,
       amount: total,
-      platformFee,
       eventType: eventType || 'Photography',
       status: 'requested'
     }));
@@ -73,7 +86,11 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
 
   const itemTotal = (item: any) => Number(item.photography_packages?.price ?? 0) + (item.photography_packages?.photography_package_addons ?? []).filter((a: any) => item.addon_ids?.includes(a.id)).reduce((sum: number, a: any) => sum + Number(a.price), 0) + Number(item.photography_packages?.photography_albums?.find((a: any) => a.id === item.album_id)?.price ?? 0);
   const total = (cart?.photography_cart_items ?? []).reduce((sum: number, item: any) => sum + itemTotal(item), 0);
-  const platformFee = Math.round(total * 0.1);
+  const platformFee = feeConfig ? calculatePlatformFee(total, feeConfig) : 0;
+  const grandTotal = total + platformFee;
+  const ADVANCE_PERCENT = 20;
+  const advancePayable = Math.round(grandTotal * ADVANCE_PERCENT / 100);
+  const remainingBalance = grandTotal - advancePayable;
 
   const inputClass = 'w-full rounded-xl border border-border/60 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#8B1538] focus:ring-2 focus:ring-[#8B1538]/10';
   const labelClass = 'block text-sm font-semibold text-foreground mb-1.5';
@@ -150,39 +167,14 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
 
                 <hr className="border-border/40" />
 
-                <div>
-                  <label className={labelClass}>Venue Name</label>
-                  <input placeholder="e.g. Grand Ballroom, Hotel Taj" value={venueName} onChange={e => setVenueName(e.target.value)} className={inputClass} />
-                </div>
-
-                <div>
-                  <label className={labelClass}><MapPin className="inline h-3.5 w-3.5 mr-1" />Venue Address *</label>
-                  <input placeholder="Full venue address" value={venueAddress} onChange={e => { setVenueAddress(e.target.value); setErrors(prev => ({ ...prev, venueAddress: '' })); }} className={`${inputClass} ${errors.venueAddress ? 'border-red-500' : ''}`} />
-                  {errors.venueAddress && <p className={errorClass}>{errors.venueAddress}</p>}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className={labelClass}>City *</label>
-                    <input placeholder="City" value={venueCity} onChange={e => { setVenueCity(e.target.value); setErrors(prev => ({ ...prev, venueCity: '' })); }} className={`${inputClass} ${errors.venueCity ? 'border-red-500' : ''}`} />
-                    {errors.venueCity && <p className={errorClass}>{errors.venueCity}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>State</label>
-                    <input placeholder="State" value={venueState} onChange={e => setVenueState(e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Pincode</label>
-                    <input placeholder="Pincode" value={pincode} onChange={e => setPincode(e.target.value)} className={inputClass} />
-                  </div>
-                </div>
+                <LocationPicker value={location} onChange={setLocation} />
 
                 <div>
                   <label className={labelClass}><FileText className="inline h-3.5 w-3.5 mr-1" />Special Instructions</label>
                   <textarea placeholder="Any special requirements, preferred style, references…" value={notes} onChange={e => setNotes(e.target.value)} rows={3} className={`${inputClass} resize-none`} />
                 </div>
 
-                <button onClick={() => { if (!date || !time || !venueAddress.trim() || !venueCity.trim()) { validate(); return; } setStep(2); }} className="w-full rounded-xl bg-[#8B1538] py-3.5 font-semibold text-white transition hover:bg-[#70102d]">
+                <button onClick={() => { const locErr = validateLocationData(location); if (!date || !time) { validate(); return; } if (locErr) { toast.error(locErr); return; } setStep(2); }} className="w-full rounded-xl bg-[#8B1538] py-3.5 font-semibold text-white transition hover:bg-[#70102d]">
                   Continue to Review →
                 </button>
               </div>
@@ -202,15 +194,18 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
                   {time && <div className="flex justify-between"><span className="text-muted-foreground">Time</span><span className="font-semibold">{time}</span></div>}
                   {eventType && <div className="flex justify-between"><span className="text-muted-foreground">Event</span><span className="font-semibold">{eventType}</span></div>}
                   {guestCount && <div className="flex justify-between"><span className="text-muted-foreground">Guests</span><span className="font-semibold">{guestCount}</span></div>}
-                  <div className="flex justify-between"><span className="text-muted-foreground">Venue</span><span className="font-semibold text-right max-w-[200px]">{[venueName, venueAddress, venueCity].filter(Boolean).join(', ')}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Venue</span><span className="font-semibold text-right max-w-[200px]">{[location.venue_name, location.town_city, location.district, location.state].filter(Boolean).join(', ')}</span></div>
+                  {location.pincode && <div className="flex justify-between"><span className="text-muted-foreground">Pincode</span><span className="font-semibold">{location.pincode}</span></div>}
                 </div>
 
                 {/* Price breakdown */}
                 <div className="rounded-xl bg-secondary p-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span>Package Total</span><b>₹{total.toLocaleString('en-IN')}</b></div>
-                  <div className="flex justify-between text-muted-foreground"><span>Platform Fee (10%)</span><span>₹{platformFee.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between"><span>Subtotal</span><b>₹{total.toLocaleString('en-IN')}</b></div>
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Platform Fee{feeConfig?.type === 'percentage' ? ` (${feeConfig.rate}%)` : ''}</span><span>₹{platformFee.toLocaleString('en-IN')}</span></div>
                   <hr className="border-border/40" />
-                  <div className="flex justify-between text-lg font-bold"><span>Grand Total</span><span className="text-[#8B1538]">₹{(total + platformFee).toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between font-semibold"><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Advance Payable ({ADVANCE_PERCENT}%)</span><span className="font-bold text-[#8B1538]">₹{advancePayable.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Remaining Balance</span><span>₹{remainingBalance.toLocaleString('en-IN')}</span></div>
                 </div>
 
                 {/* Info notice */}
@@ -261,9 +256,11 @@ export default function PhotographyPackageCheckout({ payload }: { payload: any }
                 })}
                 <div className="space-y-2 pt-2">
                   <div className="flex justify-between text-sm"><span>Subtotal</span><b>₹{total.toLocaleString('en-IN')}</b></div>
-                  <div className="flex justify-between text-xs text-muted-foreground"><span>Platform Fee (10%)</span><span>₹{platformFee.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Platform Fee{feeConfig?.type === 'percentage' ? ` (${feeConfig.rate}%)` : ''}</span><span>₹{platformFee.toLocaleString('en-IN')}</span></div>
                   <hr className="border-border/40" />
-                  <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-[#8B1538]">₹{(total + platformFee).toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-sm font-semibold"><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Advance Payable ({ADVANCE_PERCENT}%)</span><span className="font-semibold text-[#8B1538]">₹{advancePayable.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Remaining Balance</span><span>₹{remainingBalance.toLocaleString('en-IN')}</span></div>
                 </div>
               </div>
             )}

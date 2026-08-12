@@ -51,7 +51,9 @@ const ArtistOnboarding = () => {
     phone: '',
     city: '',
     state: '',
+    district: '',
     area: '',
+    address: '',
     experienceYears: '',
     languages: [] as string[],
     bio: '',
@@ -174,7 +176,10 @@ const ArtistOnboarding = () => {
           full_name: basicInfo.fullName,
           phone: basicInfo.phone,
           city: basicInfo.city,
+          state: basicInfo.state || null,
+          district: basicInfo.district || null,
           area: basicInfo.area,
+          address: basicInfo.address || null,
           avatar_url: avatarUrl,
         })
         .eq('id', user.id);
@@ -206,6 +211,7 @@ const ArtistOnboarding = () => {
           is_available: pricingInfo.isAvailable,
           category_details: categoryDetails,
           onboarding_completed: true,
+          band_category: categoryDetails.band_category || null,
           // New fields
           whatsapp: pricingInfo.whatsapp || null,
           service_radius: pricingInfo.serviceRadius || 50,

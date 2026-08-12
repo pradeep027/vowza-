@@ -4,7 +4,6 @@
 // Steps: Basic Info → Professional Info → Portfolio → Verification Docs → Review
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,10 +16,15 @@ import {
   MapPin, Languages, ChevronDown, Loader2,
   FileText, Instagram, Globe, Star
 } from 'lucide-react';
+import FaceLivenessVerification from '@/components/FaceLivenessVerification';
+import DocumentUploadCard from '@/components/DocumentUploadCard';
+import { validateFullName, validateEmail, validateTownCity, validateArea, validatePincode, validateDescription } from '@/utils/validation';
+import type { VerificationResult } from '@/utils/documentVerification';
 import {
   useProviderRegistration,
-  type Step1, type Step2, type Step3, type Step4
+  type Step1, type Step2, type Step3, type Step4, type DocVerifyStatus
 } from '@/contexts/ProviderRegistrationContext';
+import LocationPicker, { type LocationData, emptyLocationData } from '@/components/booking/LocationPicker';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const PROFESSIONS = [
@@ -31,38 +35,28 @@ const PROFESSIONS = [
   { value: 'dj',                label: 'DJ'                 },
   { value: 'singer',            label: 'Singer'             },
   { value: 'dancer',            label: 'Dancer'             },
-  { value: 'choreographer',     label: 'Choreographer'      },
   { value: 'wedding_decorator', label: 'Decorator'          },
   { value: 'makeup_artist',     label: 'Makeup Artist'      },
   { value: 'mehendi_artist',    label: 'Mehendi Artist'     },
-  { value: 'magician',          label: 'Magician'           },
   { value: 'anchor',            label: 'Anchor / Host'      },
   { value: 'catering_services', label: 'Caterer'            },
   { value: 'banquet_hall',      label: 'Banquet Hall'       },
   { value: 'pandit',            label: 'Pandit / Priest'    },
   { value: 'rentals',           label: 'Rentals'            },
   { value: 'water_supplier',    label: 'Water Supplier'     },
-  { value: 'lighting_services', label: 'Lighting Services'  },
   { value: 'sound_services',    label: 'Sound Services'     },
-  { value: 'event_planner',     label: 'Event Planner'      },
-  { value: 'stand_up_comedian', label: 'Stand-up Comedian'  },
-  { value: 'folk_artist',       label: 'Folk Artist'        },
 ];
 
 const LANGUAGES = ['Hindi','English','Telugu','Tamil','Kannada','Marathi',
   'Bengali','Gujarati','Malayalam','Punjabi','Odia','Urdu'];
-
-const INDIAN_STATES = ['Andhra Pradesh','Assam','Bihar','Delhi','Goa','Gujarat',
-  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
-  'Maharashtra','Manipur','Meghalaya','Odisha','Punjab','Rajasthan','Tamil Nadu',
-  'Telangana','Uttar Pradesh','Uttarakhand','West Bengal'];
 
 const STEPS = [
   { id: 1, label: 'Basic Info',     icon: User      },
   { id: 2, label: 'Professional',   icon: Briefcase },
   { id: 3, label: 'Portfolio',      icon: ImageIcon },
   { id: 4, label: 'Verification',   icon: Shield    },
-  { id: 5, label: 'Review',         icon: Eye       },
+  { id: 5, label: 'Human Check',    icon: Camera    },
+  { id: 6, label: 'Review',         icon: Eye       },
 ];
 
 // ── Reusable field wrapper ─────────────────────────────────────────────────────
@@ -117,6 +111,8 @@ export default function ProviderRegistration() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [livenessVerified, setLivenessVerified] = useState(false);
+  const [livenessSessionId, setLivenessSessionId] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -199,25 +195,96 @@ export default function ProviderRegistration() {
     setS3(p => { const next = [...p.portfolioFiles]; next.splice(i,1); return { ...p, portfolioFiles: next }; });
   };
 
-  // ── Document upload ────────────────────────────────────────────────────────
-  const handleDoc = (key: keyof Step4, file: File | null) => {
-    if (!file) return;
-    const previewKey = key.replace('File','Preview') as keyof Step4;
-    const url = URL.createObjectURL(file);
-    setS4(p => ({ ...p, [key]: file, [previewKey]: url }));
-  };
-
   // ── Step validation ────────────────────────────────────────────────────────
-  const canProceed = useCallback((): boolean => {
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  /** Passive check — no side effects, used for disabled/styling */
+  const isStepValid = useCallback((): boolean => {
     switch (step) {
-      case 1: return !!(s1.fullName.trim() && s1.otpVerified && s1.email.includes('@') && s1.state && s1.city.trim() && s1.profession && s1.languages.length > 0);
-      case 2: return !!(s2.experience && s2.about.trim().length >= 30 && s2.selfieBlob);
+      case 1: {
+        const nameOk = validateFullName(s1.fullName).valid;
+        const emailOk = validateEmail(s1.email).valid;
+        const cityOk = validateTownCity(s1.city).valid;
+        return !!(nameOk && s1.otpVerified && emailOk && s1.state && s1.district.trim() && cityOk && s1.profession && s1.languages.length > 0);
+      }
+      case 2: {
+        const aboutOk = validateDescription(s2.about, 30, 'About/Bio').valid;
+        return !!(s2.experience && aboutOk && s2.selfieBlob);
+      }
       case 3: return s3.portfolioFiles.length >= 2;
-      case 4: return !!(s4.aadhaarFile && s4.govtIdFile && s4.termsAccepted);
-      case 5: return true;
+      case 4: return !!(s4.aadhaarStatus === 'verified' && s4.panStatus === 'verified' && (s4.govtIdStatus === 'idle' || s4.govtIdStatus === 'verified') && s4.termsAccepted && s4.aadhaarStatus !== 'processing' && s4.panStatus !== 'processing');
+      case 5: return livenessVerified;
+      case 6: return true;
       default: return false;
     }
-  }, [step, s1, s2, s3, s4]);
+  }, [step, s1, s2, s3, s4, livenessVerified]);
+
+  /** Active validation — shows errors and toasts, called on Continue click */
+  const validateCurrentStep = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    switch (step) {
+      case 1: {
+        const nameResult = validateFullName(s1.fullName);
+        if (!nameResult.valid) errors.fullName = nameResult.error!;
+        if (!s1.otpVerified) errors.otp = 'Please verify your phone number';
+        const emailResult = validateEmail(s1.email);
+        if (!emailResult.valid) errors.email = emailResult.error!;
+        if (!s1.state) errors.state = 'Please select your state';
+        if (!s1.district.trim()) errors.district = 'Please select your district';
+        const cityResult = validateTownCity(s1.city);
+        if (!cityResult.valid) errors.city = cityResult.error!;
+        if (s1.area && s1.area.trim()) {
+          const areaResult = validateArea(s1.area);
+          if (!areaResult.valid) errors.area = areaResult.error!;
+        }
+        if (s1.pincode && s1.pincode.trim()) {
+          const pincodeResult = validatePincode(s1.pincode);
+          if (!pincodeResult.valid) errors.pincode = pincodeResult.error!;
+        }
+        if (!s1.profession) errors.profession = 'Please select your profession';
+        if (s1.languages.length === 0) errors.languages = 'Please select at least one language';
+        break;
+      }
+      case 2: {
+        if (!s2.experience) errors.experience = 'Please select your experience';
+        const aboutResult = validateDescription(s2.about, 30, 'About/Bio');
+        if (!aboutResult.valid) errors.about = aboutResult.error!;
+        if (!s2.selfieBlob) errors.selfie = 'Please capture your selfie';
+        break;
+      }
+      case 3: {
+        if (s3.portfolioFiles.length < 2) errors.portfolio = 'Please upload at least 2 portfolio items';
+        break;
+      }
+      case 4: {
+        if (s4.aadhaarStatus === 'idle') errors.aadhaar = 'Please upload your Aadhaar Card';
+        else if (s4.aadhaarStatus === 'processing') errors.aadhaar = 'Aadhaar verification is still in progress';
+        else if (s4.aadhaarStatus !== 'verified') errors.aadhaar = s4.aadhaarMessage || 'Aadhaar Card could not be verified. Please upload a valid Aadhaar.';
+        if (s4.panStatus === 'idle') errors.pan = 'Please upload your PAN Card';
+        else if (s4.panStatus === 'processing') errors.pan = 'PAN verification is still in progress';
+        else if (s4.panStatus !== 'verified') errors.pan = s4.panMessage || 'PAN Card could not be verified. Please upload a valid PAN Card.';
+        if (s4.govtIdFile && s4.govtIdStatus !== 'idle' && s4.govtIdStatus !== 'verified') errors.govtId = s4.govtIdMessage || 'The uploaded Government ID could not be verified.';
+        if (!s4.termsAccepted) errors.terms = 'Please accept the terms and conditions';
+        break;
+      }
+      case 5: {
+        if (!livenessVerified) errors.liveness = 'Please complete face verification';
+        break;
+      }
+      case 6: return true;
+    }
+
+    setValidationErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      const firstError = Object.values(errors)[0];
+      toast.error(firstError);
+      return false;
+    }
+    return true;
+  }, [step, s1, s2, s3, s4, livenessVerified]);
+
+  const canProceed = isStepValid;
 
   // ── Final submit ───────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -228,6 +295,7 @@ export default function ProviderRegistration() {
       await supabase.from('profiles').update({
         full_name: s1.fullName, phone: s1.phone, city: s1.city,
         area: s1.area, state: s1.state as any,
+        district: s1.district || null, address: s1.address || null,
       }).eq('id', user.id);
 
       // 2. Upload selfie
@@ -260,6 +328,7 @@ export default function ProviderRegistration() {
         return '';
       };
       const aadhaarUrl = s4.aadhaarFile ? await uploadDoc(s4.aadhaarFile, 'aadhaar') : '';
+      const panUrl     = s4.panFile     ? await uploadDoc(s4.panFile,     'pan')     : '';
       const govtIdUrl  = s4.govtIdFile  ? await uploadDoc(s4.govtIdFile,  'govtid')  : '';
 
       // 5. Create provider profile
@@ -274,7 +343,11 @@ export default function ProviderRegistration() {
         social_links: { instagram: s3.instagram, website: s3.website },
         verification_status: 'pending',
         onboarding_completed: true,
-        vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, govt_id_url: govtIdUrl, address: s1.address },
+        liveness_verified: livenessVerified,
+        liveness_verified_at: livenessVerified ? new Date().toISOString() : null,
+        liveness_session_id: livenessSessionId || null,
+        liveness_provider: 'mediapipe_face_mesh',
+        vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, pan_url: panUrl, govt_id_url: govtIdUrl, address: s1.address },
       } as any);
       if (error && error.code !== '23505') throw error;
 
@@ -344,9 +417,7 @@ export default function ProviderRegistration() {
             <ArrowLeft className="w-4 h-4" /> {step > 1 ? 'Back' : 'Home'}
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-maroon flex items-center justify-center">
-              <VowzaIcon className="w-3.5 h-3.5 text-white" />
-            </div>
+            <img src="/vowza-join-logo.svg" alt="Vowza" className="w-8 h-8 rounded-lg object-contain" />
             <span className="text-sm font-display font-bold text-foreground">Join Vowza</span>
           </div>
           <span className="text-xs text-muted-foreground font-medium">Step {step} of {STEPS.length}</span>
@@ -383,8 +454,9 @@ export default function ProviderRegistration() {
           {step === 1 && <Step1Form s1={s1} setS1={setS1} sendOTP={sendOTP} verifyOTP={verifyOTP} otpLoading={otpLoading} />}
           {step === 2 && <Step2Form s2={s2} setS2={setS2} openCamera={openCamera} retake={() => { setS2(p => ({...p, selfieUrl:null, selfieBlob:null})); openCamera(); }} />}
           {step === 3 && <Step3Form s3={s3} portfolioRef={portfolioRef} handlePortfolio={handlePortfolio} removePortfolio={removePortfolio} setS3={setS3} />}
-          {step === 4 && <Step4Form s4={s4} setS4={setS4} handleDoc={handleDoc} />}
-          {step === 5 && <Step5Review s1={s1} s2={s2} s3={s3} s4={s4} goTo={setStep} />}
+          {step === 4 && <Step4Form s4={s4} setS4={setS4} />}
+          {step === 5 && <FaceLivenessVerification onVerified={(sid) => { setLivenessVerified(true); setLivenessSessionId(sid); }} />}
+          {step === 6 && <Step5Review s1={s1} s2={s2} s3={s3} s4={s4} goTo={setStep} />}
         </div>
 
         {/* Navigation */}
@@ -396,7 +468,7 @@ export default function ProviderRegistration() {
           )}
           {step < 5 ? (
             <button
-              onClick={() => canProceed() && setStep(s => s + 1)}
+              onClick={() => validateCurrentStep() && setStep(s => s + 1)}
               disabled={!canProceed()}
               className={cn('flex-1 justify-center py-3 text-sm flex items-center gap-2 rounded-xl font-semibold transition-all',
                 canProceed()
@@ -495,23 +567,18 @@ function Step1Form({ s1, setS1, sendOTP, verifyOTP, otpLoading }: {
         </div>
       </Field>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="State" required>
-          <select value={s1.state} onChange={set('state')} className="input-premium text-sm w-full">
-            <option value="">Select State</option>
-            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Field>
-        <Field label="City" required>
-          <input value={s1.city} onChange={set('city')} placeholder="Your city"
-            className="input-premium text-sm w-full" />
-        </Field>
-      </div>
-
-      <Field label="Area / Locality" required>
-        <input value={s1.area} onChange={set('area')} placeholder="Area or locality name"
-          className="input-premium text-sm w-full" />
-      </Field>
+      {/* Location — uses reusable LocationPicker */}
+      <LocationPicker
+        value={{
+          country: 'India', state: s1.state, district: s1.district, town_city: s1.city,
+          locality: s1.area, venue_name: '', address_line: s1.address, pincode: s1.pincode,
+          latitude: s1.latitude, longitude: s1.longitude, location_source: s1.latitude ? 'CURRENT_LOCATION' : '',
+        }}
+        onChange={(loc) => setS1({ ...s1, state: loc.state, district: loc.district, city: loc.town_city, area: loc.locality, address: loc.address_line, pincode: loc.pincode, latitude: loc.latitude, longitude: loc.longitude })}
+        hideVenue
+        compact
+        title="Your Location"
+      />
 
       <Field label="House / Shop Number" >
         <input value={s1.address} onChange={set('address')} placeholder="Flat / Shop / House number"
@@ -700,65 +767,76 @@ function Step3Form({ s3, portfolioRef, handlePortfolio, removePortfolio, setS3 }
   );
 }
 
-function DocUpload({ label, required, preview, onChange }: {
-  label: string; required?: boolean; preview: string;
-  onChange: (f: File|null) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <div>
-      <label className="text-sm font-semibold text-foreground block mb-1.5">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {!preview ? (
-        <button onClick={() => ref.current?.click()}
-          className="w-full h-28 rounded-xl border-2 border-dashed border-border hover:border-maroon/40 flex flex-col items-center justify-center gap-2 transition-colors group">
-          <FileText className="w-6 h-6 text-muted-foreground group-hover:text-maroon" />
-          <span className="text-xs text-muted-foreground">Click to upload · JPG, PNG, PDF</span>
-          <input ref={ref} type="file" accept="image/*,.pdf" className="hidden"
-            onChange={e => onChange(e.target.files?.[0] ?? null)} />
-        </button>
-      ) : (
-        <div className="relative">
-          {preview.includes('data:') || preview.startsWith('blob:')
-            ? <img src={preview} alt={label} className="w-full h-28 rounded-xl object-cover border border-emerald-300 shadow-sm" />
-            : <div className="w-full h-28 rounded-xl border border-emerald-300 flex items-center justify-center bg-emerald-50">
-                <FileText className="w-8 h-8 text-emerald-500" />
-              </div>
-          }
-          <button onClick={() => { onChange(null); }}
-            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow">
-            <X className="w-3 h-3" />
-          </button>
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-full shadow text-[10px] font-semibold text-emerald-700">
-            <CheckCircle className="w-3 h-3" /> Uploaded
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Step4Form({ s4, setS4, handleDoc }: {
+function Step4Form({ s4, setS4 }: {
   s4: Step4; setS4: React.Dispatch<React.SetStateAction<Step4>>;
-  handleDoc: (k: keyof Step4, f: File|null) => void;
 }) {
+  const handleAadhaarVerified = useCallback((file: File, result: VerificationResult) => {
+    setS4(p => ({
+      ...p,
+      aadhaarFile: result.status === 'processing' || result.status === 'verified' || ['invalid','wrong_type','not_document','error'].includes(result.status) ? file : p.aadhaarFile,
+      aadhaarStatus: result.status as DocVerifyStatus,
+      aadhaarMessage: result.message,
+    }));
+  }, [setS4]);
+
+  const handlePanVerified = useCallback((file: File, result: VerificationResult) => {
+    setS4(p => ({
+      ...p,
+      panFile: result.status === 'processing' || result.status === 'verified' || ['invalid','wrong_type','not_document','error'].includes(result.status) ? file : p.panFile,
+      panStatus: result.status as DocVerifyStatus,
+      panMessage: result.message,
+    }));
+  }, [setS4]);
+
+  const handleGovtIdVerified = useCallback((file: File, result: VerificationResult) => {
+    setS4(p => ({
+      ...p,
+      govtIdFile: result.status === 'processing' || result.status === 'verified' || ['invalid','wrong_type','not_document','error'].includes(result.status) ? file : p.govtIdFile,
+      govtIdStatus: result.status as DocVerifyStatus,
+      govtIdMessage: result.message,
+    }));
+  }, [setS4]);
+
   return (
     <>
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3">
         <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-blue-700 leading-relaxed">
-          Your documents are encrypted and stored securely. They are only used for identity verification and will not be shared publicly.
+          Your documents are encrypted and stored securely. They are only used for identity verification and will not be shared publicly. Upload clear, full-size images with all corners visible.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DocUpload label="Aadhaar Card" required preview={s4.aadhaarPreview}
-          onChange={f => handleDoc('aadhaarFile', f)} />
-        <DocUpload label="Government ID" required preview={s4.govtIdPreview}
-          onChange={f => handleDoc('govtIdFile', f)} />
-        <DocUpload label="PAN Card (optional)" preview={s4.panPreview}
-          onChange={f => handleDoc('panFile', f)} />
+      <div className="grid grid-cols-1 gap-4">
+        <DocumentUploadCard
+          label="Aadhaar Card"
+          documentType="aadhaar"
+          required
+          onVerified={handleAadhaarVerified}
+          onCleared={() => setS4(p => ({ ...p, aadhaarFile: null, aadhaarPreview: '', aadhaarStatus: 'idle', aadhaarMessage: '' }))}
+          currentStatus={s4.aadhaarStatus}
+          currentMessage={s4.aadhaarMessage}
+          currentPreview={s4.aadhaarPreview}
+        />
+        <DocumentUploadCard
+          label="PAN Card"
+          documentType="pan"
+          required
+          onVerified={handlePanVerified}
+          onCleared={() => setS4(p => ({ ...p, panFile: null, panPreview: '', panStatus: 'idle', panMessage: '' }))}
+          currentStatus={s4.panStatus}
+          currentMessage={s4.panMessage}
+          currentPreview={s4.panPreview}
+        />
+        <DocumentUploadCard
+          label="Government ID"
+          documentType="govt_id"
+          required={false}
+          onVerified={handleGovtIdVerified}
+          onCleared={() => setS4(p => ({ ...p, govtIdFile: null, govtIdPreview: '', govtIdStatus: 'idle', govtIdMessage: '' }))}
+          currentStatus={s4.govtIdStatus}
+          currentMessage={s4.govtIdMessage}
+          currentPreview={s4.govtIdPreview}
+        />
       </div>
 
       <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl bg-surface-2 border border-border/60 hover:border-maroon/30 transition-colors">

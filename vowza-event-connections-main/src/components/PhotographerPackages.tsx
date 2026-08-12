@@ -35,9 +35,10 @@ export default function PhotographerPackages({ provider, profile }: { provider: 
     }
   }
 
-  const { data: cartId, error } = await supabase.rpc('add_photography_cart_item' as any, { p_package_id: p.id, p_addon_ids: s.addons, p_album_id: s.albumId });
+  const { data: cartId, error } = await supabase.rpc('add_photography_cart_item' as any, { p_package_id: p.id, p_addon_ids: s.addons, p_album_id: s.albumId || null });
   setBusy(null);
-  if (error) return toast.error(error.message);
+  if (error) { console.error('[Photography] Cart RPC error:', error.message); return toast.error(error.message || 'Could not add to cart. Please try again.'); }
+  if (!cartId) { return toast.error('Could not create cart. Please try again.'); }
   sessionStorage.setItem('vowza_photography_checkout', JSON.stringify({ cartId, providerName: profile.full_name }));
 
   if (checkout) {

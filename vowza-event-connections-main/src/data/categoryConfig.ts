@@ -103,8 +103,8 @@ export const CATEGORIES: CategoryDef[] = [
     icon: Music2,
     gradient: "linear-gradient(135deg,#3a1c71 0%,#d76d77 50%,#ffaf7b 100%)",
     bannerColor: "bg-purple-900",
-    professionTypes: ["music_band","normal_band","maharashtra_band","traditional_band","musician","instrumental_artist","classical_musician","wedding_band","dhol_band","brass_band"],
-    subcategories: ["Wedding Band","Dhol Band","Brass Band","Chenda Melam","Traditional Band","DJ Band"],
+    professionTypes: ["music_band","maharashtra_band","traditional_band","instrumental_artist","classical_musician","wedding_band","dhol_band","brass_band"],
+    subcategories: ["Wedding Band","Brass Band","Pad Band","Baraat Band","Punjabi Dhol Band","Nashik Dhol Band","Tamil Melam","Chenda Melam","Marfa Band","Shivaji Maharashtrian Band","Traditional Folk Band","Devotional Band","Shehnai & Nadaswaram Band","Live Music Band"],
     fields: [
       ...COMMON_FIELDS,
       { key: "members",          label: "No. of Members",     type: "number",  placeholder: "8", section: "basic"    },
@@ -136,7 +136,7 @@ export const CATEGORIES: CategoryDef[] = [
     gradient: "linear-gradient(135deg,#c94b4b 0%,#4b134f 100%)",
     bannerColor: "bg-red-800",
     professionTypes: ["singer"],
-    subcategories: ["Classical","Carnatic","Hindustani","Folk","Devotional","Melody","Cine Songs","Ghazal","Sufi","Pop","Rock","Band Singer"],
+    subcategories: ["Telugu Singer","Bollywood Singer","Hindi Singer","Folk Singer","Devotional Singer","Western / English Singer"],
     fields: [
       ...COMMON_FIELDS,
       { key: "genres",           label: "Genres",              type: "tags",    placeholder: "Classical, Folk…", section: "services" },

@@ -10,10 +10,23 @@ import {
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
 import WaterProductsManager from './WaterProductsManager';
+import WaterPackageManager from './WaterPackageManager';
 import PhotographerPackageManager from './PhotographerPackageManager';
 import CateringPackageManager from './CateringPackageManager';
 import VideographyPackageManager from './VideographyPackageManager';
-import { isPhotographer, isWaterSupplier, isCaterer, isVideographer } from '@/lib/providerCategory';
+import DronePackageManager from './DronePackageManager';
+import DJPackageManager from './DJPackageManager';
+import DecoratorPackageManager from './DecoratorPackageManager';
+import MakeupPackageManager from './MakeupPackageManager';
+import MehendiPackageManager from './MehendiPackageManager';
+import AnchorPackageManager from './AnchorPackageManager';
+import BanquetHallPackageManager from './BanquetHallPackageManager';
+import RentalPackageManager from './RentalPackageManager';
+import PriestPackageManager from './PriestPackageManager';
+import BandPackageManager from './BandPackageManager';
+import SingerPackageManager from './SingerPackageManager';
+import DancerPackageManager from './DancerPackageManager';
+import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isSinger, isDancer } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -46,7 +59,7 @@ export default function VendorPackages() {
   // Water Suppliers use a product catalogue. All other professions retain
   // the original Services & Packages experience below without any changes.
   if (isWaterSupplier(provider)) {
-    return <WaterProductsManager provider={provider} />;
+    return <WaterPackageManager provider={provider} />;
   }
   if (isPhotographer(provider)) {
     return <PhotographerPackageManager provider={provider} />;
@@ -56,6 +69,42 @@ export default function VendorPackages() {
   }
   if (isVideographer(provider)) {
     return <VideographyPackageManager provider={provider} />;
+  }
+  if (isDroneOperator(provider)) {
+    return <DronePackageManager provider={provider} />;
+  }
+  if (isDJ(provider)) {
+    return <DJPackageManager provider={provider} />;
+  }
+  if (isDecorator(provider)) {
+    return <DecoratorPackageManager provider={provider} />;
+  }
+  if (isMakeupArtist(provider)) {
+    return <MakeupPackageManager provider={provider} />;
+  }
+  if (isMehendiArtist(provider)) {
+    return <MehendiPackageManager provider={provider} />;
+  }
+  if (isAnchor(provider)) {
+    return <AnchorPackageManager provider={provider} />;
+  }
+  if (isBanquetHall(provider)) {
+    return <BanquetHallPackageManager provider={provider} />;
+  }
+  if (isRentalService(provider)) {
+    return <RentalPackageManager provider={provider} />;
+  }
+  if (isPriest(provider)) {
+    return <PriestPackageManager provider={provider} />;
+  }
+  if (isBand(provider)) {
+    return <BandPackageManager provider={provider} />;
+  }
+  if (isSinger(provider)) {
+    return <SingerPackageManager provider={provider} />;
+  }
+  if (isDancer(provider)) {
+    return <DancerPackageManager provider={provider} />;
   }
 
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };

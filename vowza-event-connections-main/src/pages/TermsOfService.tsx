@@ -46,7 +46,7 @@ const sections = [
   {
     title: "9. Contact",
     content:
-      "For legal queries, contact legal@vowza.com or write to Vowza Technologies Pvt. Ltd., Mumbai, India.",
+      "For legal queries, contact vowza.services@gmail.com or write to Vowza Technologies Pvt. Ltd., Hyderabad, India.",
   },
 ];
 

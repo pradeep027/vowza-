@@ -203,7 +203,9 @@ const Artists = () => {
   const { data: artists = [], isLoading, error } = useArtists(filters);
   const { data: categories = [] } = useCategories();
 
-  if (error) toast.error("Failed to load artists");
+  useEffect(() => {
+    if (error) toast.error("Failed to load artists");
+  }, [error]);
 
   const clearAll = () => {
     setSearch(""); setCity(""); setBudget(""); setRating("");

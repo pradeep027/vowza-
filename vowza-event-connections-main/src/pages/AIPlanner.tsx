@@ -251,15 +251,72 @@ const AIPlanner = () => {
     e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
   };
 
+  // Cleanup speech recognition on unmount
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
+
   const toggleVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
+    if (!SR) { toast.error("Voice input isn't supported on this browser. Please use Chrome or type your message."); return; }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
     const rec = new SR();
-    rec.lang = 'en-IN'; rec.continuous = false; rec.interimResults = false;
-    rec.onresult = (e: any) => { setInput(p => p + (p ? ' ' : '') + e.results[0][0].transcript); setIsListening(false); };
-    rec.onerror = rec.onend = () => setIsListening(false);
-    rec.start(); recognitionRef.current = rec; setIsListening(true);
+    rec.lang = 'en-IN';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    // Track final transcript separately to avoid duplicates
+    let finalTranscript = '';
+    const baseInput = input; // snapshot current input at start
+
+    rec.onresult = (e: any) => {
+      let interim = '';
+      // Process results from the beginning each time
+      finalTranscript = '';
+      for (let i = 0; i < e.results.length; i++) {
+        const result = e.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      // Update input: base text + final recognized + interim (shown live)
+      const separator = baseInput && !baseInput.endsWith(' ') ? ' ' : '';
+      setInput(baseInput + separator + finalTranscript + interim);
+    };
+
+    rec.onerror = (e: any) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        console.warn('[Voice]', e.error);
+      }
+      setIsListening(false);
+    };
+
+    rec.onend = () => {
+      // Finalize: remove interim, keep only final
+      if (finalTranscript) {
+        const separator = baseInput && !baseInput.endsWith(' ') ? ' ' : '';
+        setInput(baseInput + separator + finalTranscript);
+      }
+      setIsListening(false);
+    };
+
+    try {
+      rec.start();
+      recognitionRef.current = rec;
+      setIsListening(true);
+    } catch (err) {
+      console.error('[Voice] Failed to start:', err);
+      setIsListening(false);
+    }
   };
 
   const ctxPills = [

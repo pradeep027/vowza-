@@ -35,6 +35,7 @@ export interface AuthContextType {
   // Role state — derived from public.user_roles, never hardcoded
   roles:        string[];
   isAdmin:      boolean;
+  isSuperAdmin: boolean;
   isProvider:   boolean;
   isCustomer:   boolean;
   rolesLoaded:  boolean;
@@ -227,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = useCallback(async (
     email: string, password: string, fullName: string, phone?: string
   ) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.toLowerCase().trim(),
       password,
       options: {
@@ -235,7 +236,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: { full_name: fullName, phone: phone ?? '' },
       },
     });
-    return { error };
+    if (!error && data?.user) {
+      console.log('[Auth] signUp success:', {
+        userId: data.user.id,
+        email: data.user.email,
+        emailConfirmedAt: data.user.email_confirmed_at,
+        hasSession: !!data.session,
+        identities: data.user.identities?.length,
+      });
+    }
+    return { data, error };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -277,7 +287,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     authenticated: !!user,
     roles,
-    isAdmin:    roles.includes('admin'),
+    isAdmin:    roles.includes('admin') || roles.includes('super_admin'),
+    isSuperAdmin: roles.includes('super_admin'),
     isProvider: roles.includes('provider'),
     isCustomer: roles.includes('customer'),
     rolesLoaded,

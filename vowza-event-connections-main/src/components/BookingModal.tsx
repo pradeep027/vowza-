@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import AvailabilityCalendar from '@/components/booking/AvailabilityCalendar';
 import { checkDateAvailable, getNearestAvailableDates } from '@/hooks/useAvailability';
 import { toast } from 'sonner';
+import LocationPicker, { type LocationData, validateLocationData, emptyLocationData } from '@/components/booking/LocationPicker';
 import {
   Calendar, Clock, MapPin, IndianRupee,
   AlertCircle, CheckCircle, ChevronRight, Loader2,
@@ -36,8 +37,7 @@ interface BookingModalProps {
 type Step = 'calendar' | 'details' | 'confirm';
 
 interface ValidationErrors {
-  venueAddress?: string;
-  venueCity?: string;
+  location?: string;
   amount?: string;
 }
 
@@ -54,12 +54,14 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
   const [eventDate,      setEventDate]      = useState('');
   const [eventTime,      setEventTime]      = useState('');
   const [duration,       setDuration]       = useState('4');
-  const [venueName,      setVenueName]      = useState('');
-  const [venueAddress,   setVenueAddress]   = useState('');
-  const [venueCity,      setVenueCity]      = useState('');
-  const [venueState,     setVenueState]     = useState('');
-  const [venuePincode,   setVenuePincode]   = useState('');
-  const [venueArea,      setVenueArea]      = useState('');
+  const [location,       setLocation]       = useState<LocationData>(emptyLocationData);
+  // Derived from location for backward-compat with DB columns
+  const venueName = location.venue_name;
+  const venueAddress = [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ');
+  const venueCity = location.town_city;
+  const venueState = location.state;
+  const venuePincode = location.pincode;
+  const venueArea = location.locality;
   const [guestCount,     setGuestCount]     = useState('');
   const [requirements,   setRequirements]   = useState('');
   const [amount,         setAmount]         = useState('');
@@ -91,7 +93,19 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
       setValidationErrors({});
       setTermsAccepted(false);
       supabase.from('event_types').select('id, name').order('name').then(({ data }) => {
-        if (data) setEventTypes(data);
+        if (data && data.length > 0) setEventTypes(data);
+        else setEventTypes([
+          { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
+          { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
+          { id: 'corporate', name: 'Corporate Event' }, { id: 'haldi', name: 'Haldi' },
+          { id: 'sangeet', name: 'Sangeet' }, { id: 'other', name: 'Other' },
+        ]);
+      }).catch(() => {
+        setEventTypes([
+          { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
+          { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
+          { id: 'corporate', name: 'Corporate Event' }, { id: 'other', name: 'Other' },
+        ]);
       });
       if (selectedPackage?.price) setAmount(String(selectedPackage.price));
       else if (provider.price_min) setAmount(provider.price_min.toString());
@@ -140,10 +154,11 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
 
   const validateDetails = (): boolean => {
     const errors: ValidationErrors = {};
-    if (!venueAddress.trim()) errors.venueAddress = 'Venue address is required';
-    if (!venueCity.trim()) errors.venueCity = 'City is required';
+    const locErr = validateLocationData(location);
+    if (locErr) errors.location = locErr;
     if (!amount || parseInt(amount) <= 0) errors.amount = 'Please enter a valid amount';
     setValidationErrors(errors);
+    if (locErr) toast.error(locErr);
     return Object.keys(errors).length === 0;
   };
 
@@ -178,7 +193,6 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
       }
 
       const bookingAmount = parseInt(amount);
-      const platformFee   = Math.round(bookingAmount * 0.1);
 
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -194,13 +208,21 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
           venue_area:           venueArea || null,
           requirements:         requirements || null,
           amount:               bookingAmount,
-          platform_fee:         platformFee,
+          platform_fee:         0,
           status:               'requested',
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // Save structured location
+      await supabase.from('booking_locations' as any).insert({
+        booking_table: 'bookings', booking_id: bookingData.id,
+        state: location.state, district: location.district, town_city: location.town_city,
+        exact_address: venueAddress, pincode: location.pincode, landmark: location.address_line || null,
+        latitude: location.latitude, longitude: location.longitude,
+      });
 
       await NotificationService.notifyBookingReceived(user.id, provider.id, bookingData.id);
 
@@ -214,7 +236,6 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
         duration: duration,
         venue: `${venueAddress}, ${venueCity}`,
         amount: bookingAmount,
-        platformFee: platformFee,
         eventType: eventTypeName || 'Event',
         status: 'requested'
       }));
@@ -234,8 +255,10 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
 
   const eventTypeName = eventTypes.find(e => e.id === eventTypeId)?.name;
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="w-[92vw] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold bg-gradient-to-r from-gold to-maroon bg-clip-text text-transparent">
@@ -280,11 +303,15 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
         {/* ── STEP 1: Calendar ────────────────────────────────────────── */}
         {step === 'calendar' && (
           <div className="space-y-3">
-            <AvailabilityCalendar
-              providerId={provider.id}
-              selectedDate={eventDate}
-              onSelectDate={handleDateSelect}
-            />
+            {provider.id ? (
+              <AvailabilityCalendar
+                providerId={provider.id}
+                selectedDate={eventDate}
+                onSelectDate={handleDateSelect}
+              />
+            ) : (
+              <div className="text-center py-8 text-sm text-muted-foreground">Loading calendar...</div>
+            )}
 
             {/* Checking state */}
             {checkingAvail && (
@@ -399,59 +426,8 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
               </div>
             </div>
 
-            {/* Venue Name (optional) */}
-            <div className="space-y-1.5">
-              <Label>Venue Name</Label>
-              <Input placeholder="e.g. Grand Ballroom, Hotel Taj" value={venueName}
-                onChange={e => setVenueName(e.target.value)}
-                className="border-border focus:border-gold" />
-            </div>
-
-            {/* Venue Address */}
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />Venue Address *</Label>
-              <Input placeholder="Full venue address" value={venueAddress}
-                onChange={e => { setVenueAddress(e.target.value); if (validationErrors.venueAddress) setValidationErrors(prev => ({ ...prev, venueAddress: undefined })); }}
-                className={`border-border focus:border-gold ${validationErrors.venueAddress ? 'border-red-500 focus:border-red-500' : ''}`} />
-              {validationErrors.venueAddress && (
-                <p className="text-xs text-red-500 mt-1">{validationErrors.venueAddress}</p>
-              )}
-            </div>
-
-            {/* City + State */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>City *</Label>
-                <Input placeholder="City" value={venueCity}
-                  onChange={e => { setVenueCity(e.target.value); if (validationErrors.venueCity) setValidationErrors(prev => ({ ...prev, venueCity: undefined })); }}
-                  className={`border-border focus:border-gold ${validationErrors.venueCity ? 'border-red-500 focus:border-red-500' : ''}`} />
-                {validationErrors.venueCity && (
-                  <p className="text-xs text-red-500 mt-1">{validationErrors.venueCity}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>State *</Label>
-                <Input placeholder="State" value={venueState}
-                  onChange={e => setVenueState(e.target.value)}
-                  className="border-border focus:border-gold" />
-              </div>
-            </div>
-
-            {/* Pincode */}
-            <div className="space-y-1.5">
-              <Label>Pincode</Label>
-              <Input placeholder="Pincode" value={venuePincode}
-                onChange={e => setVenuePincode(e.target.value)}
-                className="border-border focus:border-gold" />
-            </div>
-
-            {/* Area */}
-            <div className="space-y-1.5">
-              <Label>Area / Locality</Label>
-              <Input placeholder="Area / Locality" value={venueArea}
-                onChange={e => setVenueArea(e.target.value)}
-                className="border-border focus:border-gold" />
-            </div>
+            {/* Location Picker */}
+            <LocationPicker value={location} onChange={setLocation} compact />
 
             {/* Number of Guests */}
             <div className="space-y-1.5">
@@ -536,9 +512,6 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
                 {guestCount && <div className="flex justify-between"><span className="text-muted-foreground">Guests</span><span className="font-medium">{guestCount}</span></div>}
                 <div className="border-t border-border/40 pt-2 flex justify-between font-bold">
                   <span>Amount</span><span className="text-gold">₹{parseInt(amount).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Platform fee (10%)</span><span>₹{Math.round(parseInt(amount) * 0.1).toLocaleString()}</span>
                 </div>
               </div>
             </div>

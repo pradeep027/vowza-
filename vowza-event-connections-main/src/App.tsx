@@ -11,7 +11,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import InactivityWarning from "@/components/InactivityWarning";
-import AIFloatingButton from "@/components/ai/AIFloatingButton";
+import BookAnArtistFloat from "@/components/BookAnArtistFloat";
 
 const Index                = lazy(() => import("./pages/Index"));
 const Auth                 = lazy(() => import("./pages/Auth"));
@@ -36,6 +36,7 @@ const Contact              = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy        = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService       = lazy(() => import("./pages/TermsOfService"));
 const CategoryPage         = lazy(() => import("./pages/CategoryPage"));
+const CateringCartPage     = lazy(() => import("./pages/CateringCartPage"));
 const VendorEditProfile    = lazy(() => import("./pages/VendorEditProfile"));
 
 // ─── Admin (new enterprise layout) ───────────────────────────────────────────
@@ -71,6 +72,7 @@ const PaymentHistoryPage   = lazy(() => import("./pages/customer/PaymentHistoryP
 const MyReviewsPage        = lazy(() => import("./pages/customer/MyReviewsPage"));
 const AIPlannerListPage    = lazy(() => import("./pages/customer/AIPlannerListPage"));
 const CustomerSettingsPage = lazy(() => import("./pages/customer/SettingsPage"));
+const CustomerHelpSupport  = lazy(() => import("./pages/customer/CustomerHelpSupport"));
 
 // ─── Vendor (artist/provider dashboard) ───────────────────────────────────────
 const VendorLayout         = lazy(() => import("./pages/vendor/VendorLayout"));
@@ -83,6 +85,8 @@ const VendorReviews        = lazy(() => import("./pages/vendor/VendorReviews"));
 const VendorMessages       = lazy(() => import("./pages/vendor/VendorMessages"));
 const VendorNotifications  = lazy(() => import("./pages/vendor/VendorNotifications"));
 const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"));
+const VendorCalendar       = lazy(() => import("./pages/vendor/VendorCalendar"));
+const VendorHelpSupport    = lazy(() => import("./pages/vendor/VendorHelpSupport"));
 
 // ─── Page loader fallback ─────────────────────────────────────────────────────
 const PageLoader = () => (
@@ -136,6 +140,7 @@ const AppContent = () => {
           <Route path="/event-dashboard" element={<ProtectedRoute><CustomerEventDashboard /></ProtectedRoute>} />
           <Route path="/chat/:bookingId" element={<ProtectedRoute><BookingChat /></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+          <Route path="/catering-cart" element={<ProtectedRoute><CateringCartPage /></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
           <Route path="/provider/register" element={<ProtectedRoute><ProviderRegistration /></ProtectedRoute>} />
           <Route path="/artist/onboarding" element={<ProtectedRoute><ArtistOnboarding /></ProtectedRoute>} />
@@ -176,13 +181,14 @@ const AppContent = () => {
             <Route path="reviews"      element={<MyReviewsPage />} />
             <Route path="ai-planner"   element={<AIPlannerListPage />} />
             <Route path="settings"     element={<CustomerSettingsPage />} />
+            <Route path="help"         element={<CustomerHelpSupport />} />
           </Route>
 
           {/* ── Vendor — VendorLayout handles auth + provider role check internally ── */}
           <Route path="/vendor" element={<VendorLayout />}>
             <Route path="dashboard"     element={<VendorDashboardHome />} />
             <Route path="bookings"      element={<VendorBookings />} />
-            <Route path="calendar"      element={<VendorDashboardHome />} />
+            <Route path="calendar"      element={<VendorCalendar />} />
             <Route path="inquiries"     element={<VendorBookings />} />
             <Route path="messages"      element={<VendorMessages />} />
             <Route path="notifications" element={<VendorNotifications />} />
@@ -190,10 +196,9 @@ const AppContent = () => {
             <Route path="packages"      element={<VendorPackages />} />
             <Route path="reviews"       element={<VendorReviews />} />
             <Route path="analytics"     element={<VendorDashboardHome />} />
-            {/* Wallet owns Transactions, Payouts and Bank Details as internal tabs */}
             <Route path="wallet"        element={<VendorWallet />} />
             <Route path="settings"      element={<VendorSettings />} />
-            <Route path="help"          element={<VendorDashboardHome />} />
+            <Route path="help"          element={<VendorHelpSupport />} />
           </Route>
 
           <Route path="/booking-success" element={<ProtectedRoute><BookingSuccess /></ProtectedRoute>} />
@@ -205,7 +210,7 @@ const AppContent = () => {
 
       {/* Global overlays — always visible regardless of route */}
       <InactivityWarning />
-      <AIFloatingButton />
+      <BookAnArtistFloat />
     </>
   );
 };

@@ -6,21 +6,43 @@ import { toast } from 'sonner';
 import { Shield, Plus, Trash2, RefreshCw, User } from 'lucide-react';
 
 export default function AdminAdmins() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [admins, setAdmins]   = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail]     = useState('');
   const [adding, setAdding]   = useState(false);
 
+  // Access control — only super_admin can use this page
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-3">
+          <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto" />
+          <h2 className="text-lg font-bold text-foreground">Access Denied</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">You do not have permission to manage administrators. Only the Super Admin can access this section.</p>
+        </div>
+      </div>
+    );
+  }
+
   const load = async () => {
     setLoading(true);
     try {
-      const { data: roles } = await supabase.from('user_roles').select('user_id, role, created_at').eq('role', 'admin');
-      if (!roles?.length) { setAdmins([]); setLoading(false); return; }
-      const ids = roles.map((r: any) => r.user_id);
+      // Fetch admin roles (user_roles only has id, user_id, role — no created_at)
+      const { data: adminRoles } = await supabase.from('user_roles').select('user_id, role').eq('role', 'admin');
+      const { data: superRoles } = await supabase.from('user_roles').select('user_id, role').eq('role', 'super_admin');
+      const roles = [...(adminRoles ?? []), ...(superRoles ?? [])];
+      // Deduplicate by user_id (keep super_admin if both exist)
+      const userMap = new Map<string, any>();
+      for (const r of roles) {
+        if (!userMap.has(r.user_id) || r.role === 'super_admin') userMap.set(r.user_id, r);
+      }
+      const uniqueRoles = Array.from(userMap.values());
+      if (!uniqueRoles.length) { setAdmins([]); setLoading(false); return; }
+      const ids = uniqueRoles.map((r: any) => r.user_id);
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', ids);
       const pm = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-      setAdmins(roles.map((r: any) => ({ ...r, ...(pm.get(r.user_id) ?? {}) })));
+      setAdmins(uniqueRoles.map((r: any) => ({ ...r, ...(pm.get(r.user_id) ?? {}) })));
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   };
@@ -41,7 +63,8 @@ export default function AdminAdmins() {
     finally { setAdding(false); }
   };
 
-  const remove = async (userId: string) => {
+  const remove = async (userId: string, role: string) => {
+    if (role === 'super_admin') { toast.error('Super Admin cannot be removed'); return; }
     if (userId === user?.id) { toast.error('Cannot remove yourself'); return; }
     if (!confirm('Remove admin access?')) return;
     await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin');
@@ -87,9 +110,11 @@ export default function AdminAdmins() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold bg-maroon/10 text-maroon px-2.5 py-1 rounded-full">Super Admin</span>
-                  {a.user_id !== user?.id ? (
-                    <button onClick={() => remove(a.user_id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4"/></button>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${a.role === 'super_admin' ? 'bg-purple-100 text-purple-700' : 'bg-maroon/10 text-maroon'}`}>{a.role === 'super_admin' ? 'Super Admin' : 'Admin'}</span>
+                  {a.role === 'super_admin' ? (
+                    <span className="text-[10px] font-medium text-muted-foreground">Protected</span>
+                  ) : a.user_id !== user?.id ? (
+                    <button onClick={() => remove(a.user_id, a.role)} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4"/></button>
                   ) : (
                     <span className="text-[10px] text-muted-foreground px-2">You</span>
                   )}

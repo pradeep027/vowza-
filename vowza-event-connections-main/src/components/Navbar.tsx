@@ -200,8 +200,8 @@ const Navbar = () => {
           "fixed top-0 left-0 right-0 z-50",
           "transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isScrolled
-            ? "bg-[#FFFFFF] dark:bg-gray-950 backdrop-blur-[12px] border-b border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
-            : "bg-white/70 dark:bg-gray-950/70 backdrop-blur-md border-b border-transparent shadow-none"
+            ? "bg-[#FFFFFF] dark:bg-gray-950 backdrop-blur-[12px] border-b border-[#E5E7EB] shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
+            : "bg-white/85 dark:bg-gray-950/80 backdrop-blur-md border-b border-[#E5E7EB]/60 shadow-none"
         )}
       >
         <div className="container">
@@ -447,6 +447,16 @@ const Navbar = () => {
 
               {user ? (
                 <>
+                  {/* Join as Artist — only for non-providers */}
+                  {rolesLoaded && !isProvider && (
+                    <Link to="/provider/register">
+                      <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                        className="px-4 py-1.5 rounded-full text-[12px] font-bold bg-gradient-to-r from-[hsl(40,95%,56%)] to-[hsl(36,85%,44%)] text-[#1a1200] shadow-[0_2px_10px_hsl(40,95%,52%,0.3)] hover:shadow-[0_3px_16px_hsl(40,95%,52%,0.45)] transition-all duration-200">
+                        Join as Artist
+                      </motion.button>
+                    </Link>
+                  )}
+
                   {/* Cart */}
                   <motion.button
                     whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
@@ -528,11 +538,18 @@ const Navbar = () => {
                   </div>
                 </>
               ) : (
-                <Link to="/auth">
-                  <button className="px-4 py-2 rounded-lg text-[15px] font-semibold text-foreground/85 hover:text-maroon hover:bg-secondary transition-colors duration-250 ease-out">
-                    Sign in
-                  </button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to="/provider/register">
+                    <button className="px-5 py-2 rounded-full text-[13px] font-bold bg-gradient-to-r from-[hsl(40,95%,56%)] to-[hsl(36,85%,44%)] text-[#1a1200] shadow-[0_2px_12px_hsl(40,95%,52%,0.35)] hover:shadow-[0_4px_20px_hsl(40,95%,52%,0.5)] hover:scale-[1.03] transition-all duration-200">
+                      Join as Artist
+                    </button>
+                  </Link>
+                  <Link to="/auth">
+                    <button className="px-4 py-2 rounded-lg text-[15px] font-semibold text-foreground/85 hover:text-maroon hover:bg-secondary transition-colors duration-250 ease-out">
+                      Sign in
+                    </button>
+                  </Link>
+                </div>
               )}
             </div>
 

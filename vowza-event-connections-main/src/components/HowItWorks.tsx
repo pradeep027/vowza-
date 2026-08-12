@@ -1,9 +1,12 @@
 // ─── HowItWorks — Mobile-first, 8-pt grid, premium typography ────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search, MessageSquare, Calendar, CreditCard, Smile,
-  UserCheck, Upload, CheckCircle, IndianRupee, TrendingUp, ArrowRight,
+  UserCheck, Upload, CheckCircle, IndianRupee, TrendingUp, ArrowRight, Loader2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const customerSteps = [
   { icon: Search,        step: "01", title: "Discover Artists",   color: "bg-rose-500",    desc: "Browse verified professionals by category, city, and budget." },
@@ -23,6 +26,26 @@ const artistSteps = [
 
 const HowItWorks = () => {
   const [tab, setTab] = useState<"customer" | "artist">("customer");
+  const { user } = useAuth();
+  const [artistStatus, setArtistStatus] = useState<'loading' | 'none' | 'pending' | 'approved' | 'rejected'>('loading');
+
+  useEffect(() => {
+    if (!user) { setArtistStatus('none'); return; }
+    (async () => {
+      const { data } = await supabase
+        .from('provider_profiles')
+        .select('verification_status')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) {
+        const s = data.verification_status || 'pending';
+        setArtistStatus(s === 'approved' ? 'approved' : s === 'rejected' ? 'rejected' : 'pending');
+      } else {
+        setArtistStatus('none');
+      }
+    })();
+  }, [user]);
+
   const steps = tab === "customer" ? customerSteps : artistSteps;
 
   return (
@@ -132,12 +155,50 @@ const HowItWorks = () => {
             </>
           ) : (
             <>
-              <a href="/provider/register" className="btn-gold justify-center text-sm py-3">
-                <TrendingUp className="w-4 h-4" /> Join as Artist — Free
-              </a>
-              <a href="/auth" className="btn-outline justify-center text-sm py-3">
-                Learn More <ArrowRight className="w-4 h-4" />
-              </a>
+              {artistStatus === 'loading' ? (
+                <div className="btn-gold justify-center text-sm py-3 opacity-70 pointer-events-none inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Checking status...
+                </div>
+              ) : artistStatus === 'approved' ? (
+                <>
+                  <div className="text-center space-y-1 px-4">
+                    <p className="text-sm font-semibold text-foreground">Thank you for joining Vowza!</p>
+                    <p className="text-xs text-emerald-600">Your artist profile has been approved.</p>
+                  </div>
+                  <a href="/provider/dashboard" className="btn-gold justify-center text-sm py-3">
+                    <CheckCircle className="w-4 h-4" /> Open Artist Dashboard
+                  </a>
+                </>
+              ) : artistStatus === 'pending' ? (
+                <>
+                  <div className="text-center space-y-1 px-4">
+                    <p className="text-sm font-semibold text-foreground">Thanks for joining Vowza!</p>
+                    <p className="text-xs text-muted-foreground">Your artist application is under review. We'll notify you once approved.</p>
+                  </div>
+                  <a href="/provider/dashboard" className="btn-outline justify-center text-sm py-3">
+                    <UserCheck className="w-4 h-4" /> View Application Status
+                  </a>
+                </>
+              ) : artistStatus === 'rejected' ? (
+                <>
+                  <div className="text-center space-y-1 px-4">
+                    <p className="text-sm font-semibold text-foreground">Application Needs Attention</p>
+                    <p className="text-xs text-red-500">Your application was not approved. Please review and resubmit.</p>
+                  </div>
+                  <a href="/provider/register" className="btn-outline justify-center text-sm py-3">
+                    Review Application <ArrowRight className="w-4 h-4" />
+                  </a>
+                </>
+              ) : (
+                <>
+                  <a href="/provider/register" className="btn-gold justify-center text-sm py-3">
+                    <TrendingUp className="w-4 h-4" /> Join as Artist — Free
+                  </a>
+                  <a href="/auth" className="btn-outline justify-center text-sm py-3">
+                    Learn More <ArrowRight className="w-4 h-4" />
+                  </a>
+                </>
+              )}
             </>
           )}
         </div>

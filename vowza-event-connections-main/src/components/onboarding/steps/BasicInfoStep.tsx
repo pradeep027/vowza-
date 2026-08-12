@@ -14,7 +14,9 @@ interface BasicInfoStepProps {
     phone: string;
     city: string;
     state: string;
+    district: string;
     area: string;
+    address: string;
     experienceYears: string;
     languages: string[];
     bio: string;
@@ -113,37 +115,64 @@ export const BasicInfoStep = ({
           <MapPin className="w-5 h-5 text-primary" />
           <Label className="text-base font-semibold">Location</Label>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="city">City *</Label>
-            <Input
-              id="city"
-              placeholder="Mumbai"
-              value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
-              className="border-border focus:border-primary"
-            />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="state">State *</Label>
-            <Input
+            <select
               id="state"
-              placeholder="Maharashtra"
               value={data.state}
-              onChange={(e) => onChange({ state: e.target.value })}
+              onChange={(e) => onChange({ state: e.target.value, district: '', city: '' })}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Select State</option>
+              {['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman & Nicobar','Chandigarh','Dadra & Nagar Haveli','Daman & Diu','Delhi','Jammu & Kashmir','Ladakh','Lakshadweep','Puducherry'].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="district">District *</Label>
+            <Input
+              id="district"
+              placeholder={data.state ? "Enter district" : "Select state first"}
+              value={data.district || ''}
+              onChange={(e) => onChange({ district: e.target.value, city: '' })}
+              disabled={!data.state}
               className="border-border focus:border-primary"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="area">Area / Locality</Label>
+            <Label htmlFor="city">Town / City *</Label>
+            <Input
+              id="city"
+              placeholder={data.district ? "Enter town or city" : "Enter district first"}
+              value={data.city}
+              onChange={(e) => onChange({ city: e.target.value })}
+              disabled={!data.district}
+              className="border-border focus:border-primary"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="area">Locality *</Label>
             <Input
               id="area"
-              placeholder="Andheri West"
+              placeholder="Enter locality (e.g. Madhapur, Banjara Hills)"
               value={data.area}
               onChange={(e) => onChange({ area: e.target.value })}
               className="border-border focus:border-primary"
             />
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="address">Full Address *</Label>
+          <Textarea
+            id="address"
+            placeholder="Enter complete address (building, street, landmark...)"
+            value={data.address || ''}
+            onChange={(e) => onChange({ address: e.target.value })}
+            rows={2}
+            className="border-border focus:border-primary resize-none"
+          />
         </div>
       </div>
 

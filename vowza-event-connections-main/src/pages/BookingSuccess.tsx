@@ -13,7 +13,8 @@ interface BookingDetails {
   duration: string;
   venue: string;
   amount: number;
-  platformFee: number;
+  advanceAmount?: number;
+  remainingBalance?: number;
   eventType: string;
   status: string;
 }
@@ -75,7 +76,7 @@ const BookingSuccess = () => {
                 <IndianRupee className="w-4 h-4 text-[#8B1538] mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-semibold">₹{details.amount.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">+ ₹{details.platformFee.toLocaleString()} platform fee</p>
+                  {details.advanceAmount && <p className="text-xs text-muted-foreground">30% advance: ₹{details.advanceAmount.toLocaleString()} · Remaining: ₹{(details.remainingBalance || 0).toLocaleString()}</p>}
                 </div>
               </div>
             </div>

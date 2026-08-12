@@ -69,11 +69,28 @@ export default function VendorPortfolio() {
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (item: any) => {
-    if (!confirm('Delete this portfolio item permanently?')) return;
+    if (!confirm('Delete this portfolio item permanently?\n\nThis will remove it from your portfolio and customer gallery.')) return;
+
+    // 1. Delete from database
     const { error } = await supabase.from('portfolio_items').delete().eq('id', item.id);
     if (error) { toast.error(error.message); return; }
+
+    // 2. Delete from Supabase Storage (extract path from public URL)
+    if (item.media_url) {
+      try {
+        const urlParts = item.media_url.split('/provider-media/');
+        if (urlParts.length === 2) {
+          const storagePath = decodeURIComponent(urlParts[1]);
+          await supabase.storage.from('provider-media').remove([storagePath]);
+        }
+      } catch {
+        // Storage deletion is best-effort — DB record is already gone
+      }
+    }
+
     toast.success('Item deleted');
     qc.invalidateQueries({ queryKey: ['vendor-portfolio'] });
+    qc.invalidateQueries({ queryKey: ['vendor-kpis'] });
   };
 
   // ── Set as cover ──────────────────────────────────────────────────────────

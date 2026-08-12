@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, RefreshCw, Download, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, RefreshCw, Download, ChevronLeft, ChevronRight, Eye, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ChatBox from '@/components/ChatBox';
 
 const PAGE_SIZE = 15;
 type StatusFilter = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
@@ -16,6 +17,9 @@ export default function AdminBookings() {
   const [page, setPage]         = useState(0);
   const [total, setTotal]       = useState(0);
   const [selected, setSelected] = useState<any>(null);
+  const [reschedules, setReschedules] = useState<any[]>([]);
+  const [loadingReschedules, setLoadingReschedules] = useState(true);
+  const [chatBookingId, setChatBookingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,6 +36,20 @@ export default function AdminBookings() {
   }, [status, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load reschedule requests
+  useEffect(() => {
+    (async () => {
+      setLoadingReschedules(true);
+      const { data } = await supabase
+        .from('reschedule_requests' as any)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (data) setReschedules(data);
+      setLoadingReschedules(false);
+    })();
+  }, [bookings]);
 
   const updateStatus = async (id: string, newStatus: string) => {
     await supabase.from('bookings').update({ status: newStatus } as any).eq('id', id);
@@ -117,6 +135,51 @@ export default function AdminBookings() {
         </div>
       </div>
 
+      {/* ── Reschedule Requests ─────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-foreground">Reschedule Requests</h2>
+          <span className="text-xs text-muted-foreground">{reschedules.length} total</span>
+        </div>
+        <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/60 bg-surface-2">
+                  {['Booking','Status','Original Date','Requested Date','Refund','Decision','Created'].map(h => (
+                    <th key={h} className="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loadingReschedules ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                ) : reschedules.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No reschedule requests yet</td></tr>
+                ) : reschedules.map((r: any) => (
+                  <tr key={r.id} className="border-b border-border/40 hover:bg-surface-2 transition-colors">
+                    <td className="px-4 py-3 text-xs font-mono text-muted-foreground">#{r.booking_id?.slice(0,8)}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn('text-[10px] font-semibold border px-2 py-0.5 rounded-full',
+                        r.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        r.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        r.status === 'declined' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      )}>{r.status}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs">{r.original_date ? new Date(r.original_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}</td>
+                    <td className="px-4 py-3 text-xs font-semibold">{r.requested_date ? new Date(r.requested_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}</td>
+                    <td className="px-4 py-3 text-xs">{Number(r.refund_amount) > 0 ? <span className="text-orange-600 font-semibold">₹{Number(r.refund_amount).toLocaleString()} ({r.refund_status})</span> : '—'}</td>
+                    <td className="px-4 py-3 text-[10px] text-muted-foreground">{r.decided_at ? new Date(r.decided_at).toLocaleDateString('en-IN') : 'Pending'}</td>
+                    <td className="px-4 py-3 text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {selected && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-background rounded-2xl border border-border p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -139,6 +202,26 @@ export default function AdminBookings() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="pt-3 border-t border-border">
+              <button onClick={() => { setChatBookingId(selected.id); setSelected(null); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary w-full justify-center">
+                <MessageSquare className="w-3.5 h-3.5" /> View Chat (Read Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Admin Chat Read-Only Modal ──────────────────────────────────── */}
+      {chatBookingId && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-2xl border border-border w-full max-w-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <h2 className="font-bold text-foreground text-sm">Chat — Booking #{chatBookingId.slice(0,8)}</h2>
+              <button onClick={() => setChatBookingId(null)} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
+            </div>
+            <div className="p-4">
+              <ChatBox bookingId={chatBookingId} otherUserName="Conversation" readOnly />
             </div>
           </div>
         </div>

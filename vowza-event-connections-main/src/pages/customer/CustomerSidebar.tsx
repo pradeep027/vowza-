@@ -4,7 +4,7 @@ import VowzaIcon from '@/components/VowzaIcon';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, CalendarCheck, Heart, Bell, User, CreditCard,
-  Star, Settings, ChevronLeft, ChevronRight, X, LogOut
+  Star, Settings, ChevronLeft, ChevronRight, X, LogOut, Home, HelpCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/AppLogo';
@@ -18,6 +18,7 @@ interface Props {
 }
 
 const NAV_ITEMS = [
+  { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/dashboard/bookings', label: 'My Bookings', icon: CalendarCheck },
   { to: '/dashboard/wishlist', label: 'Wishlist', icon: Heart },
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/reviews', label: 'My Reviews', icon: Star },
   { to: '/dashboard/ai-planner', label: 'Vowza AI Planner', icon: VowzaIcon },
   { to: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { to: '/dashboard/help', label: 'Help & Support', icon: HelpCircle },
 ];
 
 export default function CustomerSidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: Props) {

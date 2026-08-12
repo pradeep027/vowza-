@@ -110,7 +110,8 @@ export function useVendorRealtime(vendorId?: string | null) {
     if (!vendorId) return;
 
     const tables = [
-      'bookings', 'payments', 'reviews', 'messages',
+      'bookings', 'photography_package_bookings', 'catering_bookings', 'drone_bookings', 'videography_bookings', 'dj_bookings', 'decorator_bookings', 'makeup_bookings', 'mehendi_bookings', 'anchor_bookings', 'banquet_bookings', 'rental_bookings', 'priest_bookings', 'water_bookings', 'band_bookings',
+      'payments', 'reviews', 'messages',
       'portfolio_items', 'provider_availability',
       'profile_views', 'inquiries', 'pricing_packages',
       'notifications', 'provider_profiles', 'profiles',
@@ -475,16 +476,17 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
     queryFn: async () => {
       if (!vendorId) return [];
 
-      // Map UI status → DB values
+      // Map UI status → DB values (supports the new 'accepted' tab)
       const statusMap: Record<string, string[]> = {
         requested: ['requested', 'pending'],
-        confirmed: ['confirmed', 'accepted'],
+        accepted:  ['accepted'],
+        confirmed: ['confirmed', 'in_progress'],
         completed: ['completed'],
-        cancelled: ['cancelled', 'rejected'],
+        cancelled: ['cancelled', 'rejected', 'declined'],
       };
       const statusValues = status ? (statusMap[status] ?? [status]) : undefined;
 
-      // Query 1: Generic bookings table
+      // ── Query 1: Generic bookings table ──────────────────────────────────
       let q1 = supabase.from('bookings')
         .select('*')
         .eq('provider_id', vendorId)
@@ -492,7 +494,7 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
       if (statusValues) q1 = q1.in('status', statusValues);
       const { data: genericBookings } = await q1;
 
-      // Query 2: Photography package bookings table
+      // ── Query 2: Photography package bookings ────────────────────────────
       let q2 = supabase.from('photography_package_bookings' as any)
         .select('*, photography_packages(name, photography_type)')
         .eq('photographer_id', vendorId)
@@ -500,17 +502,28 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
       if (statusValues) q2 = q2.in('status', statusValues);
       const { data: photoBookings } = await q2;
 
-      // Normalize photography bookings to match generic booking shape
+      // ── Query 3: Catering bookings ───────────────────────────────────────
+      let q3 = supabase.from('catering_bookings' as any)
+        .select('*, catering_packages(name, price_per_plate)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q3 = q3.in('status', statusValues);
+      const { data: cateringBookings } = await q3;
+
+      // Normalize photography bookings
       const normalizedPhotoBookings = (photoBookings ?? []).map((b: any) => ({
         id: b.id,
         customer_id: b.customer_id,
         provider_id: b.photographer_id,
         event_date: b.event_date,
         event_time: b.event_time,
-        venue_address: b.venue,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
         venue_city: b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
         requirements: b.notes,
-        amount: b.total_amount,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
         status: b.status,
         created_at: b.created_at,
         package_name: b.photography_packages?.name || 'Photography Package',
@@ -518,13 +531,474 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         base_amount: b.base_amount,
         addons_amount: b.addons_amount,
         album_amount: b.album_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: null,
         _source: 'photography',
       }));
 
-      // Combine both lists
+      // Normalize catering bookings
+      const normalizedCateringBookings = (cateringBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: null,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
+        requirements: b.special_requests,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.catering_packages?.name || 'Catering Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: b.guest_count,
+        event_type: b.event_type,
+        _source: 'catering',
+      }));
+
+      // ── Query 4: Drone bookings ────────────────────────────────────────
+      let q4 = supabase.from('drone_bookings' as any)
+        .select('*, drone_packages(name, starting_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q4 = q4.in('status', statusValues);
+      const { data: droneBookings } = await q4;
+
+      // Normalize drone bookings
+      const normalizedDroneBookings = (droneBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
+        requirements: b.special_requests,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.drone_packages?.name || 'Drone Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: null,
+        event_type: b.event_type,
+        coverage_duration: b.coverage_duration,
+        _source: 'drone',
+      }));
+
+      // ── Query 5: Videography bookings ──────────────────────────────────
+      let q5 = supabase.from('videography_bookings' as any)
+        .select('*, videography_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q5 = q5.in('status', statusValues);
+      const { data: videographyBookings } = await q5;
+
+      // Normalize videography bookings
+      const normalizedVideographyBookings = (videographyBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
+        requirements: b.notes,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.videography_packages?.name || 'Videography Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: null,
+        event_type: b.event_type,
+        _source: 'videography',
+      }));
+
+      // ── Query 6: DJ bookings ───────────────────────────────────────────
+      let q6 = supabase.from('dj_bookings' as any)
+        .select('*, dj_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q6 = q6.in('status', statusValues);
+      const { data: djBookings } = await q6;
+
+      const normalizedDJBookings = (djBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.city || b.venue?.split(',').pop()?.trim() || '',
+        venue_area: null,
+        requirements: b.special_instructions,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.dj_packages?.name || 'DJ Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: b.expected_audience,
+        event_type: b.event_type,
+        _source: 'dj',
+      }));
+
+      // ── Query 7: Decorator bookings ────────────────────────────────────
+      let q7 = supabase.from('decorator_bookings' as any)
+        .select('*, decorator_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q7 = q7.in('status', statusValues);
+      const { data: decoratorBookings } = await q7;
+
+      const normalizedDecoratorBookings = (decoratorBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.city || '',
+        venue_area: null,
+        requirements: b.special_instructions,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.decorator_packages?.name || 'Decoration Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: null,
+        event_type: b.event_type,
+        _source: 'decorator',
+      }));
+
+      // ── Query 8: Makeup bookings ───────────────────────────────────────
+      let q8 = supabase.from('makeup_bookings' as any)
+        .select('*, makeup_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q8 = q8.in('status', statusValues);
+      const { data: makeupBookings } = await q8;
+
+      const normalizedMakeupBookings = (makeupBookings ?? []).map((b: any) => ({
+        id: b.id,
+        customer_id: b.customer_id,
+        provider_id: b.provider_id,
+        event_date: b.event_date,
+        event_time: b.event_time,
+        event_duration_hours: null,
+        venue_address: b.venue || '',
+        venue_city: b.city || '',
+        venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0),
+        total_amount: Number(b.total_amount ?? 0),
+        status: b.status,
+        created_at: b.created_at,
+        package_name: b.makeup_packages?.name || 'Makeup Package',
+        base_amount: b.base_amount,
+        addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount,
+        remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at,
+        payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at,
+        calendar_locked: b.calendar_locked,
+        guest_count: null,
+        event_type: b.event_type,
+        _source: 'makeup',
+      }));
+
+      // ── Query 9: Mehendi bookings ───────────────────────────────────────
+      let q9 = supabase.from('mehendi_bookings' as any)
+        .select('*, mehendi_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q9 = q9.in('status', statusValues);
+      const { data: mehendiBookings } = await q9;
+
+      const normalizedMehendiBookings = (mehendiBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requests,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.mehendi_packages?.name || 'Mehendi Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'mehendi',
+      }));
+
+      // ── Query 10: Anchor bookings ──────────────────────────────────────
+      let q10 = supabase.from('anchor_bookings' as any)
+        .select('*, anchor_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q10 = q10.in('status', statusValues);
+      const { data: anchorBookings } = await q10;
+
+      const normalizedAnchorBookings = (anchorBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.anchor_packages?.name || 'Anchor Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: b.expected_audience, event_type: b.event_type,
+        _source: 'anchor',
+      }));
+
+      // ── Query 11: Banquet bookings ─────────────────────────────────────
+      let q11 = supabase.from('banquet_bookings' as any)
+        .select('*, banquet_halls(name, hall_rental_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q11 = q11.in('status', statusValues);
+      const { data: banquetBookings } = await q11;
+
+      const normalizedBanquetBookings = (banquetBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.banquet_halls?.name || 'Banquet Hall',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: b.guest_count, event_type: b.event_type,
+        _source: 'banquet',
+      }));
+
+      // ── Query 12: Rental bookings ──────────────────────────────────────
+      let q12 = supabase.from('rental_bookings' as any)
+        .select('*, rental_packages(name, price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q12 = q12.in('status', statusValues);
+      const { data: rentalBookings } = await q12;
+
+      const normalizedRentalBookings = (rentalBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.delivery_address || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_instructions,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.rental_packages?.name || 'Rental Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: b.quantity_required, event_type: b.event_type,
+        _source: 'rental',
+      }));
+
+      // ── Query 13: Priest bookings ──────────────────────────────────────
+      let q13 = supabase.from('priest_bookings' as any)
+        .select('*, priest_packages(name, service_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q13 = q13.in('status', statusValues);
+      const { data: priestBookings } = await q13;
+
+      const normalizedPriestBookings = (priestBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_instructions,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.priest_packages?.name || 'Priest Service',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'priest',
+      }));
+
+      // ── Query 14: Water bookings ───────────────────────────────────────
+      let q14 = supabase.from('water_bookings' as any)
+        .select('*, water_packages(name, base_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q14 = q14.in('status', statusValues);
+      const { data: waterBookings } = await q14;
+
+      const normalizedWaterBookings = (waterBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.delivery_time, event_duration_hours: null,
+        venue_address: b.delivery_address || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_instructions,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.water_packages?.name || 'Water Supply',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'water',
+      }));
+
+      // ── Query 15: Band bookings ────────────────────────────────────────
+      let q15 = supabase.from('band_bookings' as any)
+        .select('*, band_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q15 = q15.in('status', statusValues);
+      const { data: bandBookings } = await q15;
+
+      const normalizedBandBookings = (bandBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.band_packages?.name || 'Band Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'band',
+      }));
+
+      // ── Query 16: Singer bookings ──────────────────────────────────────
+      let q16 = supabase.from('singer_bookings' as any)
+        .select('*, singer_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q16 = q16.in('status', statusValues);
+      const { data: singerBookings } = await q16;
+
+      const normalizedSingerBookings = (singerBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.singer_packages?.name || 'Singer Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'singer',
+      }));
+
+      // ── Query 17: Dancer bookings ──────────────────────────────────────
+      let q17 = supabase.from('dancer_bookings' as any)
+        .select('*, dancer_packages(name, package_price)')
+        .eq('provider_id', vendorId)
+        .order('created_at', { ascending: false });
+      if (statusValues) q17 = q17.in('status', statusValues);
+      const { data: dancerBookings } = await q17;
+
+      const normalizedDancerBookings = (dancerBookings ?? []).map((b: any) => ({
+        id: b.id, customer_id: b.customer_id, provider_id: b.provider_id,
+        event_date: b.event_date, event_time: b.event_time, event_duration_hours: null,
+        venue_address: b.venue || '', venue_city: b.city || '', venue_area: null,
+        requirements: b.special_requirements,
+        amount: Number(b.total_amount ?? 0), total_amount: Number(b.total_amount ?? 0),
+        status: b.status, created_at: b.created_at,
+        package_name: b.dancer_packages?.name || 'Dance Package',
+        base_amount: b.base_amount, addons_amount: b.addons_amount,
+        advance_amount: b.advance_amount, remaining_amount: b.remaining_amount,
+        advance_paid_at: b.advance_paid_at, payment_deadline: b.payment_deadline,
+        accepted_at: b.accepted_at, calendar_locked: b.calendar_locked,
+        guest_count: null, event_type: b.event_type,
+        _source: 'dancer',
+      }));
+
+      // Combine all lists
       const allBookings = [
-        ...(genericBookings ?? []).map((b: any) => ({ ...b, _source: 'generic' })),
+        ...(genericBookings ?? []).map((b: any) => ({
+          ...b,
+          amount: Number(b.amount ?? 0),
+          total_amount: Number(b.amount ?? 0),
+          _source: 'generic',
+        })),
         ...normalizedPhotoBookings,
+        ...normalizedCateringBookings,
+        ...normalizedDroneBookings,
+        ...normalizedVideographyBookings,
+        ...normalizedDJBookings,
+        ...normalizedDecoratorBookings,
+        ...normalizedMakeupBookings,
+        ...normalizedMehendiBookings,
+        ...normalizedAnchorBookings,
+        ...normalizedBanquetBookings,
+        ...normalizedRentalBookings,
+        ...normalizedPriestBookings,
+        ...normalizedWaterBookings,
+        ...normalizedBandBookings,
+        ...normalizedSingerBookings,
+        ...normalizedDancerBookings,
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       if (allBookings.length === 0) return [];
@@ -539,7 +1013,7 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
       }
 
-      // Enrich generic bookings with package names
+      // Enrich generic bookings with package names from pricing_packages
       const pkgIds = [...new Set(allBookings.filter(b => b._source === 'generic' && b.package_id).map(b => b.package_id))];
       const pkgMap = new Map<string, any>();
       if (pkgIds.length > 0) {
@@ -719,12 +1193,37 @@ export function useVendorMessages(vendorId?: string | null) {
       const empty = { chats: [] as any[], unreadTotal: 0 };
       if (!vendorId || !user) return empty;
 
-      // Bookings for this vendor define the chat threads
-      const { data: bookings } = await supabase.from('bookings')
-        .select('id, customer_id, event_type_id, event_date')
-        .eq('provider_id', vendorId);
+      // Bookings for this vendor define the chat threads — query ALL tables
+      const tables = [
+        { table: 'bookings', providerField: 'provider_id' },
+        { table: 'singer_bookings', providerField: 'provider_id' },
+        { table: 'dancer_bookings', providerField: 'provider_id' },
+        { table: 'videography_bookings', providerField: 'provider_id' },
+        { table: 'drone_bookings', providerField: 'provider_id' },
+        { table: 'dj_bookings', providerField: 'provider_id' },
+        { table: 'decorator_bookings', providerField: 'provider_id' },
+        { table: 'makeup_bookings', providerField: 'provider_id' },
+        { table: 'mehendi_bookings', providerField: 'provider_id' },
+        { table: 'anchor_bookings', providerField: 'provider_id' },
+        { table: 'band_bookings', providerField: 'provider_id' },
+        { table: 'priest_bookings', providerField: 'provider_id' },
+        { table: 'water_bookings', providerField: 'provider_id' },
+        { table: 'rental_bookings', providerField: 'provider_id' },
+        { table: 'banquet_bookings', providerField: 'provider_id' },
+        { table: 'catering_bookings', providerField: 'provider_id' },
+        { table: 'photography_package_bookings', providerField: 'photographer_id' },
+      ];
 
-      const bookingList = (bookings ?? []) as any[];
+      const bookingList: any[] = [];
+      for (const t of tables) {
+        try {
+          const { data } = await supabase.from(t.table as any)
+            .select('id, customer_id, event_date')
+            .eq(t.providerField, vendorId);
+          if (data && data.length > 0) bookingList.push(...data);
+        } catch { /* table may not exist or column mismatch — skip */ }
+      }
+
       if (bookingList.length === 0) return empty;
 
       const bookingIds = bookingList.map(b => b.id);
@@ -813,7 +1312,7 @@ export function useVendorAvailability(vendorId?: string | null) {
 
       const [availRes, bookRes] = await Promise.all([
         supabase.from('provider_availability')
-          .select('unavailable_date, status, slot_type')
+          .select('unavailable_date, slot_type, reason')
           .eq('provider_id', vendorId),
         supabase.from('bookings')
           .select('event_date, status')
@@ -834,11 +1333,11 @@ export function useVendorAvailability(vendorId?: string | null) {
         .map(b => String(b.event_date)).filter(Boolean);
 
       const tentativeFromAvail = avail
-        .filter(a => String(a.status) === 'tentative')
+        .filter(a => String(a.slot_type) === 'busy')
         .map(a => String(a.unavailable_date)).filter(Boolean);
 
       const blocked = avail
-        .filter(a => String(a.status) !== 'tentative' && String(a.status) !== 'available')
+        .filter(a => String(a.slot_type) === 'unavailable')
         .map(a => String(a.unavailable_date)).filter(Boolean);
 
       return {
@@ -1025,18 +1524,40 @@ export function useVendorBadges(vendorId?: string | null) {
         .eq('user_id', user.id)
         .eq('is_read', false);
 
-      // Unread messages: need my booking ids first
-      const bookingIdsP = supabase
-        .from('bookings')
-        .select('id')
-        .eq('provider_id', vendorId);
+      // Unread messages: need my booking ids from ALL tables
+      const allBookingIds: string[] = [];
+      const msgTables = [
+        { table: 'bookings', field: 'provider_id' },
+        { table: 'singer_bookings', field: 'provider_id' },
+        { table: 'dancer_bookings', field: 'provider_id' },
+        { table: 'videography_bookings', field: 'provider_id' },
+        { table: 'drone_bookings', field: 'provider_id' },
+        { table: 'dj_bookings', field: 'provider_id' },
+        { table: 'decorator_bookings', field: 'provider_id' },
+        { table: 'makeup_bookings', field: 'provider_id' },
+        { table: 'mehendi_bookings', field: 'provider_id' },
+        { table: 'anchor_bookings', field: 'provider_id' },
+        { table: 'band_bookings', field: 'provider_id' },
+        { table: 'priest_bookings', field: 'provider_id' },
+        { table: 'water_bookings', field: 'provider_id' },
+        { table: 'rental_bookings', field: 'provider_id' },
+        { table: 'banquet_bookings', field: 'provider_id' },
+        { table: 'catering_bookings', field: 'provider_id' },
+        { table: 'photography_package_bookings', field: 'photographer_id' },
+      ];
+      for (const t of msgTables) {
+        try {
+          const { data } = await supabase.from(t.table as any).select('id').eq(t.field, vendorId);
+          if (data) allBookingIds.push(...data.map((b: any) => b.id));
+        } catch { /* skip */ }
+      }
 
-      const [bRes, iRes, nRes, idRes] = await Promise.all([
-        bookingsP, inquiriesP, notifsP, bookingIdsP,
+      const [bRes, iRes, nRes] = await Promise.all([
+        bookingsP, inquiriesP, notifsP,
       ]);
 
       let messages = 0;
-      const bookingIds = ((idRes.data ?? []) as any[]).map(b => b.id);
+      const bookingIds = allBookingIds;
       if (bookingIds.length > 0) {
         const { count } = await supabase
           .from('messages' as any)

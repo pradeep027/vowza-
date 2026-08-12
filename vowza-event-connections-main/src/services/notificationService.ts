@@ -6,6 +6,10 @@ export type NotificationType =
   | 'booking_rejected'
   | 'booking_cancelled'
   | 'booking_completed'
+  | 'advance_payment_required'
+  | 'advance_payment_successful'
+  | 'booking_confirmed'
+  | 'payment_expired'
   | 'artist_approved'
   | 'artist_rejected'
   | 'new_review'
@@ -273,5 +277,64 @@ export const NotificationService = {
       .order('created_at', { ascending: false })
       .limit(limit);
     return data ?? [];
-  }
+  },
+
+  // ─── New Payment Architecture Notifications ─────────────────────────────────
+
+  // Advance payment required (after artist accepts)
+  async notifyAdvancePaymentRequired(customerId: string, bookingId: string, advanceAmount: number) {
+    await this.createNotification({
+      userId: customerId,
+      type: 'advance_payment_required',
+      title: 'Pay Advance to Confirm',
+      message: `Your booking has been accepted! Please pay ₹${advanceAmount.toLocaleString('en-IN')} (30% advance) within 24 hours to confirm.`,
+      metadata: { bookingId, advanceAmount }
+    });
+  },
+
+  // Advance payment successful
+  async notifyAdvancePaymentSuccess(customerId: string, providerId: string, bookingId: string, advanceAmount: number) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    await this.createNotification({
+      userId: customerId,
+      type: 'advance_payment_successful',
+      title: 'Booking Confirmed!',
+      message: `Your advance payment of ₹${advanceAmount.toLocaleString('en-IN')} is received on ${dateStr} at ${timeStr}. Your booking is now confirmed!`,
+      metadata: { bookingId, advanceAmount, paidAt: now.toISOString() }
+    });
+    // Look up provider's auth user_id
+    const { data: providerProfile } = await supabase.from('provider_profiles').select('user_id').eq('id', providerId).single();
+    if (providerProfile?.user_id) {
+      await this.createNotification({
+        userId: providerProfile.user_id,
+        type: 'booking_confirmed',
+        title: 'Advance Payment Received — ₹' + advanceAmount.toLocaleString('en-IN'),
+        message: `Customer paid ₹${advanceAmount.toLocaleString('en-IN')} advance on ${dateStr} at ${timeStr}. Booking is now confirmed!`,
+        metadata: { bookingId, advanceAmount, paidAt: now.toISOString() }
+      });
+    }
+  },
+
+  // Payment expired
+  async notifyPaymentExpired(customerId: string, providerId: string, bookingId: string) {
+    await this.createNotification({
+      userId: customerId,
+      type: 'payment_expired',
+      title: 'Payment Window Expired',
+      message: 'Your advance payment was not completed within 24 hours. The booking has been cancelled.',
+      metadata: { bookingId }
+    });
+    const { data: providerProfile } = await supabase.from('provider_profiles').select('user_id').eq('id', providerId).single();
+    if (providerProfile?.user_id) {
+      await this.createNotification({
+        userId: providerProfile.user_id,
+        type: 'payment_expired',
+        title: 'Customer Payment Expired',
+        message: 'The customer did not complete the advance payment. The booking has been cancelled and your availability is restored.',
+        metadata: { bookingId }
+      });
+    }
+  },
 };

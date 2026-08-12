@@ -14,16 +14,12 @@ import {
   Disc3,           // DJs
   Mic,             // Singers
   PersonStanding,  // Dancers
-  Users,           // Choreographers
   Flower2,         // Decorators
   Palette,         // Makeup Artists
   Fingerprint,     // Mehendi Artists
-  Wand2,           // Magicians
   MicVocal,        // Anchors & Hosts
   MonitorPlay,     // Drone
   Utensils,        // Catering Services
-  Lightbulb,       // Lighting Services
-  Volume2,         // Sound Services
   Building2,       // Banquet Halls
   Package,         // Rentals
   Landmark,        // Pandits / Priests
@@ -43,11 +39,16 @@ interface CategoryDef {
   types: string[];
 }
 
+// Custom photographer icon component using the provided PNG
+const PhotographerIcon = ({ className }: { className?: string }) => (
+  <img src="/images/wedding-photography.jpg" alt="" className={`${className} object-cover rounded-lg`} />
+);
+
 const CATEGORIES: CategoryDef[] = [
   {
     id:    "photographer",
     name:  "Photographers",
-    icon:  Camera,
+    icon:  PhotographerIcon as any,
     color: "bg-rose-50 dark:bg-rose-950/40",
     text:  "text-rose-600 dark:text-rose-400",
     ring:  "ring-rose-200 dark:ring-rose-800",
@@ -78,7 +79,7 @@ const CATEGORIES: CategoryDef[] = [
     color: "bg-amber-50 dark:bg-amber-950/40",
     text:  "text-amber-600 dark:text-amber-400",
     ring:  "ring-amber-200 dark:ring-amber-800",
-    types: ["music_band","normal_band","maharashtra_band","traditional_band","musician","instrumental_artist","classical_musician"],
+    types: ["music_band","maharashtra_band","traditional_band","instrumental_artist","classical_musician","wedding_band","dhol_band","brass_band"],
   },
   {
     id:    "dj",
@@ -108,15 +109,6 @@ const CATEGORIES: CategoryDef[] = [
     types: ["dancer","kuchipudi_dancer","classical_dancer","western_dancer"],
   },
   {
-    id:    "choreographer",
-    name:  "Choreographers",
-    icon:  Users,
-    color: "bg-purple-50 dark:bg-purple-950/40",
-    text:  "text-purple-600 dark:text-purple-400",
-    ring:  "ring-purple-200 dark:ring-purple-800",
-    types: ["choreographer"],
-  },
-  {
     id:    "wedding_decorator",
     name:  "Decorators",
     icon:  Flower2,
@@ -144,15 +136,6 @@ const CATEGORIES: CategoryDef[] = [
     types: ["mehendi_artist"],
   },
   {
-    id:    "magician",
-    name:  "Magicians",
-    icon:  Wand2,
-    color: "bg-indigo-50 dark:bg-indigo-950/40",
-    text:  "text-indigo-600 dark:text-indigo-400",
-    ring:  "ring-indigo-200 dark:ring-indigo-800",
-    types: ["magician"],
-  },
-  {
     id:    "anchor",
     name:  "Anchors & Hosts",
     icon:  MicVocal,
@@ -169,24 +152,6 @@ const CATEGORIES: CategoryDef[] = [
     text:  "text-yellow-700 dark:text-yellow-400",
     ring:  "ring-yellow-200 dark:ring-yellow-800",
     types: ["catering_services"],
-  },
-  {
-    id:    "lighting_services",
-    name:  "Lighting Services",
-    icon:  Lightbulb,
-    color: "bg-amber-50 dark:bg-amber-950/40",
-    text:  "text-amber-700 dark:text-amber-500",
-    ring:  "ring-amber-300 dark:ring-amber-800",
-    types: ["lighting_services"],
-  },
-  {
-    id:    "sound_services",
-    name:  "Sound Services",
-    icon:  Volume2,
-    color: "bg-blue-50 dark:bg-blue-950/40",
-    text:  "text-blue-600 dark:text-blue-400",
-    ring:  "ring-blue-200 dark:ring-blue-800",
-    types: ["sound_services"],
   },
   // ── NEW CATEGORIES ─────────────────────────────────────────────────────────
   {
@@ -230,7 +195,10 @@ const CATEGORIES: CategoryDef[] = [
 // ── Category Card — module scope to avoid focus/remount bugs ─────────────────
 interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }
 
-const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => (
+const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {
+  const isPhotographer = cat.id === 'photographer';
+
+  return (
   <motion.button
     onClick={onClick}
     aria-label={`Browse ${cat.name}`}
@@ -252,31 +220,91 @@ const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => (
     {/* Soft radial glow on hover, tinted per-category */}
     <span className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 ${cat.color} blur-2xl scale-150 pointer-events-none`} />
 
-    {/* Icon bubble */}
-    <div
-      className={`
-        relative z-10 w-12 h-12 md:w-14 md:h-14 rounded-2xl
-        ${cat.color}
-        flex items-center justify-center flex-shrink-0
-        group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300
-      `}
-    >
-      <cat.icon className={`w-5 h-5 md:w-6 md:h-6 ${cat.text}`} aria-hidden />
-    </div>
+    {/* Icon / Image */}
+    {isPhotographer ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photographers" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'videographer' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/VIDEOGRAPHY MAIN.jpg" alt="Videographers" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'catering_services' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/CATERING.jpeg" alt="Catering" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'drone_operator' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/drone main.png" alt="Drone Photography" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'music_band' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/band main.png" alt="Bands" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'dj' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/dj main.png" alt="DJs" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'makeup_artist' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/makeup main.png" alt="Makeup Artists" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'anchor' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/anchors and hosts main.png" alt="Anchors & Hosts" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'mehendi_artist' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/mehindi main.png" alt="Mehendi Artists" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'singer' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/singers main.png" alt="Singers" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'wedding_decorator' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/decorator.png" alt="Decorators" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'dancer' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/dancers main.png" alt="Dancers" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'banquet_hall' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/banquet halls.png" alt="Banquet Halls" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'rentals' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/rentals main.png" alt="Rentals" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'pandit' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/pandit main.png" alt="Pandits / Priests" className="w-full h-full object-cover" />
+      </div>
+    ) : cat.id === 'water_supplier' ? (
+      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+        <img src="/images/water main.png" alt="Drinking Water" className="w-full h-full object-cover" />
+      </div>
+    ) : (
+      <div
+        className={`
+          relative z-10 w-12 h-12 md:w-14 md:h-14 rounded-2xl
+          ${cat.color}
+          flex items-center justify-center flex-shrink-0
+          group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300
+        `}
+      >
+        <cat.icon className={`w-5 h-5 md:w-6 md:h-6 ${cat.text}`} aria-hidden />
+      </div>
+    )}
 
     {/* Label */}
-    <span className="relative z-10 text-[11px] md:text-xs font-semibold text-foreground text-center leading-snug group-hover:text-maroon transition-colors">
+    <span className="relative z-10 text-[11px] md:text-xs font-bold text-foreground text-center leading-snug group-hover:text-maroon transition-colors">
       {cat.name}
     </span>
-
-    {/* Live count — only shown when real data exists */}
-    {count > 0 && (
-      <span className="relative z-10 text-[9px] md:text-[10px] font-medium text-muted-foreground -mt-1">
-        {count}+ artists
-      </span>
-    )}
   </motion.button>
-));
+  );
+});
 CategoryCard.displayName = "CategoryCard";
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
