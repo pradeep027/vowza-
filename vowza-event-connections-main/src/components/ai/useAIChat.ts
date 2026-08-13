@@ -32,25 +32,16 @@ const CTX_KEY  = 'vowza_ai_context';
 const CONV_KEY = 'vowza_ai_conv_id';
 
 // ─── Navigation command detector ─────────────────────────────────────────────
+// IMPORTANT: Do NOT add vendor/profession patterns here (photographer, decorator,
+// makeup, etc). Those are handled by the Planner vendor search pipeline.
+// Only PAGE-level navigation belongs here.
 const NAV_COMMANDS: { pattern: RegExp; path: string }[] = [
   { pattern: /artist.*registr|join.*artist|become.*artist/i, path: '/provider/register' },
-  { pattern: /browse.*artist|find.*artist|show.*artist|search.*artist/i, path: '/artists' },
-  { pattern: /photographer/i, path: '/artists?category=photographers' },
-  { pattern: /decorator/i, path: '/artists?category=decorators' },
-  { pattern: /\bdj\b/i, path: '/artists?category=dj' },
-  { pattern: /makeup/i, path: '/artists?category=makeup' },
+  { pattern: /artist.*marketplace|browse.*marketplace|open.*marketplace/i, path: '/artists' },
   { pattern: /my booking/i, path: '/my-bookings' },
   { pattern: /dashboard/i, path: '' },  // resolved dynamically below
   { pattern: /^(home|homepage)$/i, path: '/' },
 ];
-
-function detectNavCommand(msg: string): string | null {
-  if (!/(take me|go to|open|navigate|show me|visit)/i.test(msg)) return null;
-  for (const cmd of NAV_COMMANDS) {
-    if (cmd.pattern.test(msg)) return cmd.path;
-  }
-  return null;
-}
 
 // ─── sessionStorage helpers ───────────────────────────────────────────────────
 function loadContext(): PlannerContext {

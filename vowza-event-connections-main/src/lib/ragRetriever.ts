@@ -90,8 +90,12 @@ const INTENT_MAP: Record<string, string> = {
   dancers:            'dancer',
   choreographer:      'choreographer',
   decorator:          'wedding_decorator',
+  decorators:         'wedding_decorator',
   decoration:         'wedding_decorator',
   decor:              'wedding_decorator',
+  'event decorator':  'event_decorator',
+  'stage decorator':  'stage_decorator',
+  'wedding decorator':'wedding_decorator',
   makeup:             'makeup_artist',
   mehendi:            'mehendi_artist',
   henna:              'mehendi_artist',
@@ -586,17 +590,24 @@ export async function retrieveVendors(
   const priceMax = criteria.serviceBudget;
   const minRating = criteria.minimumRating ?? 0;
 
-  if (!professions.length && !city && !priceMax) {
+  // Expand generic decorator to all decorator subtypes
+  const DECORATOR_EXPANSION: Record<string, string[]> = {
+    wedding_decorator: ['wedding_decorator', 'event_decorator', 'stage_decorator'],
+  };
+  const expandedProfessions = professions.flatMap(p => DECORATOR_EXPANSION[p] ?? [p]);
+  const uniqueProfessions = [...new Set(expandedProfessions)];
+
+  if (!uniqueProfessions.length && !city && !priceMax) {
     return { vendors: [], totalFound: 0, searchMode: 'none', searchStatus: 'not_requested', queryUsed: normalizedMessage, retrievedAt: new Date().toISOString() };
   }
 
   try {
     let allVendors: RetrievedVendor[] = [];
 
-    if (professions.length > 0) {
+    if (uniqueProfessions.length > 0) {
       const results = await Promise.all(
-        professions.slice(0, 3).map((profession) =>
-          sqlSearch(profession, city, priceMax, minRating, Math.ceil(maxVendors / Math.max(professions.length, 1)))
+        uniqueProfessions.slice(0, 5).map((profession) =>
+          sqlSearch(profession, city, priceMax, minRating, Math.ceil(maxVendors / Math.max(uniqueProfessions.length, 1)))
         )
       );
       allVendors = results.flat();

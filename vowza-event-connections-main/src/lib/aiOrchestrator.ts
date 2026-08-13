@@ -97,6 +97,8 @@ const VENDOR_KEYWORDS: [RegExp, string][] = [
   [/\bdancer/i,         'dancer'],
   [/choreograph/i,      'choreographer'],
   [/decorator|decor|decoration/i, 'wedding_decorator'],
+  [/event.decorator/i, 'event_decorator'],
+  [/stage.decorator/i, 'stage_decorator'],
   [/makeup|bridal makeup/i, 'makeup_artist'],
   [/mehendi|mehndi|henna/i, 'mehendi_artist'],
   [/magician/i,         'magician'],

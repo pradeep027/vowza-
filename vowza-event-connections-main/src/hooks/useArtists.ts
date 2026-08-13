@@ -67,6 +67,65 @@ function getCategoryMeta(professionType: string): { name: string; icon: string }
   };
 }
 
+// ─── Normalize category URL param → database profession enum ──────────────────
+// The URL might use plural or common terms (e.g. "photographers") but the
+// database enum stores singular profession_type values (e.g. "photographer").
+const CATEGORY_NORMALIZATION: Record<string, string | string[]> = {
+  photographers:     'photographer',
+  photographer:      'photographer',
+  videographers:     'videographer',
+  videographer:      'videographer',
+  decorators:        ['wedding_decorator', 'event_decorator', 'stage_decorator'],
+  decorator:         ['wedding_decorator', 'event_decorator', 'stage_decorator'],
+  wedding_decorator: 'wedding_decorator',
+  event_decorator:   'event_decorator',
+  stage_decorator:   'stage_decorator',
+  'makeup_artists':  'makeup_artist',
+  'makeup_artist':   'makeup_artist',
+  makeup:            'makeup_artist',
+  djs:              'dj',
+  dj:               'dj',
+  bands:            'music_band',
+  'music_bands':    'music_band',
+  'music_band':     'music_band',
+  singers:          'singer',
+  singer:           'singer',
+  dancers:          'dancer',
+  dancer:           'dancer',
+  caterers:         'catering_services',
+  catering:         'catering_services',
+  'catering_services': 'catering_services',
+  anchors:          'anchor',
+  anchor:           'anchor',
+  'mehendi_artists': 'mehendi_artist',
+  'mehendi_artist':  'mehendi_artist',
+  mehendi:           'mehendi_artist',
+  magicians:         'magician',
+  magician:          'magician',
+  'drone_operators': 'drone_operator',
+  'drone_operator':  'drone_operator',
+  drone:             'drone_operator',
+  choreographers:    'choreographer',
+  choreographer:     'choreographer',
+  pandits:           'pandit',
+  pandit:            'pandit',
+  'banquet_halls':   'banquet_hall',
+  'banquet_hall':    'banquet_hall',
+  rentals:           'rentals',
+};
+
+function normalizeCategoryFilter(category: string): { single?: string; multiple?: string[] } {
+  const normalized = CATEGORY_NORMALIZATION[category.toLowerCase()];
+  if (!normalized) {
+    // If not in map, pass through as-is (might be a valid enum value already)
+    return { single: category };
+  }
+  if (Array.isArray(normalized)) {
+    return { multiple: normalized };
+  }
+  return { single: normalized };
+}
+
 // ─── Main hook: fetch approved artists with filters ────────────────────────────
 export function useArtists(filters: ArtistFilters = {}, enabled = true) {
   return useQuery({
@@ -83,9 +142,24 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
         query = query.eq('is_published' as any, true);
       }
 
-      if (filters.category)  query = query.eq('profession', filters.category as any);
+      // Normalize category filter to match actual database enum values
+      if (filters.category) {
+        const { single, multiple } = normalizeCategoryFilter(filters.category);
+        if (multiple) {
+          query = query.in('profession', multiple as any);
+        } else if (single) {
+          query = query.eq('profession', single as any);
+        }
+      }
       if (filters.categories && filters.categories.length > 0) {
-        query = query.in('profession', filters.categories as any);
+        // Normalize each category in the array
+        const normalizedCategories = filters.categories.flatMap(cat => {
+          const { single, multiple } = normalizeCategoryFilter(cat);
+          if (multiple) return multiple;
+          if (single) return [single];
+          return [cat];
+        });
+        query = query.in('profession', [...new Set(normalizedCategories)] as any);
       }
       if (filters.budgetMin !== undefined) query = query.gte('price_min', filters.budgetMin);
       if (filters.budgetMax !== undefined) query = query.lte('price_max', filters.budgetMax);
