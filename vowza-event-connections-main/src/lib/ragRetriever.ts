@@ -246,6 +246,7 @@ async function sqlSearch(
   minRating = 0,
   limit = 8
 ): Promise<RetrievedVendor[]> {
+  // First try RPC
   const { data, error } = await supabase.rpc('search_vendors_sql' as any, {
     p_profession: profession ?? null,
     p_city:       city ?? null,
@@ -254,73 +255,102 @@ async function sqlSearch(
     p_limit:      limit,
   });
 
-  if (error) {
-    // Fallback: direct table query if RPC doesn't exist yet
-    let q = supabase
-      .from('provider_profiles')
-      .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, experience_years, cover_image_url, user_id')
-      .in('verification_status', ['approved', 'verified'])
-      .eq('is_verified', true)
-      .eq('is_published', true)
-      .order('average_rating', { ascending: false })
-      .limit(limit);
-
-    if (profession) q = q.eq('profession', profession as any);
-    if (priceMax)   q = q.lte('price_min', priceMax);
-    if (minRating)  q = q.gte('average_rating', minRating);
-
-    const { data: fallback, error: fallbackError } = await q;
-    if (fallbackError) throw new Error(`Verified vendor fallback query failed: ${fallbackError.message}`);
-    if (!fallback) return [];
-
-    // Get profile data for city/name
-    const userIds = fallback.map((v: any) => v.user_id).filter(Boolean);
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, city, avatar_url').in('id', userIds);
-    const pm = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-
-    return fallback
-      .filter((v: any) => !city || pm.get(v.user_id)?.city?.toLowerCase().includes(city.toLowerCase()))
-      .map((v: any): RetrievedVendor => {
-        const p = pm.get(v.user_id) ?? {};
-        return {
-          provider_id:    v.id,
-          profession:     v.profession,
-          stage_name:     v.stage_name,
-          full_name:      (p as any).full_name,
-          bio:            v.bio,
-          city:           (p as any).city,
-          price_min:      v.price_min,
-          price_max:      v.price_max,
-          average_rating: v.average_rating ?? 0,
-          total_reviews:  v.total_reviews  ?? 0,
-          total_bookings: v.total_bookings ?? 0,
-          is_verified:    v.is_verified    ?? false,
-          is_available:   v.is_available   ?? true,
-          experience_years: v.experience_years ?? null,
-          cover_image_url:  v.cover_image_url  ?? null,
-          avatar_url:     (p as any).avatar_url,
-        };
-      });
+  // If RPC works, use it
+  if (!error && data && data.length > 0) {
+    return ((data as any[]) ?? []).map((v: any): RetrievedVendor => ({
+      provider_id:    v.provider_id,
+      profession:     v.profession,
+      stage_name:     v.stage_name,
+      full_name:      v.full_name,
+      bio:            v.bio,
+      city:           v.city,
+      price_min:      v.price_min,
+      price_max:      v.price_max,
+      average_rating: v.average_rating ?? 0,
+      total_reviews:  v.total_reviews  ?? 0,
+      total_bookings: v.total_bookings ?? 0,
+      is_verified:    v.is_verified    ?? false,
+      is_available:   v.is_available   ?? true,
+      experience_years: v.experience_years ?? null,
+      cover_image_url:  v.cover_image_url  ?? null,
+      avatar_url:     v.avatar_url,
+    }));
   }
 
-  return ((data as any[]) ?? []).map((v: any): RetrievedVendor => ({
-    provider_id:    v.provider_id,
-    profession:     v.profession,
-    stage_name:     v.stage_name,
-    full_name:      v.full_name,
-    bio:            v.bio,
-    city:           v.city,
-    price_min:      v.price_min,
-    price_max:      v.price_max,
-    average_rating: v.average_rating ?? 0,
-    total_reviews:  v.total_reviews  ?? 0,
-    total_bookings: v.total_bookings ?? 0,
-    is_verified:    v.is_verified    ?? false,
-    is_available:   v.is_available   ?? true,
-    experience_years: v.experience_years ?? null,
-    cover_image_url:  v.cover_image_url  ?? null,
-    avatar_url:     v.avatar_url,
-  }));
+  // FALLBACK: Direct table query if RPC fails or returns empty
+  console.warn('[RAG] RPC search_vendors_sql returned empty or failed, using direct query:', error?.message);
+  
+  let q = supabase
+    .from('provider_profiles')
+    .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, experience_years, cover_image_url, user_id')
+    .eq('is_published', true)
+    .eq('is_verified', true)
+    .order('average_rating', { ascending: false })
+    .limit(limit);
+
+  // CRITICAL: Do NOT require verification_status check here—just query published+verified
+  if (profession) {
+    q = q.ilike('profession', `%${profession}%`); // case-insensitive partial match
+  }
+  if (priceMax)   q = q.lte('price_min', priceMax);
+  if (minRating)  q = q.gte('average_rating', minRating);
+
+  const { data: fallback, error: fallbackError } = await q;
+  
+  if (fallbackError) {
+    console.error('[RAG] Direct fallback query failed:', fallbackError.message);
+    throw new Error(`Vendor fallback query failed: ${fallbackError.message}`);
+  }
+  
+  if (!fallback || fallback.length === 0) {
+    console.log('[RAG] No vendors found via direct query');
+    return [];
+  }
+
+  // Fetch user profiles for city and name
+  const userIds = fallback.map((v: any) => v.user_id).filter(Boolean);
+  if (userIds.length === 0) return [];
+
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name, city, avatar_url')
+    .in('id', userIds);
+
+  if (profileError) {
+    console.error('[RAG] Failed to fetch user profiles:', profileError.message);
+    return [];
+  }
+
+  const pm = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+
+  // Filter by city if specified (case-insensitive)
+  return fallback
+    .filter((v: any) => {
+      if (!city) return true;
+      const vendorCity = pm.get(v.user_id)?.city ?? '';
+      return vendorCity.toLowerCase().includes(city.toLowerCase());
+    })
+    .map((v: any): RetrievedVendor => {
+      const p = pm.get(v.user_id) ?? {};
+      return {
+        provider_id:    v.id,
+        profession:     v.profession,
+        stage_name:     v.stage_name,
+        full_name:      (p as any).full_name || v.stage_name,
+        bio:            v.bio,
+        city:           (p as any).city,
+        price_min:      v.price_min,
+        price_max:      v.price_max,
+        average_rating: v.average_rating ?? 0,
+        total_reviews:  v.total_reviews  ?? 0,
+        total_bookings: v.total_bookings ?? 0,
+        is_verified:    v.is_verified    ?? false,
+        is_available:   v.is_available   ?? true,
+        experience_years: v.experience_years ?? null,
+        cover_image_url:  v.cover_image_url  ?? null,
+        avatar_url:     (p as any).avatar_url,
+      };
+    });
 }
 
 function canonicalizeRetrievedVendors(vendors: RetrievedVendor[]): RetrievedVendor[] {
