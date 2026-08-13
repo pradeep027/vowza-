@@ -269,15 +269,26 @@ function buildDeterministicResponse(
       : `Let me search Vowza in **${ctx.city}** — what two categories or vendors would you like me to compare?`;
   }
 
-  const canGenerate = ctx.eventType && ctx.city && ctx.budget && ctx.guestCount;
-  if (canGenerate) {
-    return `I have everything I need — **${ctx.eventType}** in **${ctx.city}** for **${ctx.guestCount} guests** with a budget of **₹${(ctx.budget!/100000).toFixed(1)}L**.\n\nWhat would you like?\n- **Complete plan** (day-by-day itinerary)\n- **Budget breakdown** (category-wise)\n- **Vendor recommendations** (real Vowza vendors)\n- **Planning timeline**`;
+  // CRITICAL FIX: Use sensible defaults instead of re-asking.
+  // Never ask "What type of event?" if we already know. Instead, assume
+  // defaults and generate useful output immediately.
+  const withDefaults: PlannerContext = {
+    eventType: ctx.eventType ?? 'wedding',
+    city: ctx.city ?? 'your city',
+    budget: ctx.budget ?? 500000, // ₹5 lakh default
+    guestCount: ctx.guestCount ?? 200,
+    ...ctx,
+  };
+
+  // If planning intent detected and we have at least ONE piece of context,
+  // generate immediately instead of asking.
+  const hasContext = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
+  if (hasContext || orch.intent === 'plan_event' || orch.intent === 'budget_breakdown' || orch.intent === 'timeline' || orch.intent === 'checklist' || orch.intent === 'food_plan') {
+    return `I have everything I need — **${withDefaults.eventType}** in **${withDefaults.city}** for **${withDefaults.guestCount} guests** with a budget of **₹${(withDefaults.budget!/100000).toFixed(1)}L**.\n\nWhat would you like?\n- **Complete plan** (day-by-day itinerary)\n- **Budget breakdown** (category-wise)\n- **Vendor recommendations** (real Vowza vendors)\n- **Planning timeline**`;
   }
 
-  return !ctx.eventType ? 'What type of event are you planning?'
-    : !ctx.city         ? 'Which city will the event be in?'
-    : !ctx.budget       ? 'What is your total budget?'
-    :                     'How many guests are you expecting?';
+  // NEVER re-ask. Generate a welcome + next steps instead.
+  return `Welcome to **Vowza Planner**! 🎉\n\nI can help you:\n- **Plan any event** (weddings, birthdays, corporate, housewarming...)\n- **Find verified vendors** (photographers, decorators, caterers, DJs, and 50+ more)\n- **Create budgets** and timelines\n- **Get expert advice**\n\nWhat event are you planning?`;
 }
 
 // ─── Main sendMessage ─────────────────────────────────────────────────────────

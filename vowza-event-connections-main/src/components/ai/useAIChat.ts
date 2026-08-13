@@ -100,7 +100,18 @@ export function useAIChat() {
     const storedId = loadConvId();
 
     // Load conversation list for the sidebar
-    listConversations(user.id).then(setConversations);
+    listConversations(user.id).then(convs => {
+      setConversations(convs);
+      // CRITICAL FIX: Restore context_summary from the stored conversation
+      if (storedId) {
+        const conv = convs.find(c => c.id === storedId);
+        if (conv?.context_summary) {
+          contextRef.current = conv.context_summary;
+          setContext(conv.context_summary);
+          saveContext(conv.context_summary);
+        }
+      }
+    });
 
     // Restore last active conversation
     if (storedId) {
@@ -239,6 +250,14 @@ export function useAIChat() {
   // ── Main send ────────────────────────────────────────────────────────────────
   const send = useCallback(async (userText: string) => {
     if (!userText.trim() || isStreaming) return;
+    
+    // DEDUPLICATION: Check if this message is identical to the last user message
+    const lastUserMsg = [...messagesRef.current].reverse().find(m => m.role === 'user');
+    if (lastUserMsg && lastUserMsg.text.trim() === userText.trim()) {
+      console.warn('[Vowza Planner] Duplicate message prevented:', userText);
+      return;
+    }
+    
     abortRef.current = false;
     const requestEpoch = ++requestEpochRef.current;
 
