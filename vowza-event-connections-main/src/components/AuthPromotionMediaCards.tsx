@@ -96,7 +96,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
       stopVideo(activeVideoRef.current);
       return;
     }
-    void startVideo(activeVideoRef.current);
+    if (!userPausedRef.current) void startVideo(activeVideoRef.current);
   }, [isHomepage, startVideo, stopVideo]);
 
   useEffect(() => {
@@ -108,7 +108,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
     };
     const resumeIfEligible = () => {
       inactiveRef.current = document.visibilityState !== 'visible' || !document.hasFocus();
-      if (!inactiveRef.current) void startVideo(activeVideoRef.current);
+      if (!inactiveRef.current && !userPausedRef.current) void startVideo(activeVideoRef.current);
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') becomeInactive();
@@ -139,7 +139,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
     const video = videoRef.current;
     if (!video) return;
     activeVideoRef.current = video;
-    void startVideo(video);
+    if (!userPausedRef.current) void startVideo(video);
     return () => {
       stopVideo(video);
       if (activeVideoRef.current === video) activeVideoRef.current = null;
