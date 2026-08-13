@@ -81,6 +81,7 @@ export function useAIChat() {
   const [conversations,   setConversations]    = useState<ConversationRow[]>([]);
   const [historyLoading,  setHistoryLoading]   = useState(false);
   const abortRef     = useRef(false);
+  const requestEpochRef = useRef(0);
   // ─── Keep a ref that always holds the latest messages array ─────────────────
   // This fixes the closure stale-state bug where send() saw an outdated history.
   const messagesRef  = useRef<ChatMessage[]>([]);
@@ -114,8 +115,16 @@ export function useAIChat() {
 
   // ── Load a specific conversation (called from sidebar) ──────────────────────
   const loadConversation = useCallback(async (conv: ConversationRow) => {
+    // A response belonging to another conversation must never append after
+    // this selection changes the visible thread.
+    requestEpochRef.current += 1;
+    const selectionEpoch = requestEpochRef.current;
+    abortRef.current = true;
+    setStreamingText('');
+    setIsStreaming(false);
     setHistoryLoading(true);
     const msgs = await loadMessages(conv.id);
+    if (requestEpochRef.current !== selectionEpoch) return;
     messagesRef.current = msgs;
     setMessages(msgs);
     convIdRef.current = conv.id;
@@ -141,7 +150,13 @@ export function useAIChat() {
     await deleteConversation(convId);
     setConversations(prev => prev.filter(c => c.id !== convId));
     if (conversationId === convId) {
+      requestEpochRef.current += 1;
+      abortRef.current = true;
+      setStreamingText('');
+      setIsStreaming(false);
       setMessages([]);
+      messagesRef.current = [];
+      convIdRef.current = null;
       setConversationId(null);
       saveConvId(null);
     }
@@ -158,7 +173,13 @@ export function useAIChat() {
     await deleteConversations(convIds);
     setConversations(prev => prev.filter(c => !convIds.includes(c.id)));
     if (conversationId && convIds.includes(conversationId)) {
+      requestEpochRef.current += 1;
+      abortRef.current = true;
+      setStreamingText('');
+      setIsStreaming(false);
+      messagesRef.current = [];
       setMessages([]);
+      convIdRef.current = null;
       setConversationId(null);
       saveConvId(null);
     }
@@ -168,8 +189,14 @@ export function useAIChat() {
   const removeAllConversations = useCallback(async () => {
     if (!user) return;
     await deleteAllConversations(user.id);
+    requestEpochRef.current += 1;
+    abortRef.current = true;
+    setStreamingText('');
+    setIsStreaming(false);
     setConversations([]);
+    messagesRef.current = [];
     setMessages([]);
+    convIdRef.current = null;
     setConversationId(null);
     saveConvId(null);
   }, [user]);
@@ -213,6 +240,7 @@ export function useAIChat() {
   const send = useCallback(async (userText: string) => {
     if (!userText.trim() || isStreaming) return;
     abortRef.current = false;
+    const requestEpoch = ++requestEpochRef.current;
 
     // Use refs to get current values — avoids stale closure bug
     const currentMessages = messagesRef.current;
@@ -221,7 +249,9 @@ export function useAIChat() {
 
     // Navigation shortcut — handle before touching DB
     const navPath = (() => {
-      if (!/(take me|go to|open|navigate|show me|visit)/i.test(userText)) return null;
+      // "Show me decorators/photographers" is a Planner discovery request,
+      // not a navigation command. Only explicit navigation wording redirects.
+      if (!/(take me|go to|navigate|visit)/i.test(userText)) return null;
       for (const cmd of NAV_COMMANDS) {
         if (!cmd.path) continue; // skip dashboard placeholder
         if (cmd.pattern.test(userText)) return cmd.path;
@@ -256,6 +286,9 @@ export function useAIChat() {
     // ── Ensure a conversation exists in DB ────────────────────────────────────
     if (!currentConvId && user) {
       const newId = await createConversation(user.id, userText, currentContext);
+      // New Chat or a conversation switch can happen while the initial row is
+      // being created. Never revive that abandoned thread when it resolves.
+      if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
       if (newId) {
         currentConvId = newId;
         convIdRef.current = newId;
@@ -288,7 +321,7 @@ export function useAIChat() {
         history: currentMessages,
         context: currentContext,
         onChunk: ({ delta, done }) => {
-          if (abortRef.current) return;
+          if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
           if (!done) {
             accumulated += delta;
             setStreamingText(accumulated);
@@ -297,6 +330,9 @@ export function useAIChat() {
           // We handle the final message AFTER the await resolves below.
         },
       }).then(res => {
+        // A clear/new-chat/conversation switch invalidates this request before
+        // it can mutate cards, context, or persisted conversation history.
+        if (abortRef.current || requestEpochRef.current !== requestEpoch || convIdRef.current !== currentConvId) return;
         // This runs after sendMessage fully resolves — result is safe to use here.
         finalAIResponse = res.aiResponse;
         finalContext     = res.updatedContext;
@@ -330,6 +366,7 @@ export function useAIChat() {
       });
 
     } catch (err: any) {
+      if (abortRef.current || requestEpochRef.current !== requestEpoch || convIdRef.current !== currentConvId) return;
       setStreamingText('');
       setIsStreaming(false);
       const errMsg: ChatMessage = {
@@ -388,6 +425,7 @@ export function useAIChat() {
     setConversationId(null);
     saveConvId(null);
     abortRef.current = true;
+    requestEpochRef.current += 1;
 
     // Reset planning context (event type, city, budget, guests, theme, etc.)
     contextRef.current = {};

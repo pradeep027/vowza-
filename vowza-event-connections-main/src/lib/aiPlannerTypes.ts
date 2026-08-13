@@ -153,11 +153,19 @@ export interface EventTimeline {
   multiDaySchedule?: DaySchedule[];
 }
 
-// ─── Real DB Vendor (from RAG retrieval — never invented) ────────────────────
-// Mirrors ragRetriever.RetrievedVendor structurally so AIResponse can carry
-// real marketplace data without aiPlannerTypes depending on the RAG module.
+// ─── Real DB Vendor (from marketplace retrieval — never invented) ────────────
+export type VendorAvailabilityStatus = 'not_checked' | 'needs_confirmation' | 'unavailable';
+
+/** A UUID that passed Vowza's runtime marketplace-record validation. */
+export type ProviderId = string & { readonly __providerId: unique symbol };
+
+/**
+ * A display-safe marketplace record. This is deliberately stricter than an
+ * arbitrary provider-profile row: cards may only receive a validated UUID and
+ * a provider whose verification flag is explicitly true.
+ */
 export interface DBVendor {
-  provider_id:       string;
+  provider_id:       ProviderId;
   profession:        string;
   stage_name?:       string;
   full_name?:        string;
@@ -168,11 +176,24 @@ export interface DBVendor {
   average_rating:    number;
   total_reviews:     number;
   total_bookings:    number;
-  is_verified:       boolean;
+  is_verified:       true;
   is_available:      boolean;
+  availability_status?: VendorAvailabilityStatus;
+  availability_reason?: string;
+  recommendation_reasons?: string[];
+  match_score?: number;
   experience_years?: number | null;
   cover_image_url?:  string | null;
   avatar_url?:       string;
+}
+
+// ─── Active marketplace category (from artist_categories) ─────────────────────
+export interface MarketplaceCategory {
+  id:              string;
+  name:            string;
+  profession_type: string;
+  description?:    string | null;
+  icon?:           string | null;
 }
 
 // ─── Vendor ───────────────────────────────────────────────────────────────────
@@ -273,7 +294,7 @@ export interface EventPlan {
 // ─── AI Response ──────────────────────────────────────────────────────────────
 export type ResponseType =
   | "text" | "question" | "tip"
-  | "budget_plan" | "timeline" | "vendor_recommendations" | "vendor_results"
+  | "budget_plan" | "timeline" | "vendor_recommendations" | "vendor_results" | "category_results"
   | "weather_advice" | "checklist" | "food_plan"
   | "negotiation" | "risk_analysis" | "success_score"
   | "full_plan" | "wedding_plan";
@@ -286,6 +307,7 @@ export interface AIResponse {
     timeline?:      EventTimeline;
     vendors?:       VendorRecommendation[];
     dbVendors?:     DBVendor[];   // real vendors retrieved from Vowza DB — never invented
+    categories?:    MarketplaceCategory[]; // active categories from Vowza DB — never hardcoded
     weather?:       WeatherAdvice;
     checklist?:     ChecklistItem[];
     foodPlan?:      FoodPlan;

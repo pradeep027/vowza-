@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { ChatMessage, AIResponse, PlannerContext } from './aiPlannerTypes';
+import { rehydrateVerifiedDBVendors } from './ragRetriever';
 import type {
   ConversationRow, MessageRow,
   ConversationInsert, ConversationUpdate, MessageInsert,
@@ -51,13 +52,38 @@ function generateTitle(firstUserMessage: string, context?: PlannerContext): stri
   return clean.length > 50 ? clean.slice(0, 47) + '…' : clean;
 }
 
+const SAVED_VENDOR_RESULTS_NOTICE =
+  'Saved marketplace results were refreshed from Vowza before display. Availability should still be confirmed before booking.';
+
 // ─── Row → ChatMessage converter ─────────────────────────────────────────────
 export function rowToChatMessage(row: MessageRow): ChatMessage {
+  // This synchronous converter is deliberately fail-closed for callers that do
+  // not perform async revalidation. loadMessages() below restores live cards.
+  const response = row.ai_response?.type === 'vendor_results'
+    ? { ...row.ai_response, data: { ...row.ai_response.data, dbVendors: [] } }
+    : row.ai_response ?? undefined;
   return {
     id:        row.id,
     role:      row.role,
-    text:      row.content,
-    response:  row.ai_response ?? undefined,
+    text:      row.ai_response?.type === 'vendor_results' ? SAVED_VENDOR_RESULTS_NOTICE : row.content,
+    response,
+    timestamp: new Date(row.created_at),
+  };
+}
+
+async function rehydrateRowToChatMessage(row: MessageRow): Promise<ChatMessage> {
+  if (row.ai_response?.type !== 'vendor_results') return rowToChatMessage(row);
+
+  const dbVendors = await rehydrateVerifiedDBVendors(row.ai_response.data?.dbVendors ?? []);
+  return {
+    id: row.id,
+    role: row.role,
+    text: SAVED_VENDOR_RESULTS_NOTICE,
+    response: {
+      ...row.ai_response,
+      text: SAVED_VENDOR_RESULTS_NOTICE,
+      data: { ...row.ai_response.data, dbVendors },
+    },
     timestamp: new Date(row.created_at),
   };
 }
@@ -138,7 +164,7 @@ export async function loadMessages(conversationId: string): Promise<ChatMessage[
     console.error('[ConversationRepository] loadMessages:', error.message);
     return [];
   }
-  return ((data as any[]) ?? []).map(rowToChatMessage);
+  return await Promise.all(((data as unknown as MessageRow[]) ?? []).map((row) => rehydrateRowToChatMessage(row)));
 }
 
 // ─── Save a single message ────────────────────────────────────────────────────

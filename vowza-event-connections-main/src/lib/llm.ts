@@ -9,8 +9,14 @@
 // It is never bundled into the browser.
 
 import { processMessage } from './aiPlanner';
-import { retrieveVendors, buildRAGContext, NO_VENDORS_FOUND_MESSAGE } from './ragRetriever';
-import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, nextSoftFollowUp } from './aiOrchestrator';
+import {
+  retrieveActiveMarketplaceCategories,
+  retrieveVendors,
+  buildRAGContext,
+  NO_VENDORS_FOUND_MESSAGE,
+} from './ragRetriever';
+import { dedupeVerifiedDBVendors } from './vendorTrust';
+import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, isActiveCategoryListRequest, nextSoftFollowUp } from './aiOrchestrator';
 import type { PlannerContext, AIResponse, ChatMessage } from './aiPlannerTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -214,6 +220,9 @@ function buildContinuePlanningMessage(ctx: PlannerContext): string {
   return `${NO_VENDORS_FOUND_MESSAGE}\n\n${closing}`;
 }
 
+export const VENDOR_SEARCH_UNAVAILABLE_MESSAGE =
+  `I couldn't reach Vowza's verified vendor search right now, so I won't show any marketplace vendors until it is available.\n\nPlease try again shortly, or I can still help with planning, budgets, timelines, and checklists.`;
+
 // ── Deterministic response builder ────────────────────────────────────────────
 function buildDeterministicResponse(
   message: string,
@@ -274,75 +283,77 @@ function buildDeterministicResponse(
 // ─── Main sendMessage ─────────────────────────────────────────────────────────
 export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   const { message, history, context, onChunk } = opts;
-
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  // Groq via the Edge Function is the default path. Only an explicit
-  // VITE_USE_AI_PROXY=false disables it (useful for offline development).
-  const useEdge     = import.meta.env.VITE_USE_AI_PROXY !== 'false';
+  const useEdge = import.meta.env.VITE_USE_AI_PROXY !== 'false';
 
-  // ── Step 1: Orchestrate — understand intent before doing anything ─────────
+  // Understand the turn and merge its planning context first. Marketplace
+  // retrieval deliberately happens before structured VEDA output: a request
+  // for vendor records must never become a generic budget/plan response.
   const orch = orchestrate(message, context, history);
+  const { response: vedaResponse, updatedContext } = await processMessage(message, context, history);
 
-  // ── Step 2: Run VEDA engine for structured outputs ────────────────────────
-  const { response: vedaResponse, updatedContext } =
-    await processMessage(message, context, history);
-
-  // If VEDA produced a real non-empty structured response → stream it directly
-  if (vedaResponse.type !== 'text' && vedaResponse.text) {
-    await streamDeterministic(vedaResponse.text, onChunk);
-    return { fullText: vedaResponse.text, aiResponse: vedaResponse, updatedContext };
-  }
-
-  // If VEDA decided to ask a question (missing context) → stream the question
-  if (vedaResponse.type === 'question' && vedaResponse.text) {
-    await streamDeterministic(vedaResponse.text, onChunk);
-    return { fullText: vedaResponse.text, aiResponse: vedaResponse, updatedContext };
-  }
-
-  // ── Step 3: RAG retrieval (only when orchestrator flagged it needed) ───────
-  let ragContext = '';
-  let dbVendors: import('./aiPlannerTypes').DBVendor[] | undefined;
-  if (orch.needsRetrieval) {
-    const ragResult = await retrieveVendors(message, updatedContext, 8, {
-      professions: orch.professions,
-      city:        orch.city ?? undefined,
-      priceMax:    orch.priceMax ?? undefined,
-      minRating:   orch.minRating,
-    });
-    ragContext = buildRAGContext(ragResult);
-
-    // Attach real DB vendors so the UI can render honest, DB-first vendor
-    // cards. If the search returned nothing, we never fabricate vendors —
-    // the empty state is handled by NO_VENDORS_FOUND_MESSAGE downstream.
-    if (orch.intent === 'find_vendors' || orch.intent === 'comparison') {
-      dbVendors = ragResult.vendors.map(v => ({
-        provider_id:      v.provider_id,
-        profession:       v.profession,
-        stage_name:       v.stage_name,
-        full_name:        v.full_name,
-        bio:              v.bio,
-        city:             v.city,
-        price_min:        v.price_min,
-        price_max:        v.price_max,
-        average_rating:   v.average_rating,
-        total_reviews:    v.total_reviews,
-        total_bookings:   v.total_bookings,
-        is_verified:      v.is_verified,
-        is_available:     v.is_available,
-        experience_years: v.experience_years,
-        cover_image_url:  v.cover_image_url,
-        avatar_url:       v.avatar_url,
-      }));
+  // The category directory is an explicit, database-grounded Planner response.
+  // It deliberately bypasses generic planning and LLM text so every displayed
+  // category is currently active in artist_categories.
+  if (isActiveCategoryListRequest(message)) {
+    try {
+      const categories = await retrieveActiveMarketplaceCategories();
+      const categoryText = categories.length
+        ? `Here are all **${categories.length} active Vowza marketplace categories**. Choose one and I’ll search verified profiles for it.`
+        : `I couldn't find any active Vowza marketplace categories right now.`;
+      await streamDeterministic(categoryText, onChunk);
+      return {
+        fullText: categoryText,
+        aiResponse: { type: 'category_results', text: categoryText, data: { categories } },
+        updatedContext,
+      };
+    } catch (error) {
+      console.warn('[Vowza AI] active category retrieval failed:', error);
+      const unavailableMessage = `I couldn't reach Vowza's active category directory right now, so I won't show a stale category list. Please try again shortly.`;
+      await streamDeterministic(unavailableMessage, onChunk);
+      return {
+        fullText: unavailableMessage,
+        aiResponse: { type: 'category_results', text: unavailableMessage, data: { categories: [] } },
+        updatedContext,
+      };
     }
   }
 
-  // ── Step 3b: Honesty short-circuit ────────────────────────────────────────
-  // If the user explicitly asked to find vendors and the DB search came back
-  // empty, never let the LLM guess or invent vendors. Respond immediately
-  // with the exact required empty-state copy — but keep the conversation
-  // going by offering to continue planning (budget/food/decor/timeline) and
-  // asking one relevant follow-up. The AI must never just stop here.
-  if (orch.intent === 'find_vendors' && dbVendors && dbVendors.length === 0) {
+  const hasDiscoveryLanguage = /\b(find|show|search|recommend|suggest|list|profiles?|vendors?|providers?|available|book|hire|looking for|need)\b/i.test(message);
+  const marketplaceCandidate = orch.needsRetrieval || hasDiscoveryLanguage;
+
+  let ragContext = '';
+  let dbVendors: import('./aiPlannerTypes').DBVendor[] | undefined;
+  let marketplaceTurn = false;
+  let vendorSearchFailed = false;
+
+  if (marketplaceCandidate) {
+    const ragResult = await retrieveVendors(message, updatedContext, 8, {
+      professions: orch.professions,
+      city: orch.city ?? undefined,
+      priceMax: orch.priceMax ?? undefined,
+      minRating: orch.minRating,
+    });
+    ragContext = buildRAGContext(ragResult);
+    vendorSearchFailed = ragResult.searchStatus === 'technical_error';
+    marketplaceTurn = orch.intent === 'find_vendors'
+      || orch.intent === 'comparison'
+      || ragResult.searchStatus !== 'not_requested';
+    if (marketplaceTurn) dbVendors = dedupeVerifiedDBVendors(ragResult.vendors);
+  }
+
+  // A database/search error never falls through to the model where a vendor
+  // could be invented. An empty but successful query is an honest empty state.
+  if (marketplaceTurn && vendorSearchFailed) {
+    await streamDeterministic(VENDOR_SEARCH_UNAVAILABLE_MESSAGE, onChunk);
+    return {
+      fullText: VENDOR_SEARCH_UNAVAILABLE_MESSAGE,
+      aiResponse: { type: 'vendor_results', text: VENDOR_SEARCH_UNAVAILABLE_MESSAGE, data: { dbVendors: [] } },
+      updatedContext,
+    };
+  }
+
+  if (marketplaceTurn && dbVendors?.length === 0) {
     const continueMsg = buildContinuePlanningMessage(updatedContext);
     await streamDeterministic(continueMsg, onChunk);
     return {
@@ -352,30 +363,43 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     };
   }
 
-  // ── Step 4: Build dynamic context-aware system prompt ────────────────────
+  // Text and cards originate from the exact same validated, database-backed
+  // set. The LLM/Edge path cannot alter or fabricate marketplace records.
+  if (marketplaceTurn && dbVendors) {
+    const databaseText = orch.intent === 'comparison'
+      ? `Here are the verified Vowza profiles I found for comparison:\n\n${ragContext}\n\nChoose any two profiles and I can compare only their listed prices, ratings, packages, and availability information.`
+      : `Here are the verified Vowza profiles I found:\n\n${ragContext}\n\nWould you like to narrow these by location, budget, or date?`;
+    await streamDeterministic(databaseText, onChunk);
+    return {
+      fullText: databaseText,
+      aiResponse: { type: 'vendor_results', text: databaseText, data: { dbVendors } },
+      updatedContext,
+    };
+  }
+
+  // Non-marketplace requests preserve the existing deterministic planning
+  // capabilities after database discovery has had a chance to claim its turn.
+  if (vedaResponse.type !== 'text' && vedaResponse.type !== 'vendor_recommendations' && vedaResponse.text) {
+    await streamDeterministic(vedaResponse.text, onChunk);
+    return { fullText: vedaResponse.text, aiResponse: vedaResponse, updatedContext };
+  }
+  if (vedaResponse.type === 'question' && vedaResponse.text) {
+    await streamDeterministic(vedaResponse.text, onChunk);
+    return { fullText: vedaResponse.text, aiResponse: vedaResponse, updatedContext };
+  }
+
   const dynamicSystemPrompt = buildDynamicSystemPrompt(orch, updatedContext, ragContext, history);
-
-  // ── Step 5: Route to LLM ──────────────────────────────────────────────────
-
-  // Mode 1: Supabase Edge Function proxy → Groq (key stays server-side)
   if (useEdge && supabaseUrl) {
     try {
       const msgs = buildMessages(history, message, dynamicSystemPrompt);
       const fullText = await callViaEdgeFunction(msgs, supabaseUrl, onChunk);
-      const aiResponse: AIResponse = dbVendors
-        ? { type: 'vendor_results', text: fullText, data: { dbVendors } }
-        : { type: 'text', text: fullText };
-      return { fullText, aiResponse, updatedContext };
+      return { fullText, aiResponse: { type: 'text', text: fullText }, updatedContext };
     } catch (err) {
       console.warn('[Vowza AI] Groq Edge Function failed, using deterministic engine:', err);
     }
   }
 
-  // Mode 2: Deterministic VEDA — always works, zero cost, context-aware
   const deterministicText = buildDeterministicResponse(message, updatedContext, orch, ragContext);
   await streamDeterministic(deterministicText, onChunk);
-  const aiResponse: AIResponse = dbVendors
-    ? { type: 'vendor_results', text: deterministicText, data: { dbVendors } }
-    : { type: 'text', text: deterministicText };
-  return { fullText: deterministicText, aiResponse, updatedContext };
+  return { fullText: deterministicText, aiResponse: { type: 'text', text: deterministicText }, updatedContext };
 }

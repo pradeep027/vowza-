@@ -1105,6 +1105,7 @@ export const QUICK_PROMPTS = [
   { label: "Full event plan",        prompt: "Create a complete plan for my event with timeline and vendors",         icon: "📋" },
   { label: "Event timeline",         prompt: "Create a complete planning timeline for my event",                      icon: "📅" },
   { label: "Vendor recommendations", prompt: "Recommend the best vendors for my event",                               icon: "🎯" },
+  { label: "Browse categories",      prompt: "Show all active Vowza vendor categories.",                              icon: "🗂️" },
   { label: "Success score",          prompt: "Give me an event success score for my current plan",                    icon: "📊" },
   { label: "Risk analysis",          prompt: "Analyse the risks for my event and suggest backup plans",               icon: "⚠️" },
   { label: "Food planning",          prompt: "Help me plan food and catering for my event",                           icon: "🍽️" },

@@ -12,9 +12,10 @@ import {
   Image as ImageIcon, Briefcase
 } from 'lucide-react';
 import type {
-  AIResponse, ChecklistItem, RiskItem, DBVendor,
+  AIResponse, ChecklistItem, RiskItem, DBVendor, MarketplaceCategory,
   WeddingPlan, DayPlan, TimeSlot
 } from '@/lib/aiPlannerTypes';
+import { dedupeVerifiedDBVendors } from '@/lib/vendorTrust';
 
 interface Props { response: AIResponse; }
 
@@ -167,6 +168,7 @@ const VendorCard = ({ response }: { response: AIResponse }) => {
 
   return (
     <div className="w-full mt-2 space-y-2">
+      <p className="px-1 text-[10px] font-medium text-muted-foreground">Planning guidance — not live marketplace vendor results.</p>
       {vendors.map((v) => (
         <div key={v.category} className="rounded-xl border border-border/60 bg-card px-4 py-3">
           <div className="flex items-start justify-between gap-2">
@@ -218,6 +220,11 @@ const SingleDBVendorCard = ({ v }: { v: DBVendor }) => {
     ? `${v.experience_years} yr${v.experience_years === 1 ? '' : 's'} experience`
     : 'Experience not provided';
   const priceLabel = fmtVendorPrice(v.price_min);
+  const availability = v.availability_status === 'unavailable'
+    ? { label: 'Unavailable', className: 'bg-red-50 text-red-500' }
+    : v.availability_status === 'needs_confirmation'
+      ? { label: 'Confirm availability', className: 'bg-amber-50 text-amber-700' }
+      : { label: 'Check availability', className: 'bg-muted text-muted-foreground' };
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card overflow-hidden flex gap-3 p-3">
@@ -238,11 +245,9 @@ const SingleDBVendorCard = ({ v }: { v: DBVendor }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-sm font-semibold text-foreground truncate">{name}</p>
-          {v.is_verified && (
-            <span title="Verified by Vowza" className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
-              <BadgeCheck className="w-3 h-3" /> Verified
-            </span>
-          )}
+          <span title="Verified by Vowza" className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            <BadgeCheck className="w-3 h-3" /> Verified
+          </span>
         </div>
         <p className="text-xs text-muted-foreground">{prof}</p>
 
@@ -268,12 +273,19 @@ const SingleDBVendorCard = ({ v }: { v: DBVendor }) => {
             <p className="text-[10px] text-muted-foreground">Starting from</p>
             <p className="text-sm font-bold text-foreground">{priceLabel}</p>
           </div>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-            v.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-          }`}>
-            {v.is_available ? 'Available' : 'Busy'}
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${availability.className}`}>
+            {availability.label}
           </span>
         </div>
+
+        {v.recommendation_reasons?.length ? (
+          <div className="mt-2 rounded-lg bg-gold/10 px-2.5 py-2">
+            <p className="text-[10px] font-semibold text-gold-dark">Why this matches</p>
+            <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+              {v.recommendation_reasons.slice(0, 3).map((reason) => <li key={reason}>• {reason}</li>)}
+            </ul>
+          </div>
+        ) : null}
 
         {/* Actions — Portfolio + View Profile only. No Contact button:
             contact details unlock only after a confirmed booking. */}
@@ -297,11 +309,51 @@ const SingleDBVendorCard = ({ v }: { v: DBVendor }) => {
 };
 
 const DBVendorResultsCard = ({ response }: { response: AIResponse }) => {
-  const vendors = response.data?.dbVendors;
-  if (!vendors?.length) return null;
+  // Persisted JSON and in-memory results both cross this final UI boundary.
+  // Invalid, unverified, or repeated UUIDs cannot become duplicate cards/routes.
+  const vendors = dedupeVerifiedDBVendors(response.data?.dbVendors ?? []);
+  if (!vendors.length) return null;
   return (
     <div className="w-full mt-2 space-y-2">
       {vendors.map(v => <SingleDBVendorCard key={v.provider_id} v={v} />)}
+    </div>
+  );
+};
+
+// ─── Active Marketplace Categories ────────────────────────────────────────────
+const CategoryResultsCard = ({ response }: { response: AIResponse }) => {
+  const categories = response.data?.categories;
+  if (!categories?.length) return null;
+
+  return (
+    <div className="w-full mt-2 rounded-2xl border border-border/60 bg-card overflow-hidden text-sm">
+      <div className="px-4 py-3 bg-muted/30 border-b border-border/30 flex items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-xs text-foreground">🗂️ Active Vowza Categories</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Live marketplace directory</p>
+        </div>
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gold/10 text-gold-dark">
+          {categories.length} categories
+        </span>
+      </div>
+      <div className="max-h-80 overflow-y-auto divide-y divide-border/20">
+        {categories.map((category: MarketplaceCategory) => (
+          <div key={category.id} className="px-4 py-3 flex items-start gap-3">
+            <span className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center text-sm flex-shrink-0" aria-hidden="true">
+              {category.icon || '✨'}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">{category.name}</p>
+              {category.description ? (
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{category.description}</p>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="px-4 py-2.5 border-t border-border/30 text-[11px] text-muted-foreground">
+        Ask for any category to see matching verified profiles.
+      </p>
     </div>
   );
 };
@@ -947,7 +999,8 @@ const AIResponseCards = ({ response }: Props) => {
     case 'budget_plan':            return <BudgetCard       response={response} />;
     case 'timeline':               return <TimelineCard     response={response} />;
     case 'vendor_recommendations': return <VendorCard       response={response} />;
-    case 'vendor_results':         return <DBVendorResultsCard response={response} />;
+    case 'vendor_results':         return <DBVendorResultsCard  response={response} />;
+    case 'category_results':       return <CategoryResultsCard  response={response} />;
     case 'checklist':              return <ChecklistCard    response={response} />;
     case 'weather_advice':         return <WeatherCard      response={response} />;
     case 'food_plan':              return <FoodCard         response={response} />;

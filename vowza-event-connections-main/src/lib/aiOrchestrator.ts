@@ -148,6 +148,15 @@ function detectProfessions(text: string): string[] {
   return found;
 }
 
+/**
+ * Identifies explicit requests to browse the live Vowza category directory.
+ * Concrete requests such as "show decorators" remain vendor searches.
+ */
+export function isActiveCategoryListRequest(message: string): boolean {
+  return /\b(?:show|list|browse|view|what(?:\s+are)?|which)\b[\s\w-]{0,40}\b(?:vendor|artist|service|marketplace)?\s*categories\b/i.test(message)
+    || /\bwhat\s+(?:vendor|artist|service|marketplace)\s+(?:categories|services)\s+(?:do|are)\b/i.test(message);
+}
+
 // ── Core intent classifier ────────────────────────────────────────────────────
 function classifyIntent(
   message: string,
@@ -163,8 +172,11 @@ function classifyIntent(
     return 'greeting';
   }
 
-  // Context updates — user correcting/changing something
-  if (/change|update|modify|make it|instead|actually|correction|not \w+|switch to/i.test(l)) {
+  // Context updates — except when the same turn explicitly changes the
+  // marketplace request ("Actually, show me photographers instead").
+  const switchesMarketplaceRequest = detectProfessions(message).length > 0
+    && /find|show|search|recommend|suggest|list|profiles?|vendors?|providers?|available|book|hire|looking for|need/i.test(l);
+  if (/change|update|modify|make it|instead|actually|correction|not \w+|switch to/i.test(l) && !switchesMarketplaceRequest) {
     return 'context_update';
   }
 
@@ -173,20 +185,25 @@ function classifyIntent(
     return 'follow_up';
   }
 
-  // Vendor-specific searches
-  if (detectProfessions(message).length > 0) {
-    if (/find|show|search|recommend|suggest|best|top|available|list|book/i.test(l) ||
-        /under|below|within|budget|cheap|affordable/i.test(l) ||
-        /in\s+\w+/i.test(l)) {
-      return 'find_vendors';
-    }
+  // Marketplace discovery has priority over generic planning whenever a known
+  // service category is paired with a request for profiles or booking options.
+  // This prevents "decorator profiles" from falling through to a budget card.
+  const professions = detectProfessions(message);
+  if (professions.length > 0) {
     if (/compare|vs\b|versus|difference|which is better|which one/i.test(l)) {
       return 'comparison';
+    }
+
+    const asksForMarketplaceRecords = /find|show|search|recommend|suggest|best|top|available|list|book|profile|profiles|vendor|vendors|provider|providers|need|looking for|hire|want/i.test(l);
+    const isShortCategoryRequest = l.split(/\s+/).filter(Boolean).length <= 4;
+    if (asksForMarketplaceRecords || isShortCategoryRequest || /under|below|within|cheap|affordable/i.test(l) || /in\s+\w+/i.test(l)) {
+      return 'find_vendors';
     }
   }
 
   // Planning
-  if (/(plan|full plan|complete plan|plan everything|plan my|plan a .+? for|wedding plan|create plan)/i.test(l)) {
+  if (/(plan|full plan|complete plan|plan everything|plan my|plan a .+? for|wedding plan|create plan)/i.test(l)
+      && !/(budget|cost breakdown|how much|afford|₹|lakh|crore|estimate|quote|price list)/i.test(l)) {
     return 'plan_event';
   }
 
@@ -281,14 +298,29 @@ function determineNextQuestion(
   intent: Intent,
   ctx: PlannerContext
 ): string | null {
-  // Vendor searches need at minimum a city — this is the one case where a
-  // blocking question is still useful, since the DB query needs it.
-  if (intent === 'find_vendors') {
-    if (!ctx.city) return FIELD_QUESTIONS.city;
-    return null;
-  }
+  // Discovery is useful without a city. The retriever searches the public,
+  // verified marketplace first and ranks any city/budget context when present.
+  // Do not gate a specific category request behind an unnecessary question.
+  if (intent === 'find_vendors') return null;
 
   return null;
+}
+
+function extractEventDate(text: string): string | undefined {
+  const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+
+  const named = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(20\d{2}))?\b/i);
+  if (!named) return undefined;
+
+  const month = ['january','february','march','april','may','june','july','august','september','october','november','december']
+    .indexOf(named[1].toLowerCase());
+  if (month < 0) return undefined;
+  const day = Number(named[2]);
+  let year = named[3] ? Number(named[3]) : new Date().getFullYear();
+  const candidate = new Date(year, month, day);
+  if (!named[3] && candidate < new Date(new Date().toDateString())) year += 1;
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 // ── Extract context updates from message ─────────────────────────────────────
@@ -323,7 +355,7 @@ export function extractContextUpdates(
     [/\bgruhapravesam\b/i,'housewarming'], [/\bconference\b/i,'conference'],
   ];
   for (const [re, et] of eventMap) {
-    if (re.test(l)) { updates.eventType = et as any; break; }
+    if (re.test(l)) { updates.eventType = et as PlannerContext['eventType']; break; }
   }
 
   // Style
@@ -354,10 +386,17 @@ export function extractContextUpdates(
   if (/\btraditional\b/i.test(l))    updates.styleVibe = 'traditional';
   else if (/\bmodern\b|contemporary/i.test(l)) updates.styleVibe = 'modern';
 
-  // Date / month
-  const months = ['january','february','march','april','may','june',
-    'july','august','september','october','november','december'];
-  for (const m of months) if (l.includes(m)) { updates.eventDate = m; break; }
+  // Keep an exact date when supplied so marketplace availability can be checked.
+  // A month-only statement remains useful planning context but is never treated
+  // as confirmation of a provider's calendar availability.
+  const exactDate = extractEventDate(message);
+  if (exactDate) {
+    updates.eventDate = exactDate;
+  } else {
+    const months = ['january','february','march','april','may','june',
+      'july','august','september','october','november','december'];
+    for (const month of months) if (l.includes(month)) { updates.eventDate = month; break; }
+  }
 
   // Duration
   const dm = message.match(/(\d+)\s*days?/i);
@@ -372,20 +411,21 @@ export function orchestrate(
   ctx: PlannerContext,
   history: ChatMessage[]
 ): OrchestrationResult {
+  const normalizedMessage = message.replace(/\bvideo\s+graphers?\b/gi, 'videographer');
   // 1. Merge any new context from the message
-  const updates = extractContextUpdates(message, ctx);
+  const updates = extractContextUpdates(normalizedMessage, ctx);
   const merged: PlannerContext = { ...ctx, ...updates };
 
   // 2. Classify intent
-  const intent = classifyIntent(message, merged, history);
+  const intent = classifyIntent(normalizedMessage, merged, history);
 
   // 3. Detect vendor professions
-  const professions = detectProfessions(message);
+  const professions = detectProfessions(normalizedMessage);
 
   // 4. Extract search parameters
-  const city = merged.city ?? extractCity(message);
-  const priceMax = extractBudget(message) ?? merged.budget ?? null;
-  const minRating = /highly.rated|top.rated|best|verified/i.test(message) ? 4.0 : 0;
+  const city = merged.city ?? extractCity(normalizedMessage);
+  const priceMax = extractBudget(normalizedMessage) ?? merged.budget ?? null;
+  const minRating = /highly.rated|top.rated|best|verified/i.test(normalizedMessage) ? 4.0 : 0;
 
   // 5. Decide if retrieval is needed
   // STRICT RULE: only search the Vowza database when the user explicitly
@@ -479,9 +519,11 @@ CRITICAL RULES:
 5. Answer the user's EXACT question first, then offer the next useful step.
 6. If the user says "hi" or "hello" mid-conversation, just acknowledge briefly and continue.
 7. For general questions (not event-related), answer naturally like ChatGPT.
-8. For vendor questions, ONLY use the real data provided in the RAG CONTEXT below.
-9. NEVER invent vendor names, prices, ratings, IDs, reviews, packages, or experience — ever.
-10. You are an EXPERT EVENT PLANNER, not a vendor search bot. When the user mentions an event,
+8. For vendor questions, ONLY use the real records provided in the MARKETPLACE EVIDENCE below.
+9. NEVER invent vendor names, prices, ratings, IDs, reviews, packages, experience, locations, or availability.
+10. Treat availability marked "needs confirmation" as exactly that: never call a provider available until Vowza data confirms it.
+11. Generated budget allocations and timelines are planning guidance, not vendor quotes; clearly distinguish them from retrieved marketplace prices.
+12. You are an EXPERT EVENT PLANNER, not a vendor search bot. When the user mentions an event,
     budget, guest count, or city, immediately generate useful planning content — budget
     allocation, timeline, checklist, food suggestions, decoration ideas, photography plan,
     entertainment plan, guest management, parking plan, weather backup, emergency planning,
@@ -500,7 +542,7 @@ CRITICAL RULES:
     question block or delay the actual planning content.
 
 CURRENT SESSION:
-${hasCtx ? `You already know: ${result.contextSummary.replace(/[\[\]]/g,'').trim()}` : 'Fresh conversation — no event details yet.'}
+${hasCtx ? `You already know: ${result.contextSummary.replaceAll('[', '').replaceAll(']', '').trim()}` : 'Fresh conversation — no event details yet.'}
 Conversation turns so far: ${turnCount}
 Detected intent this turn: ${result.intent}
 
@@ -513,9 +555,7 @@ RESPONSE STYLE:
 - Keep responses focused — don't dump everything at once
 - End with ONE relevant follow-up offer (not multiple options)
 
-VOWZA MARKETPLACE KNOWLEDGE:
-- 20 vendor categories: Photographers, Videographers, DJs, Bands, Singers, Dancers, Choreographers, Decorators, Makeup Artists, Mehendi Artists, Magicians, Anchors, Caterers, Banquet Halls, Pandits/Priests, Rentals, Water Suppliers, Lighting, Sound, Drone Photography
-- Pricing varies by city: Mumbai 1.55x | Delhi 1.45x | Bangalore 1.35x | Chennai 1.15x | Hyderabad 1.0x | Pune 1.12x
-- Peak season (Nov–Feb): 20-30% premium | Monsoon (Jun–Sep): 15-20% discount
-- All vendors on Vowza are verified — profiles at /artist/[id]`;
+VOWZA MARKETPLACE:
+- Categories and provider fields are discovered from Vowza marketplace evidence; do not imply that a category, package, price, rating, or verification state exists unless it appears in that evidence.
+- Never expose private contact details. Profile, portfolio, availability, and booking actions must stay inside Vowza's existing flow.`;
 }
