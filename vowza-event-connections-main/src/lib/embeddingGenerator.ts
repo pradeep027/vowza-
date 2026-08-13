@@ -1,15 +1,16 @@
 // ─── Embedding Generator ─────────────────────────────────────────────────────
-// Converts vendor profile text into vector embeddings and stores them in
-// public.vendor_embeddings for pgvector semantic search.
+// Generates vector embeddings for vendor profiles via the server-side
+// Supabase Edge Function `generate-embedding`.
 //
-// Usage (run once per vendor after approval, or in admin panel):
-//   await generateAndStoreEmbedding(providerId);
+// SECURITY: The OpenAI API key is stored as a Supabase secret and NEVER
+// exposed to the browser. All embedding generation happens server-side.
 //
-// Requires: VITE_OPENAI_KEY or calls via Edge Function proxy.
+// Usage (admin panel):
+//   await generateAllEmbeddings((done, total) => setProgress({ done, total }));
 
 import { supabase } from '@/integrations/supabase/client';
 
-// ── Build plain text from a vendor profile (what gets embedded) ──────────────
+// ── Build plain text from a vendor profile (exported for display/testing) ─────
 export function buildVendorText(provider: any, profile: any): string {
   const parts: string[] = [];
 
@@ -46,92 +47,87 @@ export function buildVendorText(provider: any, profile: any): string {
   return parts.join('. ');
 }
 
-// ── Call OpenAI embeddings API (text-embedding-3-small, 1536 dims) ────────────
-async function getEmbedding(text: string): Promise<number[] | null> {
-  const apiKey = import.meta.env.VITE_OPENAI_KEY as string | undefined;
-  if (!apiKey || !apiKey.startsWith('sk-')) return null;
+// ── Call the server-side Edge Function to generate + store an embedding ────────
+async function generateEmbeddingViaEdge(providerId: string): Promise<{ success: boolean; error?: string }> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  if (!supabaseUrl) {
+    return { success: false, error: 'VITE_SUPABASE_URL not configured' };
+  }
+
+  // Get the current user's session token for auth
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { success: false, error: 'Not authenticated. Please log in as admin.' };
+  }
+
+  const functionUrl = `${supabaseUrl}/functions/v1/generate-embedding`;
 
   try {
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
+    const res = await fetch(functionUrl, {
       method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: text.slice(0, 8000), // token safety limit
-      }),
+      body: JSON.stringify({ provider_id: providerId }),
     });
 
-    if (!res.ok) return null;
     const data = await res.json();
-    return data?.data?.[0]?.embedding ?? null;
-  } catch {
-    return null;
+
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || `HTTP ${res.status}` };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: `Network error: ${err?.message || 'unknown'}` };
   }
 }
 
-// ── Generate and store embedding for one provider ─────────────────────────────
+// ── Generate and store embedding for one provider (via Edge Function) ──────────
 export async function generateAndStoreEmbedding(providerId: string): Promise<boolean> {
-  try {
-    // Fetch provider data
-    const { data: p, error: pErr } = await supabase
-      .from('provider_profiles')
-      .select('*')
-      .eq('id', providerId)
-      .single();
-    if (pErr || !p) return false;
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, city, area')
-      .eq('id', p.user_id)
-      .maybeSingle();
-
-    const text = buildVendorText(p, profile);
-    if (!text.trim()) return false;
-
-    const embedding = await getEmbedding(text);
-
-    // Upsert into vendor_embeddings
-    const { error: upsertErr } = await supabase
-      .from('vendor_embeddings' as any)
-      .upsert({
-        provider_id:  providerId,
-        content:      text,
-        embedding:    embedding ? JSON.stringify(embedding) : null,
-        content_type: 'profile',
-        updated_at:   new Date().toISOString(),
-      }, { onConflict: 'provider_id' });
-
-    return !upsertErr;
-  } catch {
-    return false;
+  const result = await generateEmbeddingViaEdge(providerId);
+  if (!result.success) {
+    console.error(`[Embedding] Failed for ${providerId}:`, result.error);
   }
+  return result.success;
 }
 
 // ── Batch generate for all approved providers (admin use) ─────────────────────
 export async function generateAllEmbeddings(
   onProgress?: (done: number, total: number) => void
-): Promise<{ success: number; failed: number }> {
-  const { data: providers } = await supabase
+): Promise<{ success: number; failed: number; errors: string[] }> {
+  const { data: providers, error: queryErr } = await supabase
     .from('provider_profiles')
     .select('id')
     .in('verification_status', ['approved', 'verified']);
 
-  if (!providers?.length) return { success: 0, failed: 0 };
+  if (queryErr) {
+    throw new Error(`Failed to fetch providers: ${queryErr.message}`);
+  }
+  if (!providers?.length) return { success: 0, failed: 0, errors: ['No approved/verified vendors found'] };
 
   let success = 0;
   let failed  = 0;
+  const errors: string[] = [];
 
   for (let i = 0; i < providers.length; i++) {
-    const ok = await generateAndStoreEmbedding(providers[i].id);
-    ok ? success++ : failed++;
+    const result = await generateEmbeddingViaEdge(providers[i].id);
+
+    if (result.success) {
+      success++;
+    } else {
+      failed++;
+      const errMsg = `${providers[i].id}: ${result.error}`;
+      errors.push(errMsg);
+      console.error(`[Embedding] ${errMsg}`);
+    }
+
     onProgress?.(i + 1, providers.length);
-    // Small delay to respect OpenAI rate limits
+
+    // Respect rate limits — 200ms between calls
     await new Promise(r => setTimeout(r, 200));
   }
 
-  return { success, failed };
+  return { success, failed, errors };
 }

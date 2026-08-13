@@ -116,16 +116,28 @@ export default function AdminAIPlanner() {
         )}
 
         {embResult && (
-          <div className="flex items-center gap-2 text-xs">
-            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-            <span className="font-medium text-foreground">{embResult.success} embeddings generated</span>
-            {embResult.failed > 0 && <span className="text-red-500 ml-1">{embResult.failed} failed</span>}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <span className="font-medium text-foreground">{embResult.success} embeddings generated</span>
+              {embResult.failed > 0 && <span className="text-red-500 ml-1">{embResult.failed} failed</span>}
+            </div>
+            {embResult.errors && embResult.errors.length > 0 && (
+              <details className="text-xs text-red-600 dark:text-red-400">
+                <summary className="cursor-pointer hover:underline">Show failure details ({embResult.errors.length})</summary>
+                <ul className="mt-1 ml-4 space-y-0.5 list-disc max-h-32 overflow-y-auto">
+                  {embResult.errors.slice(0, 10).map((err: string, i: number) => <li key={i}>{err}</li>)}
+                  {embResult.errors.length > 10 && <li>...and {embResult.errors.length - 10} more</li>}
+                </ul>
+              </details>
+            )}
           </div>
         )}
 
         <div className="bg-secondary/60 rounded-xl p-3 text-xs text-muted-foreground space-y-1">
           <p><strong>How it works:</strong> Embeddings convert vendor profile text into vectors. The AI uses these for semantic search — finding "photographers under ₹50K in Hyderabad" even if the vendor doesn't use those exact words.</p>
-          <p>Requires <code className="bg-background px-1 py-0.5 rounded">VITE_OPENAI_KEY=sk-…</code> in <code className="bg-background px-1 py-0.5 rounded">.env</code>. Without a key, Vowza AI falls back to SQL-based search which still works well.</p>
+          <p>Requires <code className="bg-background px-1 py-0.5 rounded">OPENAI_API_KEY</code> configured as a Supabase Edge Function secret. Without it, Vowza AI falls back to SQL-based search which still works well.</p>
+          <p className="text-[10px] opacity-70">Deploy: <code className="bg-background px-1 py-0.5 rounded">supabase functions deploy generate-embedding</code> then <code className="bg-background px-1 py-0.5 rounded">supabase secrets set OPENAI_API_KEY=sk-...</code></p>
         </div>
       </div>
 
