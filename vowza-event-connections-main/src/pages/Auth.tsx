@@ -23,53 +23,124 @@ import {
 import { validateFullName, validateEmail, validateIndianPhone } from '@/utils/validation';
 
 // ── Layout shell — MODULE scope (never re-created on parent re-render) ────────
-const AuthLayout = memo(({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-[#09090f] flex">
-    {/* Left panel — branding (desktop only) */}
-    <div className="hidden lg:flex flex-col justify-between w-[420px] xl:w-[480px] flex-shrink-0 p-12 relative overflow-hidden">
-      {/* Background glow orbs */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-20 blur-[100px]"
-        style={{ background: 'radial-gradient(circle, hsl(345 72% 36%), transparent 70%)' }} />
-      <div className="absolute bottom-1/4 right-0 w-[300px] h-[300px] rounded-full opacity-15 blur-[80px]"
-        style={{ background: 'radial-gradient(circle, hsl(40 95% 52%), transparent 70%)' }} />
+// Centered two-panel card: LEFT = auth form, RIGHT = dynamic promotion carousel
+const AuthLayout = memo(({ children }: { children: React.ReactNode }) => {
+  const [promotions, setPromotions] = useState<{ id: string; current_image_url: string | null; overlay_opacity: number }[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-      {/* Logo */}
-      <AppLogo theme="dark" size="lg" className="relative z-10" />
+  // Fetch ALL active promotions
+  useEffect(() => {
+    const fetchPromotions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('auth_promotional_config')
+          .select('id, current_image_url, overlay_opacity')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true });
 
-      {/* Brand copy */}
-      <div className="relative z-10">
-        <h2 className="text-3xl xl:text-4xl font-display font-bold text-white leading-tight mb-4">
-          Where Talent<br />Meets{' '}
-          <span style={{ background: 'linear-gradient(135deg,hsl(40 95% 65%),hsl(36 85% 44%))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            Celebration
-          </span>
-        </h2>
-        <p className="text-white/50 text-sm leading-relaxed mb-8">
-          India's premier event marketplace. Book verified photographers, DJs, bands, makeup artists, and 50+ more categories.
-        </p>
-        <div className="space-y-3">
-          {['1,500+ Verified Artists', '10,000+ Events Completed', '4.9★ Average Rating', '50+ Cities Covered'].map(s => (
-            <div key={s} className="flex items-center gap-2.5 text-sm text-white/60">
-              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              {s}
+        if (!error && data && data.length > 0) {
+          setPromotions(data as any[]);
+        }
+      } catch (err) {
+        console.error('[Auth] Failed to fetch promotions:', err);
+      }
+    };
+    fetchPromotions();
+  }, []);
+
+  // Auto-rotate promotions every 6 seconds
+  useEffect(() => {
+    if (promotions.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % promotions.length);
+      setImageLoaded(false);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [promotions.length]);
+
+  const activePromo = promotions[activeIndex];
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-50 via-white to-rose-50/30 dark:from-[#09090f] dark:via-[#0d0d15] dark:to-[#120d14]">
+      {/* Centered card container */}
+      <div className="w-full max-w-[1040px] max-h-[720px] bg-white dark:bg-[#141420] rounded-3xl shadow-2xl shadow-black/8 dark:shadow-black/40 border border-border/40 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+
+        {/* LEFT PANEL — Auth form */}
+        <div className="flex flex-col justify-center px-8 sm:px-12 py-10 overflow-y-auto max-h-[720px]">
+          {/* Logo */}
+          <AppLogo size="md" className="mb-6" />
+          {children}
+        </div>
+
+        {/* RIGHT PANEL — Dynamic Auth Promotion (desktop only) */}
+        <div className="hidden lg:flex relative bg-slate-100 dark:bg-[#1a1a28] overflow-hidden rounded-r-3xl">
+          {/* Active promotion image */}
+          {activePromo?.current_image_url ? (
+            <>
+              <img
+                key={activePromo.id}
+                src={activePromo.current_image_url}
+                alt="Vowza Promotion"
+                className={cn(
+                  "w-full h-full object-cover transition-opacity duration-700",
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                )}
+                onLoad={() => setImageLoaded(true)}
+              />
+              {/* Overlay */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ backgroundColor: `rgba(0,0,0,${activePromo.overlay_opacity || 0})` }}
+              />
+            </>
+          ) : (
+            /* Fallback — Vowza branding when no promotions exist */
+            <div className="w-full h-full flex flex-col items-center justify-center p-10 bg-gradient-to-br from-[hsl(345,72%,30%)] via-[hsl(345,60%,22%)] to-[hsl(30,70%,20%)]">
+              <VowzaIcon className="w-16 h-16 text-white/80 mb-6" />
+              <h2 className="text-3xl font-display font-bold text-white text-center leading-tight mb-3">
+                Where Talent{'\n'}Meets{' '}
+                <span className="bg-gradient-to-r from-yellow-300 to-amber-500 bg-clip-text text-transparent">
+                  Celebration
+                </span>
+              </h2>
+              <p className="text-white/60 text-sm text-center max-w-xs mb-8">
+                India's premier event marketplace. Book verified photographers, DJs, decorators, and 50+ more categories.
+              </p>
+              <div className="space-y-2.5 text-sm text-white/70">
+                {['1,500+ Verified Artists', '10,000+ Events Completed', '4.9★ Average Rating'].map(s => (
+                  <div key={s} className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    {s}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Carousel indicators */}
+          {promotions.length > 1 && (
+            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
+              {promotions.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setActiveIndex(i); setImageLoaded(false); }}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all duration-300",
+                    i === activeIndex
+                      ? "bg-white w-5"
+                      : "bg-white/40 hover:bg-white/60"
+                  )}
+                  aria-label={`Show promotion ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      <p className="text-white/25 text-xs relative z-10">© {new Date().getFullYear()} Vowza Technologies Pvt. Ltd.</p>
     </div>
-
-    {/* Right panel — form */}
-    <div className="flex-1 flex items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-md">
-        {/* Mobile logo */}
-        <AppLogo size="md" className="mb-8 lg:hidden" />
-        {children}
-      </div>
-    </div>
-  </div>
-));
+  );
+});
 AuthLayout.displayName = 'AuthLayout';
 
 // ── Main Auth component ───────────────────────────────────────────────────────
