@@ -23,6 +23,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
   const routeIsHomepageRef = useRef(isHomepage);
   const inactiveRef = useRef(typeof document !== 'undefined' && (document.visibilityState !== 'visible' || !document.hasFocus()));
   const mutedRef = useRef(false);
+  const userPausedRef = useRef(false);
   const playRequestRef = useRef(0);
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -54,6 +55,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
     && mountedRef.current
     && routeIsHomepageRef.current
     && !inactiveRef.current
+    && !userPausedRef.current
     && document.visibilityState === 'visible'
     && document.hasFocus()
     && videoRef.current === video,
@@ -153,7 +155,7 @@ const VideoPromotionCard = memo(({ media, loading, isHomepage }: { media: AuthPr
   }, [current, stopVideo]);
 
   if (!current) return <Frame label="Homepage promotion slot 1: video playlist" index={0}><Fallback type="video" loading={loading} /></Frame>;
-  return <Frame label="Homepage promotion slot 1: video playlist" index={0}><div className="absolute inset-0 flex items-center justify-center bg-black cursor-pointer" onClick={() => { const v = videoRef.current; if (!v) return; if (v.paused) { v.play(); } else { v.pause(); } }}><video ref={videoRef} key={current.id} className="h-full w-full object-contain brightness-[1.08]" src={current.media_url} muted={muted} loop={playable.length === 1} playsInline preload="metadata" controlsList="nodownload noplaybackrate nofullscreen" disablePictureInPicture onContextMenu={(event) => event.preventDefault()} onEnded={advance} onError={failedCurrent} aria-label="Vowza promotional video" /></div><div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" /></Frame>;
+  return <Frame label="Homepage promotion slot 1: video playlist" index={0}><div className="absolute inset-0 flex items-center justify-center bg-black cursor-pointer" onClick={() => { const v = videoRef.current; if (!v) return; if (v.paused) { userPausedRef.current = false; v.play(); } else { userPausedRef.current = true; v.pause(); } }}><video ref={videoRef} key={current.id} className="h-full w-full object-contain brightness-[1.08]" src={current.media_url} muted={muted} loop={playable.length === 1} playsInline preload="metadata" controlsList="nodownload noplaybackrate nofullscreen" disablePictureInPicture onContextMenu={(event) => event.preventDefault()} onEnded={advance} onError={failedCurrent} aria-label="Vowza promotional video" /></div><div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" /></Frame>;
 });
 VideoPromotionCard.displayName = 'VideoPromotionCard';
 
