@@ -2,6 +2,7 @@ import { useState } from "react";
 import VowzaIcon from '@/components/VowzaIcon';
 import { ChevronDown, MapPin, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import AuthPromotionMediaCards from "./AuthPromotionMediaCards";
 
 const EVENT_OPTIONS = [
   "Wedding", "Reception", "Birthday Party", "Corporate Event",
@@ -125,15 +126,8 @@ const MobileHero = () => {
           </div>
         )}
 
-        {/* ── Category quick cards — visible immediately after search ── */}
-        <div className="mt-4 flex w-full gap-2.5 overflow-x-auto pb-1 no-scrollbar" aria-label="Browse event categories">
-          {MOBILE_CARDS.map((card) => (
-            <button key={card.label} type="button" onClick={() => navigate(`/artists?search=${encodeURIComponent(card.label)}`)} className="flex w-[130px] shrink-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/10 text-left shadow-xl">
-              <img src={card.image} alt="" className="h-20 w-full object-cover" loading="lazy" />
-              <span className="flex min-h-[44px] items-center px-2.5 text-[11px] font-semibold leading-tight text-white">{card.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* ── Auth Promotion media — one video plus three dynamic photo cards ── */}
+        <AuthPromotionMediaCards variant="mobile" />
       </div>
     </section>
   );

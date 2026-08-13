@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import MobileHero from "./MobileHero";
+import AuthPromotionMediaCards from "./AuthPromotionMediaCards";
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
@@ -162,37 +163,9 @@ VisualCard.displayName = "VisualCard";
 
 const HeroVisual = memo(() => (
   <div className="relative hidden lg:block" style={{ height: 420, marginTop: -8 }}>
-    {/* Backdrop glow */}
     <div aria-hidden className="glow-orb animate-glow-pulse"
       style={{ top: "10%", left: "8%", width: 300, height: 300, background: "radial-gradient(circle, hsl(40 95% 52% / 0.10) 0%, transparent 70%)" }} />
-    {/* 3×2 Grid */}
-    <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-3 pl-6 pr-4 pt-0 pb-4" style={{ maxHeight: 390 }}>
-      {VISUAL_CARDS.map((card, i) => (
-        <motion.div
-          key={card.label}
-          className="relative rounded-2xl overflow-hidden shadow-xl group"
-          style={{ border: "1px solid hsl(40 85% 55% / 0.28)" }}
-          initial={{ opacity: 0, y: 20, scale: 0.94 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.3 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ y: -6, scale: 1.04, transition: { duration: 0.25 } }}
-        >
-          <motion.div
-            className="w-full h-full relative"
-            animate={{ y: [0, -4, 0] }}
-            transition={{ duration: 6 + i * 0.5, repeat: Infinity, ease: "easeInOut", delay: card.delay }}
-          >
-            <img src={card.img} alt={card.label} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover brightness-[1.15]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/18 to-transparent" />
-            <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ boxShadow: "inset 0 0 0 1.5px hsl(40 95% 62% / 0.55), 0 0 18px 2px hsl(40 95% 56% / 0.18)" }} />
-            <div className="relative z-10 h-full flex flex-col justify-end p-3.5">
-              <p className="text-white text-[12.5px] font-semibold leading-tight drop-shadow-md">{card.label}</p>
-              {card.sub && <p className="text-white/70 text-[10.5px] font-medium leading-tight mt-0.5">{card.sub}</p>}
-            </div>
-          </motion.div>
-        </motion.div>
-      ))}
-    </div>
+    <AuthPromotionMediaCards variant="desktop" />
   </div>
 ));
 HeroVisual.displayName = "HeroVisual";
@@ -202,38 +175,7 @@ HeroVisual.displayName = "HeroVisual";
 // the same real-photo cards become a horizontally swipeable strip instead.
 const HeroVisualMobile = memo(() => (
   <div className="lg:hidden -mx-4 px-4">
-    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1" style={{ scrollSnapType: "x mandatory" }}>
-      {VISUAL_CARDS.map((card, i) => {
-        const Icon = card.icon as React.ElementType | null;
-        return (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-            whileTap={{ scale: 0.97 }}
-            className="relative flex-shrink-0 w-[152px] h-[172px] rounded-3xl overflow-hidden shadow-xl border border-white/12"
-            style={{ scrollSnapAlign: "start" }}
-          >
-            <img src={card.img} alt={card.label} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
-            <div className="relative z-10 h-full flex flex-col justify-between p-3.5">
-              {Icon ? (
-                <div className="w-8 h-8 rounded-lg bg-white/12 border border-white/20 flex items-center justify-center backdrop-blur-md">
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-              ) : <div />}
-              <div>
-                <p className="text-white text-[12px] font-semibold leading-tight">{card.label}</p>
-                {card.sub && (
-                  <p className="text-white/70 text-[10px] font-medium leading-tight mt-0.5">{card.sub}</p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
+    <AuthPromotionMediaCards variant="mobile" />
   </div>
 ));
 HeroVisualMobile.displayName = "HeroVisualMobile";
