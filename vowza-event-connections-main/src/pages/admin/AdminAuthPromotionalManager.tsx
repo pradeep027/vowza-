@@ -276,9 +276,12 @@ export const AdminAuthPromotionalManager: React.FC = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold mb-2">Authentication Promotional Banner</h1>
+        <h1 className="text-3xl font-display font-bold mb-2">Authentication Side Promotion</h1>
         <p className="text-muted-foreground">
-          Manage the promotional image shown on the authentication modal when users log in or sign up.
+          Upload an image that appears on the <strong>right side</strong> of the Sign In / Sign Up page. This image is displayed beside the authentication form in the centered card layout.
+        </p>
+        <p className="text-xs text-muted-foreground mt-2 bg-secondary/60 rounded-lg p-3">
+          <strong>Note:</strong> This is separate from Homepage Promotion Media. Changes here only affect the Sign In / Sign Up page.
         </p>
       </div>
 
@@ -286,8 +289,9 @@ export const AdminAuthPromotionalManager: React.FC = () => {
       <div className="rounded-lg border border-border bg-secondary p-6 space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Eye className="w-5 h-5" />
-          Current Image Preview
+          Sign In / Sign Up Side Panel Preview
         </h2>
+        <p className="text-xs text-muted-foreground">This image appears on the right side of the authentication card when users sign in or sign up.</p>
 
         {config?.current_image_url ? (
           <div className="relative aspect-[1.5/1] rounded-lg overflow-hidden bg-slate-200">
@@ -396,8 +400,9 @@ export const AdminAuthPromotionalManager: React.FC = () => {
       <div className="rounded-lg border border-border bg-secondary p-6 space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Upload className="w-5 h-5" />
-          Upload New Image
+          Upload Authentication Side Image
         </h2>
+        <p className="text-xs text-muted-foreground">Choose an image to display beside the Sign In / Sign Up form. Recommended: portrait or square aspect ratio, minimum 800×800px.</p>
 
         <div className="space-y-4">
           {previewUrl ? (
