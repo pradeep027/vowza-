@@ -330,6 +330,49 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     }
   }
 
+  // CRITICAL: If user explicitly mentions finding vendors, ALWAYS retrieve and show them
+  // Do not let this fall through to planning logic
+  const explicitVendorRequest = /\b(show|find|search|display|list|profiles?)\s+(me\s+)?(all\s+)?(the\s+)?(verified\s+)?(vowza\s+)?(photographer|videographer|decorator|caterer|dj|band|makeup|artist|vendor|provider)\w*/i.test(message);
+  
+  if (explicitVendorRequest) {
+    console.log('[Vowza AI] Explicit vendor request detected:', message);
+    const ragResult = await retrieveVendors(message, updatedContext, 12, {
+      professions: orch.professions || [],
+      city: orch.city ?? undefined,
+      priceMax: orch.priceMax ?? undefined,
+      minRating: orch.minRating || 0,
+    });
+    
+    const dbVendors = dedupeVerifiedDBVendors(ragResult.vendors);
+    console.log('[Vowza AI] Retrieved vendors:', dbVendors.length);
+    
+    if (dbVendors.length > 0) {
+      const vendor_text = `I found **${dbVendors.length} verified Vowza ${orch.professions?.[0] || 'vendor'} profiles**. Here they are:`;
+      await streamDeterministic(vendor_text, onChunk);
+      return {
+        fullText: vendor_text,
+        aiResponse: { 
+          type: 'vendor_results', 
+          text: vendor_text, 
+          data: { dbVendors } 
+        },
+        updatedContext,
+      };
+    } else {
+      const noResultText = `I couldn't find any verified ${orch.professions?.[0] || 'vendor'} profiles${orch.city ? ` in ${orch.city}` : ''} right now on Vowza. Try a different category or location!`;
+      await streamDeterministic(noResultText, onChunk);
+      return {
+        fullText: noResultText,
+        aiResponse: { 
+          type: 'vendor_results', 
+          text: noResultText, 
+          data: { dbVendors: [] } 
+        },
+        updatedContext,
+      };
+    }
+  }
+
   const hasDiscoveryLanguage = /\b(find|show|search|recommend|suggest|list|profiles?|vendors?|providers?|available|book|hire|looking for|need)\b/i.test(message);
   const marketplaceCandidate = orch.needsRetrieval || hasDiscoveryLanguage;
 
