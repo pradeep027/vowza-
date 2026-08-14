@@ -120,14 +120,24 @@ const queryClient = new QueryClient({
 // ─── AppContent — uses router context so hooks like useNavigate work ──────────
 const AppContent = () => {
   useInactivityLogout();
-  const { video, recordView } = usePromotionVideoAd();
+  const { video, recordView, isLoading, hasUserViewed } = usePromotionVideoAd();
   const [showOverlay, setShowOverlay] = useState(true);
 
+  console.log('[AppContent] Render check:', {
+    video: video?.id,
+    showOverlay,
+    shouldRender: !!(video && showOverlay),
+    isLoading,
+    hasUserViewed,
+  });
+
   const handleClose = () => {
+    console.log('[AppContent] Overlay closed by user');
     setShowOverlay(false);
   };
 
   const handleViewRecorded = async () => {
+    console.log('[AppContent] Recording view...');
     await recordView();
   };
 

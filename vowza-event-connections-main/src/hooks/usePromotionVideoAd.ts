@@ -29,7 +29,9 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
   const [hasUserViewed, setHasUserViewed] = useState(false);
 
   const refresh = useCallback(async () => {
+    console.log('[usePromotionVideoAd] refresh() called, user?.id:', user?.id);
     if (!user?.id) {
+      console.log('[usePromotionVideoAd] No user ID, clearing video');
       setVideo(null);
       setIsLoading(false);
       return;
@@ -37,9 +39,12 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
 
     setIsLoading(true);
     try {
+      console.log('[usePromotionVideoAd] Fetching active video for user:', user.id);
       const activeVideo = await getActivePromotionVideo(user.id);
+      console.log('[usePromotionVideoAd] RPC returned:', activeVideo);
       setVideo(activeVideo);
       setHasUserViewed(activeVideo?.has_user_viewed ?? false);
+      console.log('[usePromotionVideoAd] State updated - video:', activeVideo, 'hasUserViewed:', activeVideo?.has_user_viewed ?? false);
     } catch (error) {
       console.error('[usePromotionVideoAd] Failed to fetch active promotion video:', error);
       setVideo(null);
@@ -68,15 +73,19 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
 
   // Fetch active video on mount and when user changes
   useEffect(() => {
+    console.log('[usePromotionVideoAd] useEffect triggered, user?.id:', user?.id);
     void refresh();
-  }, [refresh]);
+  }, [user?.id, refresh]);
 
   // Listen for updates across tabs and from admin changes
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_NAME) : null;
-    const onMessage = () => void refresh();
+    const onMessage = () => {
+      console.log('[usePromotionVideoAd] Admin update detected, refreshing');
+      void refresh();
+    };
 
     window.addEventListener(PROMOTION_VIDEO_UPDATED_EVENT, onMessage);
     channel?.addEventListener('message', onMessage);
@@ -88,11 +97,22 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
     };
   }, [user?.id, refresh]);
 
-  return {
+  const returnValue = {
     video: video && !hasUserViewed ? video : null, // Only show if user hasn't viewed
     isLoading,
     hasUserViewed,
     recordView,
     refresh,
   };
+  
+  console.log('[usePromotionVideoAd] Returning:', {
+    video: returnValue.video?.id,
+    isLoading,
+    hasUserViewed,
+    videoExists: !!video,
+    userViewed: hasUserViewed,
+    shouldRender: !!(video && !hasUserViewed),
+  });
+  
+  return returnValue;
 }
