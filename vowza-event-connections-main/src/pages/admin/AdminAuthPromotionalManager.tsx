@@ -18,6 +18,7 @@ import {
   type AuthPromoConfig,
   type AuthPromotionMedia,
   type AuthPromoMediaType,
+  type HomepagePromotionSlotNumber,
 } from '@/integrations/supabase/auth-promo';
 import { toast } from 'sonner';
 
@@ -551,46 +552,15 @@ export const AdminAuthPromotionalManager: React.FC = () => {
       {config?.current_image_url && <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-6"><h2 className="flex items-center gap-2 text-lg font-semibold text-red-600"><Trash2 className="h-5 w-5" />Delete Authentication Image</h2><p className="text-sm text-red-600">Remove the authentication image and revert to the default Vowza promotional background.</p><button onClick={deleteImage} disabled={uploading} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50">{uploading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Deleting…</> : <><Trash2 className="mr-2 inline h-4 w-4" />Delete Image</>}</button></div>}
 
       <section className="space-y-6 rounded-lg border border-border bg-secondary p-6">
-        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><Video className="h-5 w-5" />Homepage Promotion Media</h2><p className="mt-1 text-sm text-muted-foreground">Manage four fixed media cards on the homepage. Upload video or photos for each position. Each slot can have multiple items that rotate/loop on the homepage; unpublished items never appear publicly.</p></div>
+        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><ImageIcon className="h-5 w-5" />Homepage Promotion Media</h2><p className="mt-1 text-sm text-muted-foreground">Manage four fixed image cards on the homepage in a 2×2 grid. Upload images for each position. Each slot can have multiple images that rotate automatically every 10 seconds; unpublished items never appear publicly.</p></div>
 
-        {/* VIDEO CARD - Slot 1 */}
-        <HomepageMediaSlotCard
-          slotNumber={1}
-          slotTitle="Video Card"
-          slotDescription="Homepage top-left video position"
-          acceptedTypes="video/mp4,video/webm"
-          mediaType="video"
-          media={homepageMedia.filter((m) => m.slot_number === 1)}
-          onUpload={async (file) => {
-            const uploaded = await uploadAuthPromoMedia(file);
-            try {
-              const created = await createAuthPromotionMedia({
-                media_type: uploaded.mediaType,
-                media_url: uploaded.url,
-                storage_path: uploaded.path,
-                display_order: Math.max(...homepageMedia.filter((m) => m.slot_number === 1).map((m) => m.display_order), -1) + 1,
-                slot_number: 1,
-              });
-              setHomepageMedia((current) => [...current, created].sort((a, b) => a.display_order - b.display_order));
-              notifyAuthPromoUpdated();
-              toast.success('Video uploaded successfully.');
-            } catch (persistError) {
-              await deleteAuthPromoImage(uploaded.path);
-              throw persistError;
-            }
-          }}
-          onDelete={(item) => deleteHomepageMedia(item)}
-          onToggleActive={(item) => toggleHomepageMediaActive(item)}
-          isUploading={mediaUploading}
-        />
-
-        {/* PHOTO CARDS - Slots 2, 3, 4 */}
-        {[2, 3, 4].map((slotNum) => (
+        {/* IMAGE CARDS - Slots 1-4 */}
+        {[1, 2, 3, 4].map((slotNum) => (
           <HomepageMediaSlotCard
             key={slotNum}
-            slotNumber={slotNum}
-            slotTitle={`Photo Card ${slotNum - 1}`}
-            slotDescription={['top-right', 'bottom-left', 'bottom-right'][slotNum - 2] ? `Homepage ${['top-right', 'bottom-left', 'bottom-right'][slotNum - 2]} photo position` : ''}
+            slotNumber={slotNum as HomepagePromotionSlotNumber}
+            slotTitle={`Image Card ${slotNum}`}
+            slotDescription={`Homepage ${['top-left', 'top-right', 'bottom-left', 'bottom-right'][slotNum - 1]} image position`}
             acceptedTypes="image/jpeg,image/png,image/webp"
             mediaType="image"
             media={homepageMedia.filter((m) => m.slot_number === slotNum)}
@@ -598,15 +568,15 @@ export const AdminAuthPromotionalManager: React.FC = () => {
               const uploaded = await uploadAuthPromoMedia(file);
               try {
                 const created = await createAuthPromotionMedia({
-                  media_type: uploaded.mediaType,
+                  media_type: 'image',
                   media_url: uploaded.url,
                   storage_path: uploaded.path,
                   display_order: Math.max(...homepageMedia.filter((m) => m.slot_number === slotNum).map((m) => m.display_order), -1) + 1,
-                  slot_number: slotNum,
+                  slot_number: slotNum as HomepagePromotionSlotNumber,
                 });
                 setHomepageMedia((current) => [...current, created].sort((a, b) => a.display_order - b.display_order));
                 notifyAuthPromoUpdated();
-                toast.success('Photo uploaded successfully.');
+                toast.success('Image uploaded successfully.');
               } catch (persistError) {
                 await deleteAuthPromoImage(uploaded.path);
                 throw persistError;
