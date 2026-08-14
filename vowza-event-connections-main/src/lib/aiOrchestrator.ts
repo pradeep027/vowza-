@@ -194,6 +194,13 @@ function classifyIntent(
   // This prevents "decorator profiles" from falling through to a budget card.
   const professions = detectProfessions(message);
   if (professions.length > 0) {
+    // Comparison request — when user asks to compare vendors
+    // NEW Phase 7D: Enhanced comparison detection
+    const comparisonPatterns = /compare|vs\b|versus|difference|which is better|which one|best option|choose|comparison|vs\.|who's better|side\s*by\s*side/i;
+    if (comparisonPatterns.test(l)) {
+      return 'comparison';
+    }
+
     if (/compare|vs\b|versus|difference|which is better|which one/i.test(l)) {
       return 'comparison';
     }

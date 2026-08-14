@@ -39,6 +39,7 @@ import {
   formatDietaryPreferences,           // NEW Phase 7C
 } from './eventContextCapturer';
 import { filterVendorsByDietaryPreference, formatDietaryFilterMessage, buildDietaryFilterContext } from './dietaryFilterer'; // NEW Phase 7C
+import { formatDetailedComparison, formatComparisonTable, createComparisonCard } from './vendorComparison'; // NEW Phase 7D
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
@@ -488,6 +489,62 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
       generatedPlan,
       recommendedPackages: [],
     };
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ─── PHASE 7D: Handle vendor comparison requests ──────────────────────────────
+  if (orch.intent === 'comparison') {
+    // Get prior vendors from message history to compare
+    let priorVendors: any[] = [];
+    for (const msg of history.reverse()) {
+      if (msg.role === 'assistant' && msg.type === 'vendor_results' && msg.data?.dbVendors) {
+        priorVendors = msg.data.dbVendors;
+        break;
+      }
+    }
+
+    console.log('[Vowza AI Phase 7D] Comparison request detected:', {
+      message,
+      priorVendorsCount: priorVendors.length,
+    });
+
+    if (priorVendors.length < 2) {
+      // Need to retrieve vendors first
+      const ragResult = await retrieveVendors(message, updatedContext, 5, {
+        professions: orch.professions || [],
+        city: orch.city ?? undefined,
+        priceMax: orch.priceMax ?? undefined,
+        minRating: orch.minRating || 0,
+      });
+
+      priorVendors = dedupeVerifiedDBVendors(ragResult.vendors);
+    }
+
+    if (priorVendors.length >= 2) {
+      const comparisonText = formatDetailedComparison(priorVendors);
+
+      await streamDeterministic(comparisonText, onChunk);
+      return {
+        fullText: comparisonText,
+        aiResponse: {
+          type: 'vendor_results',
+          text: comparisonText,
+          data: { dbVendors: priorVendors, comparison: true },
+        },
+        updatedContext,
+        generatedPlan,
+        recommendedPackages: [],
+      };
+    } else {
+      const noVendorText = `I need at least 2 vendors to compare. Let me search for ${orch.professions?.join(' and ') || 'vendors'} in ${orch.city || updatedContext.city} first.`;
+      await streamDeterministic(noVendorText, onChunk);
+      return {
+        fullText: noVendorText,
+        aiResponse: { type: 'vendor_results', text: noVendorText, data: { dbVendors: [] } },
+        updatedContext,
+        generatedPlan,
+      };
+    }
   }
   // ────────────────────────────────────────────────────────────────────────────
 
