@@ -1,230 +1,308 @@
-/**
- * AdminAuthPromotionalManager — Admin control for authentication page promo images
- * 
- * Features:
- * - Upload/replace promotional image
- * - Preview image
- * - Adjust overlay opacity
- * - Delete image (revert to default)
- * - Admin-only access (RLS enforced)
- * - Image validation
- */
-
-import React, { useState, useEffect } from 'react';
-import { Upload, Trash2, Eye, Loader2, Check, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, ArrowDown, ArrowUp, Check, Eye, Image as ImageIcon, Loader2, Trash2, Upload, Video } from 'lucide-react';
 import { useAdmin } from '@/contexts/AuthContext';
+import {
+  createAuthPromoConfig,
+  createAuthPromotionMedia,
+  deleteAuthPromoImage,
+  deleteAuthPromotionMedia,
+  fetchAuthPromotionMediaForManagement,
+  fetchLatestAuthPromoConfig,
+  notifyAuthPromoUpdated,
+  updateAuthPromoConfig,
+  updateAuthPromotionMedia,
+  uploadAuthPromoImage,
+  uploadAuthPromoMedia,
+  validateAuthPromoImage,
+  validateAuthPromoMedia,
+  type AuthPromoConfig,
+  type AuthPromotionMedia,
+  type AuthPromoMediaType,
+} from '@/integrations/supabase/auth-promo';
 import { toast } from 'sonner';
 
-interface AuthPromoConfig {
-  id: string;
-  admin_id: string;
-  current_image_url: string | null;
-  image_storage_path: string | null;
-  overlay_opacity: number;
-  is_active: boolean;
+const DEFAULT_OVERLAY_COLOR = 'rgba(0, 0, 0, 1)';
+
+interface SelectedPromotionMedia {
+  file: File;
+  previewUrl: string;
+  mediaType: AuthPromoMediaType;
 }
 
+const mediaTypeLabel = (mediaType: AuthPromoMediaType) => mediaType === 'video' ? 'Video' : 'Photo';
+
 export const AdminAuthPromotionalManager: React.FC = () => {
-  const { isAdmin, userId } = useAdmin();
+  const { isAdmin } = useAdmin();
   const [config, setConfig] = useState<AuthPromoConfig | null>(null);
+  const [homepageMedia, setHomepageMedia] = useState<AuthPromotionMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [overlayOpacity, setOverlayOpacity] = useState(0.3);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [isActive, setIsActive] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [selectedHomepageMedia, setSelectedHomepageMedia] = useState<SelectedPromotionMedia[]>([]);
 
-  // Fetch current config
-  useEffect(() => {
-    fetchConfig();
-  }, []);
-
-  const fetchConfig = async () => {
+  const loadConfiguration = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('auth_promotional_config')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setConfig(data as AuthPromoConfig);
-        setOverlayOpacity(data.overlay_opacity || 0.3);
-        setIsActive(data.is_active);
-      }
-    } catch (err) {
-      console.error('[AdminAuthPromo] Failed to fetch config:', err);
-      toast.error('Failed to load current configuration');
+      const [nextConfig, nextMedia] = await Promise.all([
+        fetchLatestAuthPromoConfig(),
+        fetchAuthPromotionMediaForManagement(),
+      ]);
+      setConfig(nextConfig);
+      setOverlayOpacity(nextConfig?.overlay_opacity ?? 0.3);
+      setHomepageMedia(nextMedia);
+    } catch (error) {
+      console.error('[AdminAuthPromo] Unable to load configuration:', error);
+      toast.error('Failed to load the current promotion configuration.');
     } finally {
       setLoading(false);
     }
   };
 
-  const validateImage = (file: File): boolean => {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+  useEffect(() => {
+    void loadConfiguration();
+  }, []);
 
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG or WebP image');
-      return false;
-    }
+  useEffect(() => () => {
+    selectedHomepageMedia.forEach((selection) => URL.revokeObjectURL(selection.previewUrl));
+  }, [selectedHomepageMedia]);
 
-    if (file.size > maxSize) {
-      toast.error('Image must be less than 10MB');
-      return false;
-    }
-
-    return true;
+  const overlayStyle = {
+    backgroundColor: config?.overlay_color ?? DEFAULT_OVERLAY_COLOR,
+    opacity: overlayOpacity,
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const nextDisplayOrder = useMemo(
+    () => homepageMedia.reduce((largest, item) => Math.max(largest, item.display_order), -1) + 1,
+    [homepageMedia],
+  );
+
+  const clearSelectedImage = () => {
+    setSelectedFile(null);
+    setPreviewUrl('');
+  };
+
+  const clearSelectedHomepageMedia = () => setSelectedHomepageMedia([]);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!validateImage(file)) {
-      setSelectedFile(null);
-      setPreviewUrl('');
-      return;
+    try {
+      await validateAuthPromoImage(file);
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    } catch (error) {
+      clearSelectedImage();
+      event.target.value = '';
+      toast.error(error instanceof Error ? error.message : 'Please choose a valid image.');
     }
+  };
 
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPreviewUrl(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const handleHomepageMediaSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+
+    try {
+      const selections = await Promise.all(files.map(async (file) => ({
+        file,
+        mediaType: await validateAuthPromoMedia(file),
+      })));
+      setSelectedHomepageMedia(selections.map((selection) => ({
+        ...selection,
+        previewUrl: URL.createObjectURL(selection.file),
+      })));
+    } catch (error) {
+      event.target.value = '';
+      toast.error(error instanceof Error ? error.message : 'Please choose valid media files.');
+    }
   };
 
   const uploadImage = async () => {
     if (!selectedFile) {
-      toast.error('Please select an image');
+      toast.error('Please select an image.');
       return;
     }
 
+    setUploading(true);
     try {
-      setUploading(true);
-
-      // Upload to Supabase Storage
-      const timestamp = Date.now();
-      const filename = `promo-${timestamp}.${selectedFile.name.split('.').pop()}`;
-      const storagePath = `promotional-images/${filename}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('auth-promotional')
-        .upload(storagePath, selectedFile);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('auth-promotional').getPublicUrl(storagePath);
-
-      // Update or create config record
-      if (config) {
-        const { error: updateError } = await supabase
-          .from('auth_promotional_config')
-          .update({
-            current_image_url: publicUrl,
-            image_storage_path: storagePath,
-            overlay_opacity: overlayOpacity,
-            is_active: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', config.id);
-
-        if (updateError) throw updateError;
-      } else {
-        if (!userId) throw new Error('Your administrator session has expired. Please sign in again.');
-
-        const { error: insertError } = await supabase
-          .from('auth_promotional_config')
-          .insert({
-            admin_id: userId,
-            current_image_url: publicUrl,
-            image_storage_path: storagePath,
-            overlay_opacity: overlayOpacity,
-            is_active: true,
-          });
-
-        if (insertError) throw insertError;
+      const previousPath = config?.image_storage_path ?? null;
+      const uploadedImage = await uploadAuthPromoImage(selectedFile);
+      let persistedConfig: AuthPromoConfig;
+      try {
+        persistedConfig = config
+          ? await updateAuthPromoConfig(config.id, {
+              current_image_url: uploadedImage.url,
+              image_storage_path: uploadedImage.path,
+              overlay_opacity: overlayOpacity,
+              is_active: true,
+            })
+          : await createAuthPromoConfig(uploadedImage.url, uploadedImage.path, overlayOpacity);
+      } catch (persistError) {
+        await deleteAuthPromoImage(uploadedImage.path);
+        throw persistError;
       }
 
-      toast.success('Promotional image updated! Changes will appear immediately.');
-      await fetchConfig();
-      setSelectedFile(null);
-      setPreviewUrl('');
-    } catch (err) {
-      console.error('[AdminAuthPromo] Upload failed:', err);
-      toast.error('Failed to upload image. Please try again.');
+      setConfig(persistedConfig);
+      setOverlayOpacity(persistedConfig.overlay_opacity ?? 0.3);
+      notifyAuthPromoUpdated();
+      clearSelectedImage();
+
+      if (previousPath && previousPath !== uploadedImage.path && !await deleteAuthPromoImage(previousPath)) {
+        toast.warning('Promotion updated, but the old image could not be removed automatically.');
+        return;
+      }
+
+      toast.success('Authentication promotional image updated.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Upload failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload the promotional image.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const uploadHomepageMedia = async () => {
+    if (!selectedHomepageMedia.length) {
+      toast.error('Select one or more photos or videos first.');
+      return;
+    }
+
+    setMediaUploading(true);
+    const createdMedia: AuthPromotionMedia[] = [];
+    try {
+      for (const [index, selection] of selectedHomepageMedia.entries()) {
+        const uploaded = await uploadAuthPromoMedia(selection.file);
+        try {
+          const created = await createAuthPromotionMedia({
+            media_type: uploaded.mediaType,
+            media_url: uploaded.url,
+            storage_path: uploaded.path,
+            display_order: nextDisplayOrder + index,
+          });
+          createdMedia.push(created);
+        } catch (persistError) {
+          await deleteAuthPromoImage(uploaded.path);
+          throw persistError;
+        }
+      }
+
+      setHomepageMedia((current) => [...current, ...createdMedia].sort((a, b) => a.display_order - b.display_order));
+      clearSelectedHomepageMedia();
+      notifyAuthPromoUpdated();
+      toast.success(`${createdMedia.length} homepage promotion ${createdMedia.length === 1 ? 'item' : 'items'} uploaded.`);
+    } catch (error) {
+      await Promise.allSettled(createdMedia.map(async (item) => {
+        await deleteAuthPromotionMedia(item.id);
+        await deleteAuthPromoImage(item.storage_path);
+      }));
+      console.error('[AdminAuthPromo] Homepage media upload failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload homepage promotion media.');
+      await loadConfiguration();
+    } finally {
+      setMediaUploading(false);
     }
   };
 
   const deleteImage = async () => {
     if (!config) return;
 
+    setUploading(true);
     try {
-      setUploading(true);
+      const previousPath = config.image_storage_path;
+      const persistedConfig = await updateAuthPromoConfig(config.id, {
+        current_image_url: null,
+        image_storage_path: null,
+      });
 
-      // Delete from storage if path exists
-      if (config.image_storage_path) {
-        await supabase.storage
-          .from('auth-promotional')
-          .remove([config.image_storage_path]);
+      setConfig(persistedConfig);
+      notifyAuthPromoUpdated();
+      if (!await deleteAuthPromoImage(previousPath)) {
+        toast.warning('The promotion was removed, but the old storage object could not be cleaned up automatically.');
+        return;
       }
 
-      // Update config to null
-      const { error } = await supabase
-        .from('auth_promotional_config')
-        .update({
-          current_image_url: null,
-          image_storage_path: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', config.id);
-
-      if (error) throw error;
-
-      toast.success('Promotional image deleted. Default image will be shown.');
-      await fetchConfig();
-    } catch (err) {
-      console.error('[AdminAuthPromo] Delete failed:', err);
-      toast.error('Failed to delete image. Please try again.');
+      toast.success('Authentication promotional image removed.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Delete failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete the promotional image.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const deleteHomepageMedia = async (item: AuthPromotionMedia) => {
+    setMediaUploading(true);
+    try {
+      await deleteAuthPromotionMedia(item.id);
+      setHomepageMedia((current) => current.filter((media) => media.id !== item.id));
+      notifyAuthPromoUpdated();
+      if (!await deleteAuthPromoImage(item.storage_path)) {
+        toast.warning('Media was removed from the homepage, but its stored file could not be cleaned up automatically.');
+        return;
+      }
+      toast.success('Homepage promotion media removed.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Homepage media delete failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to remove homepage promotion media.');
+    } finally {
+      setMediaUploading(false);
     }
   };
 
   const toggleActive = async () => {
     if (!config) return;
 
+    setUploading(true);
     try {
-      setUploading(true);
-
-      const { error } = await supabase
-        .from('auth_promotional_config')
-        .update({
-          is_active: !isActive,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', config.id);
-
-      if (error) throw error;
-
-      setIsActive(!isActive);
-      toast.success(isActive ? 'Promotional image hidden' : 'Promotional image shown');
-    } catch (err) {
-      console.error('[AdminAuthPromo] Toggle failed:', err);
-      toast.error('Failed to update status. Please try again.');
+      const persistedConfig = await updateAuthPromoConfig(config.id, { is_active: !config.is_active });
+      setConfig(persistedConfig);
+      notifyAuthPromoUpdated();
+      toast.success(persistedConfig.is_active ? 'Authentication promotional image shown.' : 'Authentication promotional image hidden.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Status update failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update promotional image status.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const toggleHomepageMediaActive = async (item: AuthPromotionMedia) => {
+    setMediaUploading(true);
+    try {
+      const updated = await updateAuthPromotionMedia(item.id, { is_active: !item.is_active });
+      setHomepageMedia((current) => current.map((media) => media.id === updated.id ? updated : media));
+      notifyAuthPromoUpdated();
+      toast.success(updated.is_active ? 'Homepage media published.' : 'Homepage media hidden.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Homepage media status update failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update homepage media status.');
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+
+  const moveHomepageMedia = async (item: AuthPromotionMedia, direction: -1 | 1) => {
+    const itemIndex = homepageMedia.findIndex((media) => media.id === item.id);
+    const adjacent = homepageMedia[itemIndex + direction];
+    if (itemIndex < 0 || !adjacent) return;
+
+    setMediaUploading(true);
+    try {
+      await Promise.all([
+        updateAuthPromotionMedia(item.id, { display_order: adjacent.display_order }),
+        updateAuthPromotionMedia(adjacent.id, { display_order: item.display_order }),
+      ]);
+      await loadConfiguration();
+      notifyAuthPromoUpdated();
+      toast.success('Homepage media order updated.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Homepage media reorder failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reorder homepage media.');
+    } finally {
+      setMediaUploading(false);
     }
   };
 
@@ -234,282 +312,63 @@ export const AdminAuthPromotionalManager: React.FC = () => {
       return;
     }
 
+    setUploading(true);
     try {
-      setUploading(true);
-      const { error } = await supabase
-        .from('auth_promotional_config')
-        .update({
-          overlay_opacity: overlayOpacity,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', config.id);
-
-      if (error) throw error;
-
-      setConfig({ ...config, overlay_opacity: overlayOpacity });
+      const persistedConfig = await updateAuthPromoConfig(config.id, { overlay_opacity: overlayOpacity });
+      setConfig(persistedConfig);
+      notifyAuthPromoUpdated();
       toast.success('Overlay settings saved.');
-    } catch (err) {
-      console.error('[AdminAuthPromo] Overlay update failed:', err);
-      toast.error('Failed to save overlay settings. Please try again.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Overlay update failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save overlay settings.');
     } finally {
       setUploading(false);
     }
   };
 
   if (!isAdmin) {
-    return (
-      <div className="p-8 rounded-lg border border-red-200 bg-red-50 text-red-600">
-        <AlertCircle className="w-5 h-5 mb-2" />
-        <p>Admin access required</p>
-      </div>
-    );
+    return <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-red-600"><AlertCircle className="mb-2 h-5 w-5" /><p>Admin access required.</p></div>;
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold mb-2">Authentication Side Promotion</h1>
-        <p className="text-muted-foreground">
-          Upload an image that appears on the <strong>right side</strong> of the Sign In / Sign Up page. This image is displayed beside the authentication form in the centered card layout.
-        </p>
-        <p className="text-xs text-muted-foreground mt-2 bg-secondary/60 rounded-lg p-3">
-          <strong>Note:</strong> This is separate from Homepage Promotion Media. Changes here only affect the Sign In / Sign Up page.
-        </p>
+        <h1 className="mb-2 text-3xl font-display font-bold">Authentication Promotional Banner</h1>
+        <p className="text-muted-foreground">Manage the sign-in image and the ordered image/video media used by the homepage promotion cards.</p>
       </div>
 
-      {/* Current Image Preview */}
-      <div className="rounded-lg border border-border bg-secondary p-6 space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Eye className="w-5 h-5" />
-          Sign In / Sign Up Side Panel Preview
-        </h2>
-        <p className="text-xs text-muted-foreground">This image appears on the right side of the authentication card when users sign in or sign up.</p>
-
-        {config?.current_image_url ? (
-          <div className="relative aspect-[1.5/1] rounded-lg overflow-hidden bg-slate-200">
-            <img
-              src={config.current_image_url}
-              alt="Current promotional"
-              className="w-full h-full object-cover"
-            />
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{ backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})` }}
-            />
-          </div>
-        ) : (
-          <div className="aspect-[1.5/1] rounded-lg bg-gradient-to-br from-purple-600 via-maroon-600 to-orange-600 flex items-center justify-center text-white">
-            <div className="text-center">
-              <p className="text-sm text-white/80 mb-2">Default promotional image</p>
-              <p className="font-semibold">Vowza</p>
-              <p className="text-sm text-white/80">Where Talent Meets Celebration</p>
-            </div>
-          </div>
-        )}
-
-        {/* Status */}
-        <div className="flex items-center justify-between pt-2">
-          <div>
-            <p className="text-xs text-muted-foreground">Status</p>
-            <p className="font-semibold flex items-center gap-2">
-              {config ? (
-                isActive ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    Active
-                  </>
-                ) : (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                    Hidden
-                  </>
-                )
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                  Default background
-                </>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={toggleActive}
-            disabled={uploading || !config}
-            className="btn-secondary text-sm"
-          >
-            {isActive ? 'Hide' : 'Show'}
-          </button>
-        </div>
+      <div className="space-y-4 rounded-lg border border-border bg-secondary p-6">
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><Eye className="h-5 w-5" />Current Authentication Image</h2>
+        {config?.current_image_url ? <div className="relative aspect-[1.5/1] overflow-hidden rounded-lg bg-slate-200"><img src={config.current_image_url} alt="Current promotional" className="h-full w-full object-cover" /><div className="pointer-events-none absolute inset-0" style={overlayStyle} /></div> : <div className="flex aspect-[1.5/1] items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 via-maroon-600 to-orange-600 text-white"><div className="text-center"><p className="mb-2 text-sm text-white/80">Default promotional image</p><p className="font-semibold">Vowza</p><p className="text-sm text-white/80">Where Talent Meets Celebration</p></div></div>}
+        <div className="flex items-center justify-between pt-2"><div><p className="text-xs text-muted-foreground">Status</p><p className="flex items-center gap-2 font-semibold"><span className={`h-2 w-2 rounded-full ${config?.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />{config ? (config.is_active ? 'Active' : 'Hidden') : 'Default background'}</p></div><button onClick={toggleActive} disabled={uploading || !config} className="btn-secondary text-sm">{config?.is_active ? 'Hide' : 'Show'}</button></div>
       </div>
 
-      {/* Overlay Opacity Control */}
-      <div className="rounded-lg border border-border bg-secondary p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Overlay Settings</h2>
-
-        <div>
-          <label className="text-sm font-semibold text-foreground block mb-3">
-            Overlay Opacity: {Math.round(overlayOpacity * 100)}%
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={overlayOpacity * 100}
-            onChange={(e) => setOverlayOpacity(parseInt(e.target.value) / 100)}
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            Adjust darkness of overlay on top of the image for better text readability
-          </p>
-        </div>
-
-        {/* Preview with opacity */}
-        <div className="relative aspect-[1.5/1] rounded-lg overflow-hidden bg-slate-200">
-          {config?.current_image_url && (
-            <img
-              src={config.current_image_url}
-              alt="Preview"
-              className="w-full h-full object-cover"
-            />
-          )}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})` }}
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={saveOverlay}
-          disabled={uploading || !config}
-          className="btn-primary text-sm"
-        >
-          {uploading ? 'Saving…' : 'Save Overlay Settings'}
-        </button>
+      <div className="space-y-4 rounded-lg border border-border bg-secondary p-6">
+        <h2 className="text-lg font-semibold">Authentication Image Overlay</h2>
+        <div><label className="mb-3 block text-sm font-semibold text-foreground">Overlay Opacity: {Math.round(overlayOpacity * 100)}%</label><input type="range" min="0" max="100" value={overlayOpacity * 100} onChange={(event) => setOverlayOpacity(Number(event.target.value) / 100)} className="w-full" /><p className="mt-2 text-xs text-muted-foreground">Adjust darkness over the image for better text readability.</p></div>
+        <div className="relative aspect-[1.5/1] overflow-hidden rounded-lg bg-slate-200">{config?.current_image_url && <img src={config.current_image_url} alt="Overlay preview" className="h-full w-full object-cover" />}<div className="pointer-events-none absolute inset-0" style={overlayStyle} /></div>
+        <button type="button" onClick={saveOverlay} disabled={uploading || !config} className="btn-primary text-sm">{uploading ? 'Saving…' : 'Save Overlay Settings'}</button>
       </div>
 
-      {/* Upload New Image */}
-      <div className="rounded-lg border border-border bg-secondary p-6 space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Upload className="w-5 h-5" />
-          Upload Authentication Side Image
-        </h2>
-        <p className="text-xs text-muted-foreground">Choose an image to display beside the Sign In / Sign Up form. Recommended: portrait or square aspect ratio, minimum 800×800px.</p>
-
-        <div className="space-y-4">
-          {previewUrl ? (
-            <div className="relative aspect-[1.5/1] rounded-lg overflow-hidden border-2 border-maroon/50 bg-slate-100">
-              <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})` }}
-              />
-            </div>
-          ) : (
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-maroon/50 transition-colors cursor-pointer">
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="image-upload"
-              />
-              <label htmlFor="image-upload" className="cursor-pointer block">
-                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                <p className="font-semibold text-foreground mb-1">Click to upload image</p>
-                <p className="text-xs text-muted-foreground">
-                  JPG, PNG or WebP • Max 10MB • Recommended: 1920×1080px or wider
-                </p>
-              </label>
-            </div>
-          )}
-
-          {selectedFile && (
-            <div className="p-3 rounded-lg bg-blue-50 text-blue-600 text-sm flex items-center gap-2">
-              <Check className="w-4 h-4" />
-              {selectedFile.name} selected
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            {previewUrl && (
-              <>
-                <button
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setPreviewUrl('');
-                  }}
-                  disabled={uploading}
-                  className="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={uploadImage}
-                  disabled={uploading || !selectedFile}
-                  className="btn-primary flex-1 justify-center gap-2"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Uploading…
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      Upload Image
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <p className="text-xs text-muted-foreground pt-2">
-          Images should be landscape oriented. The left side will be visible in desktop view, showing alongside the authentication form.
-        </p>
+      <div className="space-y-4 rounded-lg border border-border bg-secondary p-6">
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><Upload className="h-5 w-5" />Upload Authentication Image</h2>
+        {previewUrl ? <div className="relative aspect-[1.5/1] overflow-hidden rounded-lg border-2 border-maroon/50 bg-slate-100"><img src={previewUrl} alt="Selected promotion preview" className="h-full w-full object-cover" /><div className="pointer-events-none absolute inset-0" style={overlayStyle} /></div> : <div className="cursor-pointer rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:border-maroon/50"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} className="hidden" id="image-upload" /><label htmlFor="image-upload" className="block cursor-pointer"><Upload className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="mb-1 font-semibold text-foreground">Click to upload image</p><p className="text-xs text-muted-foreground">JPG, PNG or WebP • Max 10MB • Recommended: 1920×1080px or wider</p></label></div>}
+        {selectedFile && <div className="flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-600"><Check className="h-4 w-4" />{selectedFile.name} selected</div>}
+        {previewUrl && <div className="flex gap-3"><button onClick={clearSelectedImage} disabled={uploading} className="btn-secondary flex-1">Cancel</button><button onClick={uploadImage} disabled={uploading || !selectedFile} className="btn-primary flex-1 justify-center gap-2">{uploading ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading…</> : <><Upload className="h-4 w-4" />Upload Image</>}</button></div>}
       </div>
 
-      {/* Delete Current Image */}
-      {config?.current_image_url && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2">
-            <Trash2 className="w-5 h-5" />
-            Delete Current Image
-          </h2>
+      {config?.current_image_url && <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-6"><h2 className="flex items-center gap-2 text-lg font-semibold text-red-600"><Trash2 className="h-5 w-5" />Delete Authentication Image</h2><p className="text-sm text-red-600">Remove the authentication image and revert to the default Vowza promotional background.</p><button onClick={deleteImage} disabled={uploading} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50">{uploading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Deleting…</> : <><Trash2 className="mr-2 inline h-4 w-4" />Delete Image</>}</button></div>}
 
-          <p className="text-sm text-red-600">
-            Remove the promotional image and revert to the default Vowza promotional background.
-          </p>
-
-          <button
-            onClick={deleteImage}
-            disabled={uploading}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors disabled:opacity-50"
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                Deleting…
-              </>
-            ) : (
-              <>
-                <Trash2 className="w-4 h-4 inline mr-2" />
-                Delete Image
-              </>
-            )}
-          </button>
-        </div>
-      )}
+      <section className="space-y-5 rounded-lg border border-border bg-secondary p-6">
+        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><Video className="h-5 w-5" />Homepage Promotion Media</h2><p className="mt-1 text-sm text-muted-foreground">Upload ordered photos and MP4/WebM videos for the homepage. It renders one sequential video card and three independently rotating photo cards; unpublished items never appear publicly.</p></div>
+        <div className="rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-maroon/50"><input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={handleHomepageMediaSelect} className="hidden" id="homepage-media-upload" multiple /><label htmlFor="homepage-media-upload" className="block cursor-pointer"><Upload className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="mb-1 font-semibold text-foreground">Select photos or videos</p><p className="text-xs text-muted-foreground">JPG, PNG, WebP, MP4, or WebM • Multiple files • Max 100MB each</p></label></div>
+        {selectedHomepageMedia.length > 0 && <><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selectedHomepageMedia.map((selection) => <div key={selection.previewUrl} className="overflow-hidden rounded-lg border border-border bg-background"><div className="aspect-video bg-slate-100">{selection.mediaType === 'image' ? <img src={selection.previewUrl} alt="Selected homepage promotion" className="h-full w-full object-cover" /> : <video src={selection.previewUrl} muted controls className="h-full w-full object-cover" />}</div><p className="truncate px-3 py-2 text-xs font-medium"><span className="mr-1 text-muted-foreground">{mediaTypeLabel(selection.mediaType)}:</span>{selection.file.name}</p></div>)}</div><div className="flex gap-3"><button type="button" onClick={clearSelectedHomepageMedia} disabled={mediaUploading} className="btn-secondary flex-1">Cancel</button><button type="button" onClick={uploadHomepageMedia} disabled={mediaUploading} className="btn-primary flex-1 justify-center gap-2">{mediaUploading ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading…</> : <><Upload className="h-4 w-4" />Upload Homepage Media</>}</button></div></>}
+        <div className="space-y-3 border-t border-border pt-5"><div className="flex items-baseline justify-between"><h3 className="font-semibold">Ordered homepage media</h3><span className="text-xs text-muted-foreground">{homepageMedia.length} item{homepageMedia.length === 1 ? '' : 's'}</span></div>{homepageMedia.length === 0 ? <p className="rounded-lg bg-background p-4 text-sm text-muted-foreground">No homepage media has been uploaded. The homepage keeps four branded placeholders until active media is available.</p> : homepageMedia.map((item, index) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"><div className="h-20 w-full shrink-0 overflow-hidden rounded-md bg-slate-100 sm:w-32">{item.media_type === 'image' ? <img src={item.media_url} alt="Homepage promotion" className="h-full w-full object-cover" /> : <video src={item.media_url} muted preload="metadata" className="h-full w-full object-cover" />}</div><div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-sm font-semibold">{item.media_type === 'image' ? <ImageIcon className="h-4 w-4" /> : <Video className="h-4 w-4" />}{mediaTypeLabel(item.media_type)} <span className={`rounded-full px-2 py-0.5 text-[10px] ${item.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{item.is_active ? 'Published' : 'Hidden'}</span></p><p className="mt-1 break-all text-xs text-muted-foreground">Order {item.display_order + 1} · {item.storage_path}</p></div><div className="flex shrink-0 flex-wrap gap-2"><button type="button" aria-label="Move media up" onClick={() => moveHomepageMedia(item, -1)} disabled={mediaUploading || index === 0} className="btn-secondary px-2"><ArrowUp className="h-4 w-4" /></button><button type="button" aria-label="Move media down" onClick={() => moveHomepageMedia(item, 1)} disabled={mediaUploading || index === homepageMedia.length - 1} className="btn-secondary px-2"><ArrowDown className="h-4 w-4" /></button><button type="button" onClick={() => toggleHomepageMediaActive(item)} disabled={mediaUploading} className="btn-secondary text-xs">{item.is_active ? 'Hide' : 'Publish'}</button><button type="button" onClick={() => deleteHomepageMedia(item)} disabled={mediaUploading} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"><Trash2 className="mr-1 inline h-3.5 w-3.5" />Delete</button></div></div>)}</div>
+      </section>
     </div>
   );
 };
