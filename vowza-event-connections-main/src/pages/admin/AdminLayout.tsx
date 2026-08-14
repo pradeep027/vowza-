@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { LogOut, ChevronLeft, Menu, Activity, Home,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
   Tag, Star, Megaphone, Bell, BarChart3, Ticket, FileText,
-  Globe, HeadphonesIcon, Settings, Shield, ClipboardList, Image
+  Globe, HeadphonesIcon, Settings, Shield, ClipboardList, Image, Gift
 } from 'lucide-react';
 
 type NavigationItem = {
@@ -32,6 +32,7 @@ const NAV: NavigationItem[] = [
   { label: 'Notifications',  icon: Bell,            path: '/admin/notifications', section: 'CONTENT' },
   { label: 'Analytics',      icon: BarChart3,       path: '/admin/analytics',     section: 'BUSINESS' },
   { label: 'Coupons',        icon: Ticket,          path: '/admin/coupons',       section: 'BUSINESS' },
+  { label: 'Event Packages', icon: Gift,            path: '/admin/event-packages',section: 'BUSINESS' },
   { label: 'Reports',        icon: FileText,        path: '/admin/reports',       section: 'BUSINESS' },
   { label: 'Support',        icon: HeadphonesIcon,  path: '/admin/support',       section: 'SERVICES' },
   { label: 'AI Planner',     icon: VowzaIcon,       path: '/admin/ai-planner',    section: 'SERVICES' },

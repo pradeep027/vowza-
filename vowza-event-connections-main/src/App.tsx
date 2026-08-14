@@ -53,6 +53,7 @@ const AdminAnnouncements   = lazy(() => import("./pages/admin/AdminAnnouncements
 const AdminNotifications   = lazy(() => import("./pages/admin/AdminNotifications"));
 const AdminAnalytics       = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminCoupons         = lazy(() => import("./pages/admin/AdminCoupons"));
+const AdminEventPackages   = lazy(() => import("./pages/admin/AdminEventPackages"));
 const AdminReports         = lazy(() => import("./pages/admin/AdminReports"));
 const AdminSupport         = lazy(() => import("./pages/admin/AdminSupport"));
 const AdminAIPlanner       = lazy(() => import("./pages/admin/AdminAIPlanner"));
@@ -163,6 +164,7 @@ const AppContent = () => {
             <Route path="notifications"element={<AdminNotifications />} />
             <Route path="analytics"    element={<AdminAnalytics />} />
             <Route path="coupons"      element={<AdminCoupons />} />
+            <Route path="event-packages" element={<AdminEventPackages />} />
             <Route path="reports"      element={<AdminReports />} />
             <Route path="support"      element={<AdminSupport />} />
             <Route path="ai-planner"   element={<AdminAIPlanner />} />

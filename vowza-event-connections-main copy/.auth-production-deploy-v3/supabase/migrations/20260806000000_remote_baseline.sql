@@ -1,0 +1,5 @@
+-- Historical remote baseline.
+-- This version was already applied to the linked Supabase project before this
+-- checkout was created. The original source migration is unavailable locally.
+-- Intentionally no-op: it exists only to keep local CLI history aligned with the
+-- remote migration ledger and must never be used to reapply production schema.

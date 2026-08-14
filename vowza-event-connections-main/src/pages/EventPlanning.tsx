@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useArtists } from '@/hooks/useArtists';
 import { eventTypes } from '@/data/services';
 import { getCategoriesForEvent, getBudgetDistribution } from '@/data/eventCategoryMappings';
+import { EventPackageSelector } from '@/components/EventPackageSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -223,6 +224,11 @@ const EventPlanning = () => {
         </div>
       </div>
       
+      {/* Admin Event Packages Section */}
+      <div className="container mx-auto px-4 py-12">
+        <EventPackageSelector eventTypeId={eventId || ''} eventTypeName={event?.name || ''} />
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Sidebar - Budget & Selection */}
