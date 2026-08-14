@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   Image as ImageIcon, Video, Upload, Plus, Trash2, Star,
-  Grid3X3, LayoutGrid, ExternalLink, Eye,
+  Grid3X3, LayoutGrid, ExternalLink, Eye, EyeOff,
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPortfolio } from '@/hooks/useVendorData';
 
@@ -15,6 +15,7 @@ export default function VendorPortfolio() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [view, setView] = useState<'grid' | 'large'>('grid');
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   const { data: provider } = useVendorId();
   const vendorId = provider?.id ?? null;
@@ -52,6 +53,7 @@ export default function VendorPortfolio() {
         media_url:   pub.publicUrl,
         media_type:  file.type.startsWith('video') ? 'video' : 'image',
         title:       file.name.replace(/\.[^.]+$/, ''),
+        is_published: false,  // NEW: Default to PRIVATE
       } as any);
 
       if (insErr) { toast.error(`${file.name}: ${insErr.message}`); continue; }
@@ -67,7 +69,18 @@ export default function VendorPortfolio() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  // ── Toggle visibility ─────────────────────────────────────────────────────
+  const toggleVisibility = async (item: any) => {
+    if (!vendorId) return;
+    const { error } = await supabase.from('portfolio_items')
+      .update({ is_published: !item.is_published } as any)
+      .eq('id', item.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(item.is_published ? 'Item hidden from public' : 'Item now public');
+    qc.invalidateQueries({ queryKey: ['vendor-portfolio'] });
+  };
+
+  // ── Delete portfolio item ──────────────────────────────────────────────────
   const handleDelete = async (item: any) => {
     if (!confirm('Delete this portfolio item permanently?\n\nThis will remove it from your portfolio and customer gallery.')) return;
 
@@ -206,7 +219,12 @@ export default function VendorPortfolio() {
           )}
           <div className={cn('grid gap-4', gridCls)}>
             {items.map((item: any) => (
-              <div key={item.id} className="relative group aspect-square rounded-2xl overflow-hidden bg-muted border border-border/60">
+              <div 
+                key={item.id} 
+                className="relative aspect-square rounded-2xl overflow-hidden bg-muted border border-border/60"
+                onMouseEnter={() => setHoveredItemId(item.id)}
+                onMouseLeave={() => setHoveredItemId(null)}
+              >
                 {item.media_type === 'video' ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 gap-2">
                     <Video className="w-10 h-10 text-white/50" />
@@ -214,29 +232,40 @@ export default function VendorPortfolio() {
                   </div>
                 ) : (
                   <img src={item.media_url} alt={item.title ?? ''} loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    className="w-full h-full object-cover transition-transform duration-300" style={{transform: hoveredItemId === item.id ? 'scale(1.05)' : 'scale(1)'}} />
                 )}
 
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <a href={item.media_url} target="_blank" rel="noopener noreferrer"
-                    className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white transition-colors" title="Open">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                  {item.media_type !== 'video' && !item.is_cover && (
-                    <button onClick={() => setCover(item)}
-                      className="p-2 rounded-full bg-white/90 text-[#D4AF37] hover:bg-white transition-colors" title="Set as cover">
-                      <Star className="w-4 h-4" />
+                {hoveredItemId === item.id && (
+                  <div className="absolute inset-0 bg-black/45 transition-colors flex items-center justify-center gap-2">
+                    <a href={item.media_url} target="_blank" rel="noopener noreferrer"
+                      className="p-2 rounded-full bg-white/90 text-foreground hover:bg-white transition-colors" title="Open">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <button onClick={() => toggleVisibility(item)}
+                      className="p-2 rounded-full bg-white/90 text-blue-600 hover:bg-white transition-colors" title={item.is_published ? 'Make Private' : 'Make Public'}>
+                      {item.is_published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                     </button>
-                  )}
-                  <button onClick={() => handleDelete(item)}
-                    className="p-2 rounded-full bg-white/90 text-red-600 hover:bg-white transition-colors" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                    {item.media_type !== 'video' && !item.is_cover && (
+                      <button onClick={() => setCover(item)}
+                        className="p-2 rounded-full bg-white/90 text-[#D4AF37] hover:bg-white transition-colors" title="Set as cover">
+                        <Star className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button onClick={() => handleDelete(item)}
+                      className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors font-bold" title="Delete this image">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
 
                 {item.is_cover && (
                   <span className="absolute top-2 left-2 text-[9px] font-bold bg-[#D4AF37] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
                     <Star className="w-2.5 h-2.5 fill-white" /> Cover
+                  </span>
+                )}
+                {!item.is_published && (
+                  <span className="absolute top-2 left-2 text-[9px] font-bold bg-gray-700 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                    PRIVATE
                   </span>
                 )}
                 {Number(item.view_count ?? 0) > 0 && (

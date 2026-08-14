@@ -172,7 +172,7 @@ const ProviderProfile = () => {
       if (prof) setProfile(prof);
 
       const [portRes, revRes, pkgRes, faqRes, menuRes, rentalRes, poojaRes] = await Promise.allSettled([
-        supabase.from("portfolio_items").select("*").eq("provider_id", id).order("created_at", { ascending: false }),
+        supabase.from("portfolio_items").select("*").eq("provider_id", id).eq("is_published", true).order("created_at", { ascending: false }),
         supabase.from("reviews").select("id,rating,review_text,created_at,customer_id").eq("provider_id", id).order("created_at", { ascending: false }).limit(15),
         supabase.from("pricing_packages" as any).select("*").eq("provider_id", id).order("sort_order"),
         supabase.from("provider_faqs" as any).select("*").eq("provider_id", id).order("sort_order"),
