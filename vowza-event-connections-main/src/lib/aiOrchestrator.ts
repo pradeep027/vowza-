@@ -47,6 +47,7 @@ export interface OrchestrationResult {
   contextSummary:   string;         // what we know so far — injected into LLM
   shouldAskNext:    string | null;  // next question if info is missing
   adminPackageContext?: string;     // NEW Phase 7E: admin packages context
+  liveAvailabilityContext?: string; // NEW Phase 7F: real-time availability
 }
 
 export type ResponseStrategy =
@@ -663,6 +664,8 @@ Detected intent this turn: ${result.intent}
 ${ragContext ? `\nRAG CONTEXT — REAL VOWZA MARKETPLACE DATA:\n${ragContext}\n\nWhen answering vendor questions, cite these real vendors by name and include their profile links.\n` : ''}
 
 ${result.adminPackageContext ? `\nADMIN EVENT PACKAGES — Phase 7E:\n${result.adminPackageContext}\n` : ''}
+
+${result.liveAvailabilityContext ? `\nREAL-TIME AVAILABILITY — Phase 7F:\n${result.liveAvailabilityContext}\n` : ''}
 
 RESPONSE STYLE:
 - Conversational, direct, helpful

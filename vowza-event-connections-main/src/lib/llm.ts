@@ -41,6 +41,7 @@ import {
 import { filterVendorsByDietaryPreference, formatDietaryFilterMessage, buildDietaryFilterContext } from './dietaryFilterer'; // NEW Phase 7C
 import { formatDetailedComparison, formatComparisonTable, createComparisonCard } from './vendorComparison'; // NEW Phase 7D
 import { formatAdminPackageRecommendation, formatAdminVsCustomComparison, shouldPrioritizeAdminPackage, buildAdminPackageContext } from './adminPackageHandler'; // NEW Phase 7E
+import { checkVendorAvailability, getAvailableSlots, formatAvailabilityStatus, buildLiveAvailabilityContext, createHold, formatBookingWithHold } from './realTimeAvailability'; // NEW Phase 7F
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
