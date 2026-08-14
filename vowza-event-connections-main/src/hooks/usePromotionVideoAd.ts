@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getActivePromotionVideo,
-  getAllEligiblePromotionVideos,
   recordPromotionView,
   type PromotionVideoWithViewStatus,
   PROMOTION_VIDEO_UPDATED_EVENT,
@@ -23,9 +22,8 @@ interface UsePromotionVideoAdResult {
  * Hook for managing promotional video ads.
  * 
  * Features:
- * - Fetches active promotion videos for authenticated users
- * - Implements ONE-TIME display per user (persisted via localStorage + RPC check)
- * - Random selection among eligible videos for new users
+ * - Fetches active promotion video for authenticated users
+ * - Implements ONE-TIME display per user (persisted via localStorage)
  * - Prevents double-counting via database UNIQUE constraint
  */
 export function usePromotionVideoAd(): UsePromotionVideoAdResult {
@@ -44,7 +42,9 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
   const hasUserAlreadySeenPromo = useCallback((): boolean => {
     try {
       const storedUserId = localStorage.getItem(PROMO_VIEWED_STORAGE_KEY);
-      return storedUserId === user?.id;
+      const alreadySeen = storedUserId === user?.id;
+      console.log('[usePromotionVideoAd] hasUserAlreadySeenPromo:', alreadySeen, 'stored:', storedUserId, 'current:', user?.id);
+      return alreadySeen;
     } catch (e) {
       console.warn('[usePromotionVideoAd] localStorage check failed:', e);
       return false;
@@ -55,7 +55,7 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
     try {
       if (user?.id) {
         localStorage.setItem(PROMO_VIEWED_STORAGE_KEY, user.id);
-        console.log('[usePromotionVideoAd] Marked promo as viewed for user:', user.id);
+        console.log('[usePromotionVideoAd] ✅ Marked promo as viewed for user:', user.id);
       }
     } catch (e) {
       console.warn('[usePromotionVideoAd] localStorage write failed:', e);
@@ -82,21 +82,18 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
 
     setIsLoading(true);
     try {
-      console.log('[usePromotionVideoAd] Fetching eligible promotion video for user:', user.id);
+      console.log('[usePromotionVideoAd] Fetching active promotion video for user:', user.id);
       
-      // Get ALL eligible videos (for random selection)
-      const eligibleVideos = await getAllEligiblePromotionVideos(user.id);
+      // Use proven RPC that returns active video
+      const activeVideo = await getActivePromotionVideo(user.id);
       
-      if (!eligibleVideos || eligibleVideos.length === 0) {
-        console.warn('[usePromotionVideoAd] No eligible promotion videos available');
+      if (!activeVideo) {
+        console.warn('[usePromotionVideoAd] No eligible promotion video available');
         setVideo(null);
       } else {
-        // Random selection among eligible videos
-        const selectedVideo = eligibleVideos[Math.floor(Math.random() * eligibleVideos.length)];
-        console.log('[usePromotionVideoAd] ✅ Randomly selected video from', eligibleVideos.length, 'eligible:', selectedVideo.id);
-        
-        setVideo(selectedVideo);
-        setHasUserViewed(selectedVideo.has_user_viewed ?? false);
+        console.log('[usePromotionVideoAd] ✅ Got video:', activeVideo.id);
+        setVideo(activeVideo);
+        setHasUserViewed(activeVideo.has_user_viewed ?? false);
       }
     } catch (error) {
       console.error('[usePromotionVideoAd] Exception in refresh():', error);
@@ -107,7 +104,10 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
   }, [user?.id, hasUserAlreadySeenPromo]);
 
   const recordView = useCallback(async (): Promise<boolean> => {
-    if (!user?.id || !video?.id) return false;
+    if (!user?.id || !video?.id) {
+      console.log('[usePromotionVideoAd] recordView() early exit - no user or video');
+      return false;
+    }
 
     // If user already viewed THIS VIDEO, skip recording to prevent double-count
     if (hasUserViewed) {
@@ -180,4 +180,5 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
   
   return returnValue;
 }
+
 
