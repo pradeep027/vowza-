@@ -557,9 +557,10 @@ const DesktopHero = () => {
               </motion.div>
 
               {/* Mobile/tablet: swipeable service card carousel */}
-              <div className="mt-6">
-                <HeroVisualMobile />
-              </div>
+              {/* NOTE: Mobile promotion media is handled by MobileHero component
+                  which is conditionally rendered via useIsMobile() in Hero.
+                  Do NOT render a second AuthPromotionMediaCards here — it creates
+                  a duplicate video that plays audio even when hidden. */}
             </div>
 
             {/* ── Right column: premium visual composition (desktop only) ── */}
