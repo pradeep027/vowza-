@@ -31,6 +31,193 @@ interface SelectedPromotionMedia {
 
 const mediaTypeLabel = (mediaType: AuthPromoMediaType) => mediaType === 'video' ? 'Video' : 'Photo';
 
+interface HomepageMediaSlotCardProps {
+  slotNumber: 1 | 2 | 3 | 4;
+  slotTitle: string;
+  slotDescription: string;
+  acceptedTypes: string;
+  mediaType: AuthPromoMediaType;
+  media: AuthPromotionMedia[];
+  onUpload: (file: File) => Promise<void>;
+  onDelete: (item: AuthPromotionMedia) => Promise<void>;
+  onToggleActive: (item: AuthPromotionMedia) => Promise<void>;
+  isUploading: boolean;
+}
+
+const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
+  slotNumber,
+  slotTitle,
+  slotDescription,
+  acceptedTypes,
+  mediaType,
+  media,
+  onUpload,
+  onDelete,
+  onToggleActive,
+  isUploading,
+}) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await validateAuthPromoMedia(file);
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    } catch (error) {
+      event.target.value = '';
+      toast.error(error instanceof Error ? error.message : `Please choose a valid ${mediaType} file.`);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+    try {
+      await onUpload(selectedFile);
+      setSelectedFile(null);
+      setPreviewUrl('');
+    } catch (error) {
+      console.error(`[AdminAuthPromo] Slot ${slotNumber} upload failed:`, error);
+      toast.error(error instanceof Error ? error.message : `Failed to upload ${mediaType}.`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    setPreviewUrl('');
+  };
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-6">
+      {/* Header */}
+      <div className="mb-4">
+        <h3 className="text-base font-semibold">{slotTitle}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{slotDescription}</p>
+      </div>
+
+      {/* Current Media Items */}
+      {media.length > 0 && (
+        <div className="mb-6 space-y-2 border-b border-border pb-4">
+          <p className="text-xs font-semibold text-muted-foreground">CURRENT ITEMS ({media.length})</p>
+          {media.map((item, index) => (
+            <div key={item.id} className="flex items-center gap-3 rounded-lg border border-border/50 bg-slate-50 p-3">
+              {/* Thumbnail */}
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
+                {item.media_type === 'image' ? (
+                  <img src={item.media_url} alt={`${mediaType} ${index + 1}`} className="h-full w-full object-cover" />
+                ) : (
+                  <video src={item.media_url} muted preload="metadata" className="h-full w-full object-cover" />
+                )}
+              </div>
+
+              {/* Details */}
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 text-sm font-semibold">
+                  {item.media_type === 'image' ? <ImageIcon className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                  Slot {item.slot_number}, Item {index + 1}
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${item.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                    {item.is_active ? 'Published' : 'Hidden'}
+                  </span>
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onToggleActive(item)}
+                  disabled={isUploading || uploading}
+                  className="btn-secondary text-xs px-2.5 py-1.5"
+                >
+                  {item.is_active ? 'Hide' : 'Publish'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(item)}
+                  disabled={isUploading || uploading}
+                  className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  <Trash2 className="inline h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload Section */}
+      {!previewUrl ? (
+        <div className="rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-maroon/50">
+          <input
+            type="file"
+            accept={acceptedTypes}
+            onChange={handleFileSelect}
+            className="hidden"
+            id={`slot-${slotNumber}-upload`}
+          />
+          <label htmlFor={`slot-${slotNumber}-upload`} className="block cursor-pointer">
+            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="font-semibold text-foreground">Upload {mediaType}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {mediaType === 'video' ? 'MP4 or WebM' : 'JPG, PNG or WebP'} • Max 100MB
+            </p>
+          </label>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="aspect-video overflow-hidden rounded-lg border-2 border-maroon/50 bg-slate-100">
+            {mediaType === 'image' ? (
+              <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+            ) : (
+              <video src={previewUrl} muted controls className="h-full w-full object-cover" />
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={uploading}
+              className="btn-secondary flex-1 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={uploading || !selectedFile}
+              className="btn-primary flex-1 justify-center gap-2 text-sm"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Upload {mediaType === 'video' ? 'Video' : 'Photo'}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const AdminAuthPromotionalManager: React.FC = () => {
   const { isAdmin } = useAdmin();
   const [config, setConfig] = useState<AuthPromoConfig | null>(null);
@@ -363,11 +550,73 @@ export const AdminAuthPromotionalManager: React.FC = () => {
 
       {config?.current_image_url && <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-6"><h2 className="flex items-center gap-2 text-lg font-semibold text-red-600"><Trash2 className="h-5 w-5" />Delete Authentication Image</h2><p className="text-sm text-red-600">Remove the authentication image and revert to the default Vowza promotional background.</p><button onClick={deleteImage} disabled={uploading} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50">{uploading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Deleting…</> : <><Trash2 className="mr-2 inline h-4 w-4" />Delete Image</>}</button></div>}
 
-      <section className="space-y-5 rounded-lg border border-border bg-secondary p-6">
-        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><Video className="h-5 w-5" />Homepage Promotion Media</h2><p className="mt-1 text-sm text-muted-foreground">Upload ordered photos and MP4/WebM videos for the homepage. It renders one sequential video card and three independently rotating photo cards; unpublished items never appear publicly.</p></div>
-        <div className="rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-maroon/50"><input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={handleHomepageMediaSelect} className="hidden" id="homepage-media-upload" multiple /><label htmlFor="homepage-media-upload" className="block cursor-pointer"><Upload className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="mb-1 font-semibold text-foreground">Select photos or videos</p><p className="text-xs text-muted-foreground">JPG, PNG, WebP, MP4, or WebM • Multiple files • Max 100MB each</p></label></div>
-        {selectedHomepageMedia.length > 0 && <><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selectedHomepageMedia.map((selection) => <div key={selection.previewUrl} className="overflow-hidden rounded-lg border border-border bg-background"><div className="aspect-video bg-slate-100">{selection.mediaType === 'image' ? <img src={selection.previewUrl} alt="Selected homepage promotion" className="h-full w-full object-cover" /> : <video src={selection.previewUrl} muted controls className="h-full w-full object-cover" />}</div><p className="truncate px-3 py-2 text-xs font-medium"><span className="mr-1 text-muted-foreground">{mediaTypeLabel(selection.mediaType)}:</span>{selection.file.name}</p></div>)}</div><div className="flex gap-3"><button type="button" onClick={clearSelectedHomepageMedia} disabled={mediaUploading} className="btn-secondary flex-1">Cancel</button><button type="button" onClick={uploadHomepageMedia} disabled={mediaUploading} className="btn-primary flex-1 justify-center gap-2">{mediaUploading ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading…</> : <><Upload className="h-4 w-4" />Upload Homepage Media</>}</button></div></>}
-        <div className="space-y-3 border-t border-border pt-5"><div className="flex items-baseline justify-between"><h3 className="font-semibold">Ordered homepage media</h3><span className="text-xs text-muted-foreground">{homepageMedia.length} item{homepageMedia.length === 1 ? '' : 's'}</span></div>{homepageMedia.length === 0 ? <p className="rounded-lg bg-background p-4 text-sm text-muted-foreground">No homepage media has been uploaded. The homepage keeps four branded placeholders until active media is available.</p> : homepageMedia.map((item, index) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"><div className="h-20 w-full shrink-0 overflow-hidden rounded-md bg-slate-100 sm:w-32">{item.media_type === 'image' ? <img src={item.media_url} alt="Homepage promotion" className="h-full w-full object-cover" /> : <video src={item.media_url} muted preload="metadata" className="h-full w-full object-cover" />}</div><div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-sm font-semibold">{item.media_type === 'image' ? <ImageIcon className="h-4 w-4" /> : <Video className="h-4 w-4" />}{mediaTypeLabel(item.media_type)} <span className={`rounded-full px-2 py-0.5 text-[10px] ${item.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{item.is_active ? 'Published' : 'Hidden'}</span></p><p className="mt-1 break-all text-xs text-muted-foreground">Order {item.display_order + 1} · {item.storage_path}</p></div><div className="flex shrink-0 flex-wrap gap-2"><button type="button" aria-label="Move media up" onClick={() => moveHomepageMedia(item, -1)} disabled={mediaUploading || index === 0} className="btn-secondary px-2"><ArrowUp className="h-4 w-4" /></button><button type="button" aria-label="Move media down" onClick={() => moveHomepageMedia(item, 1)} disabled={mediaUploading || index === homepageMedia.length - 1} className="btn-secondary px-2"><ArrowDown className="h-4 w-4" /></button><button type="button" onClick={() => toggleHomepageMediaActive(item)} disabled={mediaUploading} className="btn-secondary text-xs">{item.is_active ? 'Hide' : 'Publish'}</button><button type="button" onClick={() => deleteHomepageMedia(item)} disabled={mediaUploading} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"><Trash2 className="mr-1 inline h-3.5 w-3.5" />Delete</button></div></div>)}</div>
+      <section className="space-y-6 rounded-lg border border-border bg-secondary p-6">
+        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><Video className="h-5 w-5" />Homepage Promotion Media</h2><p className="mt-1 text-sm text-muted-foreground">Manage four fixed media cards on the homepage. Upload video or photos for each position. Each slot can have multiple items that rotate/loop on the homepage; unpublished items never appear publicly.</p></div>
+
+        {/* VIDEO CARD - Slot 1 */}
+        <HomepageMediaSlotCard
+          slotNumber={1}
+          slotTitle="Video Card"
+          slotDescription="Homepage top-left video position"
+          acceptedTypes="video/mp4,video/webm"
+          mediaType="video"
+          media={homepageMedia.filter((m) => m.slot_number === 1)}
+          onUpload={async (file) => {
+            const uploaded = await uploadAuthPromoMedia(file);
+            try {
+              const created = await createAuthPromotionMedia({
+                media_type: uploaded.mediaType,
+                media_url: uploaded.url,
+                storage_path: uploaded.path,
+                display_order: Math.max(...homepageMedia.filter((m) => m.slot_number === 1).map((m) => m.display_order), -1) + 1,
+                slot_number: 1,
+              });
+              setHomepageMedia((current) => [...current, created].sort((a, b) => a.display_order - b.display_order));
+              notifyAuthPromoUpdated();
+              toast.success('Video uploaded successfully.');
+            } catch (persistError) {
+              await deleteAuthPromoImage(uploaded.path);
+              throw persistError;
+            }
+          }}
+          onDelete={(item) => deleteHomepageMedia(item)}
+          onToggleActive={(item) => toggleHomepageMediaActive(item)}
+          isUploading={mediaUploading}
+        />
+
+        {/* PHOTO CARDS - Slots 2, 3, 4 */}
+        {[2, 3, 4].map((slotNum) => (
+          <HomepageMediaSlotCard
+            key={slotNum}
+            slotNumber={slotNum}
+            slotTitle={`Photo Card ${slotNum - 1}`}
+            slotDescription={['top-right', 'bottom-left', 'bottom-right'][slotNum - 2] ? `Homepage ${['top-right', 'bottom-left', 'bottom-right'][slotNum - 2]} photo position` : ''}
+            acceptedTypes="image/jpeg,image/png,image/webp"
+            mediaType="image"
+            media={homepageMedia.filter((m) => m.slot_number === slotNum)}
+            onUpload={async (file) => {
+              const uploaded = await uploadAuthPromoMedia(file);
+              try {
+                const created = await createAuthPromotionMedia({
+                  media_type: uploaded.mediaType,
+                  media_url: uploaded.url,
+                  storage_path: uploaded.path,
+                  display_order: Math.max(...homepageMedia.filter((m) => m.slot_number === slotNum).map((m) => m.display_order), -1) + 1,
+                  slot_number: slotNum,
+                });
+                setHomepageMedia((current) => [...current, created].sort((a, b) => a.display_order - b.display_order));
+                notifyAuthPromoUpdated();
+                toast.success('Photo uploaded successfully.');
+              } catch (persistError) {
+                await deleteAuthPromoImage(uploaded.path);
+                throw persistError;
+              }
+            }}
+            onDelete={(item) => deleteHomepageMedia(item)}
+            onToggleActive={(item) => toggleHomepageMediaActive(item)}
+            isUploading={mediaUploading}
+          />
+        ))}
       </section>
     </div>
   );

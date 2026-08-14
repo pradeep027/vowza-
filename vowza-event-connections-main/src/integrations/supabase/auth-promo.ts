@@ -293,7 +293,7 @@ export const uploadAuthPromoMedia = async (
 };
 
 export const createAuthPromotionMedia = async (
-  media: Pick<AuthPromotionMedia, 'media_type' | 'media_url' | 'storage_path' | 'display_order'>,
+  media: Pick<AuthPromotionMedia, 'media_type' | 'media_url' | 'storage_path' | 'display_order' | 'slot_number'>,
 ): Promise<AuthPromotionMedia> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
