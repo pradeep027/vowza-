@@ -258,6 +258,9 @@ export const fetchActiveAuthPromotionMedia = async (): Promise<AuthPromotionMedi
     .from('auth_promotion_media')
     .select('*')
     .eq('is_active', true)
+    .eq('media_type', 'image')
+    .in('slot_number', [1, 2, 3, 4])
+    .order('slot_number', { ascending: true })
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true });
 
