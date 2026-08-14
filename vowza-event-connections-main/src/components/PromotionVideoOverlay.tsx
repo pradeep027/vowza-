@@ -21,7 +21,11 @@ interface PromotionVideoOverlayProps {
  */
 const PromotionVideoOverlay = memo(
   ({ video, onClose, onViewRecorded }: PromotionVideoOverlayProps) => {
-    console.log('[PromotionVideoOverlay] Component rendering with video:', video.id);
+    console.log('[PromotionVideoOverlay] Component rendering with video:', {
+      id: video.id,
+      video_url: video.video_url,
+      display_position: video.display_position,
+    });
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -115,8 +119,10 @@ const PromotionVideoOverlay = memo(
                     controlsList="nodownload noplaybackrate nofullscreen"
                     disablePictureInPicture
                     onPlay={handlePlayStart}
-                    onError={() => {
-                      console.error('[PromotionVideoOverlay] Video playback error');
+                    onError={(e) => {
+                      console.error('[PromotionVideoOverlay] ❌ Video playback error event:', e);
+                      console.error('[PromotionVideoOverlay] Video element error code:', videoRef.current?.error?.code, videoRef.current?.error?.message);
+                      console.error('[PromotionVideoOverlay] Attempted URL:', video.video_url);
                       setHasError(true);
                     }}
                     className="absolute inset-0 w-full h-full object-contain"

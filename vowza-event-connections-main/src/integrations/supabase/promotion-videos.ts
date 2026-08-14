@@ -213,8 +213,30 @@ export const getActivePromotionVideo = async (
     console.warn('  3. Video unique_users_reached >= user_limit');
     return null;
   }
-  console.log('[promotionVideos] RPC success - returning first video:', data[0]);
-  return data[0] as PromotionVideoWithViewStatus;
+  
+  const video = data[0] as PromotionVideoWithViewStatus;
+  console.log('[promotionVideos] ✅ RPC success - video object:', {
+    id: video.id,
+    video_url: video.video_url,
+    has_user_viewed: video.has_user_viewed,
+    unique_users_reached: video.unique_users_reached,
+    user_limit: video.user_limit,
+    is_active: video.is_active,
+    display_position: video.display_position,
+  });
+  
+  // Validate URL is not empty
+  if (!video.video_url) {
+    console.error('[promotionVideos] ❌ ERROR: video_url is empty/null!');
+    return null;
+  }
+  
+  // Check if URL looks valid
+  if (!video.video_url.includes('supabase.co') && !video.video_url.startsWith('http')) {
+    console.error('[promotionVideos] ❌ ERROR: video_url looks invalid:', video.video_url);
+  }
+  
+  return video;
 };
 
 /**
