@@ -153,7 +153,7 @@ const PromotionVideoOverlay = memo(
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className={`fixed ${positionClasses} z-[9999] w-[calc(100vw-24px)] sm:w-auto sm:max-w-md lg:max-w-lg pointer-events-auto safe-area-inset`}
+          className={`fixed ${positionClasses} z-[9999] w-[calc(100vw-24px)] sm:w-96 md:w-[500px] lg:w-[600px] pointer-events-auto safe-area-inset`}
         >
           {/* Main overlay container */}
           <div className="relative overflow-hidden rounded-2xl bg-black shadow-2xl border border-white/10">
