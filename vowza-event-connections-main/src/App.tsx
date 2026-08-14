@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import InactivityWarning from "@/components/InactivityWarning";
 import BookAnArtistFloat from "@/components/BookAnArtistFloat";
+import PromotionVideoOverlay from "@/components/PromotionVideoOverlay";
+import { usePromotionVideoAd } from "@/hooks/usePromotionVideoAd";
 
 const Index                = lazy(() => import("./pages/Index"));
 const Auth                 = lazy(() => import("./pages/Auth"));
@@ -118,6 +120,16 @@ const queryClient = new QueryClient({
 // ─── AppContent — uses router context so hooks like useNavigate work ──────────
 const AppContent = () => {
   useInactivityLogout();
+  const { video, recordView } = usePromotionVideoAd();
+  const [showOverlay, setShowOverlay] = useState(true);
+
+  const handleClose = () => {
+    setShowOverlay(false);
+  };
+
+  const handleViewRecorded = async () => {
+    await recordView();
+  };
 
   return (
     <>
@@ -215,6 +227,13 @@ const AppContent = () => {
       </Suspense>
 
       {/* Global overlays — always visible regardless of route */}
+      {video && showOverlay && (
+        <PromotionVideoOverlay
+          video={video}
+          onClose={handleClose}
+          onViewRecorded={handleViewRecorded}
+        />
+      )}
       <InactivityWarning />
       <BookAnArtistFloat />
     </>

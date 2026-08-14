@@ -200,10 +200,13 @@ export interface AuthPromotionMedia {
   media_url: string;
   storage_path: string;
   display_order: number;
+  slot_number?: number; // 1-4 for fixed slots, null for unassigned
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
+
+export type HomepagePromotionSlotNumber = 1 | 2 | 3 | 4;
 
 type AuthPromotionMediaUpdates = Partial<
   Pick<AuthPromotionMedia, 'display_order' | 'is_active'>

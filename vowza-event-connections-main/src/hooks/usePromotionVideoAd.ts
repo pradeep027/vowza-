@@ -1,0 +1,98 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  getActivePromotionVideo,
+  recordPromotionView,
+  type PromotionVideoWithViewStatus,
+  PROMOTION_VIDEO_UPDATED_EVENT,
+} from '@/integrations/supabase/promotion-videos';
+
+const CHANNEL_NAME = 'vowza-promotion-videos';
+
+interface UsePromotionVideoAdResult {
+  video: PromotionVideoWithViewStatus | null;
+  isLoading: boolean;
+  hasUserViewed: boolean;
+  recordView: () => Promise<boolean>;
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Hook for managing promotional video ads.
+ * Fetches the active promotion video for the authenticated user and handles view tracking.
+ * Only authenticated users see promotions.
+ */
+export function usePromotionVideoAd(): UsePromotionVideoAdResult {
+  const { user } = useAuth();
+  const [video, setVideo] = useState<PromotionVideoWithViewStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasUserViewed, setHasUserViewed] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!user?.id) {
+      setVideo(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const activeVideo = await getActivePromotionVideo(user.id);
+      setVideo(activeVideo);
+      setHasUserViewed(activeVideo?.has_user_viewed ?? false);
+    } catch (error) {
+      console.error('[usePromotionVideoAd] Failed to fetch active promotion video:', error);
+      setVideo(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
+  const recordView = useCallback(async (): Promise<boolean> => {
+    if (!user?.id || !video?.id) return false;
+
+    try {
+      const recorded = await recordPromotionView(video.id, user.id);
+      if (recorded) {
+        // Update local state to prevent double-showing
+        setHasUserViewed(true);
+        // Refresh to get next video in sequence
+        await refresh();
+      }
+      return recorded;
+    } catch (error) {
+      console.error('[usePromotionVideoAd] Failed to record view:', error);
+      return false;
+    }
+  }, [user?.id, video?.id, refresh]);
+
+  // Fetch active video on mount and when user changes
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // Listen for updates across tabs and from admin changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_NAME) : null;
+    const onMessage = () => void refresh();
+
+    window.addEventListener(PROMOTION_VIDEO_UPDATED_EVENT, onMessage);
+    channel?.addEventListener('message', onMessage);
+
+    return () => {
+      window.removeEventListener(PROMOTION_VIDEO_UPDATED_EVENT, onMessage);
+      channel?.removeEventListener('message', onMessage);
+      channel?.close();
+    };
+  }, [user?.id, refresh]);
+
+  return {
+    video: video && !hasUserViewed ? video : null, // Only show if user hasn't viewed
+    isLoading,
+    hasUserViewed,
+    recordView,
+    refresh,
+  };
+}
