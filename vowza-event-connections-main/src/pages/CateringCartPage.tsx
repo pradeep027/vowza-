@@ -135,6 +135,10 @@ export default function CateringCartPage() {
       const { data: freshPkg } = await supabase.from('catering_packages' as any).select('id, status').eq('id', pkg.id).single();
       if (!freshPkg || freshPkg.status !== 'active') { toast.error('This package is no longer available'); setBusy(false); return; }
 
+      // Self-booking check: vendor cannot book their own package
+      const { data: vendorCheck } = await supabase.from('provider_profiles' as any).select('id').eq('id', provider.id).eq('user_id', user.id).single();
+      if (vendorCheck) { toast.error('You cannot book your own package.'); setBusy(false); return; }
+
       // Double-booking check
       const { data: existing } = await supabase.from('catering_bookings' as any).select('id').eq('package_id', pkg.id).eq('customer_id', user.id).eq('event_date', event.eventDate).neq('status', 'cancelled');
       if (existing && existing.length > 0) { toast.error('You already have a booking for this package on this date'); setBusy(false); return; }
