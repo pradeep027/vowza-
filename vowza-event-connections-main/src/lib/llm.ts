@@ -448,6 +448,43 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     }
   }
 
+  // ─── PHASE 7A: Handle booking requests ──────────────────────────────────────
+  if (orch.intent === 'booking_request') {
+    // Import booking handler
+    const { handleBookingRequest, formatBookingResponse, generateBookingData } = await import('./bookingHandler');
+    
+    // Get prior vendors from message history or current context
+    let priorVendors: any[] = [];
+    for (const msg of history.reverse()) {
+      if (msg.role === 'assistant' && msg.type === 'vendor_results' && msg.data?.dbVendors) {
+        priorVendors = msg.data.dbVendors;
+        break;
+      }
+    }
+    
+    console.log('[Vowza AI Phase 7A] Booking request detected:', {
+      message,
+      priorVendorsCount: priorVendors.length,
+    });
+    
+    const booking = await handleBookingRequest(message, priorVendors, updatedContext, currentPlan || null);
+    const bookingText = formatBookingResponse(booking);
+    
+    await streamDeterministic(bookingText, onChunk);
+    return {
+      fullText: bookingText,
+      aiResponse: {
+        type: 'booking_request',
+        text: bookingText,
+        data: generateBookingData(booking, updatedContext, currentPlan || undefined),
+      },
+      updatedContext,
+      generatedPlan,
+      recommendedPackages: [],
+    };
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   // 3. Vendor discovery
   const explicitVendorRequest = /\b(show|find|search|display|list|profiles?)\s+(me\s+)?(all\s+)?(the\s+)?(verified\s+)?(vowza\s+)?(photographer|videographer|decorator|caterer|dj|band|makeup|artist|vendor|provider)\w*/i.test(message);
   

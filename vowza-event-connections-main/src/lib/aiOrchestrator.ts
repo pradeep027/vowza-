@@ -27,6 +27,7 @@ export type Intent =
   | 'success_score'       // "score my plan"
   | 'negotiation'         // "help negotiate with vendor"
   | 'comparison'          // "compare these two options"
+  | 'booking_request'     // "book this photographer" / "reserve vendor" (NEW Phase 7A)
   | 'general_question'    // "what is Gruhapravesam"
   | 'context_update'      // "change city to mumbai" / "increase budget"
   | 'follow_up'           // "tell me more about that" / "that one"
@@ -197,7 +198,14 @@ function classifyIntent(
       return 'comparison';
     }
 
-    const asksForMarketplaceRecords = /find|show|search|recommend|suggest|best|top|available|list|book|profile|profiles|vendor|vendors|provider|providers|need|looking for|hire|want/i.test(l);
+    // Booking request — when user explicitly asks to book/reserve/schedule
+    // NEW Phase 7A: Separate booking from vendor discovery
+    const isBookingRequest = /\b(book|reserve|schedule.*consultation|next.*available|want to book|ready to book|let's book|proceed with booking|confirm booking|book now)/i.test(l);
+    if (isBookingRequest) {
+      return 'booking_request';
+    }
+
+    const asksForMarketplaceRecords = /find|show|search|recommend|suggest|best|top|available|list|profile|profiles|vendor|vendors|provider|providers|need|looking for|hire|want/i.test(l);
     const isShortCategoryRequest = l.split(/\s+/).filter(Boolean).length <= 4;
     if (asksForMarketplaceRecords || isShortCategoryRequest || /under|below|within|cheap|affordable/i.test(l) || /in\s+\w+/i.test(l)) {
       return 'find_vendors';

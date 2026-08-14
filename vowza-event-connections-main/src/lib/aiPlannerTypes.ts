@@ -295,6 +295,7 @@ export interface EventPlan {
 export type ResponseType =
   | "text" | "question" | "tip"
   | "budget_plan" | "timeline" | "vendor_recommendations" | "vendor_results" | "category_results"
+  | "booking_request"  // NEW Phase 7A: Booking request handler
   | "weather_advice" | "checklist" | "food_plan"
   | "negotiation" | "risk_analysis" | "success_score"
   | "full_plan" | "wedding_plan";
