@@ -32,6 +32,9 @@ import {
   extractCityFromText,
   extractBudgetFromText,
   extractGuestCountFromText,
+  extractEventDateFromText,  // NEW Phase 7B
+  formatEventDate,           // NEW Phase 7B
+  checkDateAvailability,     // NEW Phase 7B
 } from './eventContextCapturer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

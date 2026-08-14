@@ -395,6 +395,24 @@ export function extractPlanState(
 }
 
 function extractEventDate(text: string): string | undefined {
+  // NEW Phase 7B: Use enhanced date extraction from eventContextCapturer
+  // This replaces the basic regex-only extraction with comprehensive parsing
+  
+  // Import the enhanced function locally
+  const { extractEventDateFromText, formatEventDate } = require('./eventContextCapturer');
+  
+  try {
+    const dateObj = extractEventDateFromText(text);
+    if (!dateObj) return undefined;
+    
+    // Convert Date object to ISO string format (YYYY-MM-DD)
+    const iso = dateObj.toISOString().split('T')[0];
+    return iso;
+  } catch (e) {
+    // Fallback to original logic if enhanced extraction fails
+  }
+
+  // Original fallback logic
   const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
 

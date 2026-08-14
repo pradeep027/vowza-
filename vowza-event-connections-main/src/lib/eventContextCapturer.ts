@@ -392,3 +392,215 @@ export function getExtractionConfidence(
   return 0.6;
 }
 
+
+
+// ─── Event Date Extraction (NEW Phase 7B) ──────────────────────────────────
+/**
+ * Extract event date from user message
+ * Supports multiple formats:
+ * - Absolute dates: "June 15", "15-06-2026", "June 15 2026"
+ * - Relative dates: "2 weeks from now", "next month", "in 30 days"
+ * - Fuzzy dates: "summer 2026", "winter", "monsoon season"
+ * - Days of week: "next Saturday", "this Friday"
+ */
+export function extractEventDateFromText(text: string): Date | null {
+  if (!text || typeof text !== 'string') return null;
+
+  const now = new Date();
+  const msg = text.toLowerCase().trim();
+
+  // Pattern 1: Relative days ("2 weeks from now", "in 30 days", "next month")
+  const relativePattern = /(?:in|within|about|around|roughly)\s+(\d+)\s+(days?|weeks?|months?|years?)/i;
+  const relativeMatch = msg.match(relativePattern);
+  if (relativeMatch) {
+    const value = parseInt(relativeMatch[1]);
+    const unit = relativeMatch[2].toLowerCase();
+    const result = new Date(now);
+    
+    if (unit.startsWith('day')) result.setDate(result.getDate() + value);
+    else if (unit.startsWith('week')) result.setDate(result.getDate() + value * 7);
+    else if (unit.startsWith('month')) result.setMonth(result.getMonth() + value);
+    else if (unit.startsWith('year')) result.setFullYear(result.getFullYear() + value);
+    
+    return result;
+  }
+
+  // Pattern 2: "next month", "this month", "next week"
+  if (/^(next|this)\s+(month|week|year)$/i.test(msg)) {
+    const result = new Date(now);
+    if (msg.includes('next month')) result.setMonth(result.getMonth() + 1);
+    else if (msg.includes('next week')) result.setDate(result.getDate() + 7);
+    else if (msg.includes('next year')) result.setFullYear(result.getFullYear() + 1);
+    return result;
+  }
+
+  // Pattern 3: Days of week ("next Saturday", "this Friday")
+  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayPattern = new RegExp(`(next|this|this coming)\\s+(${daysOfWeek.join('|')})`, 'i');
+  const dayMatch = msg.match(dayPattern);
+  if (dayMatch) {
+    const targetDay = daysOfWeek.indexOf(dayMatch[2].toLowerCase());
+    const result = new Date(now);
+    const currentDay = result.getDay();
+    let daysAhead = targetDay - currentDay;
+    
+    if (dayMatch[1].toLowerCase() === 'next') {
+      if (daysAhead <= 0) daysAhead += 7;
+    } else {
+      // "this Friday"
+      if (daysAhead <= 0) daysAhead = 0; // If today is Friday and they say "this Friday", use today
+      if (daysAhead === 0 && targetDay === currentDay) daysAhead = 0;
+    }
+    
+    result.setDate(result.getDate() + daysAhead);
+    return result;
+  }
+
+  // Pattern 4: Absolute dates (Multiple formats)
+  // Format: "June 15", "June 15 2026", "15-06-2026", "15/06/2026", "15.06.2026"
+  const months = ['january', 'february', 'march', 'april', 'may', 'june',
+                   'july', 'august', 'september', 'october', 'november', 'december'];
+  const monthPattern = `(${months.join('|')})`;
+  
+  // "June 15" or "June 15 2026"
+  const monthDayPattern = new RegExp(`${monthPattern}\\s+(\\d{1,2})(?:\\s+(\\d{4}))?`, 'i');
+  const monthDayMatch = msg.match(monthDayPattern);
+  if (monthDayMatch) {
+    const month = months.indexOf(monthDayMatch[1].toLowerCase());
+    const day = parseInt(monthDayMatch[2]);
+    const year = monthDayMatch[3] ? parseInt(monthDayMatch[3]) : now.getFullYear();
+    
+    const result = new Date(year, month, day);
+    // If the constructed date is in the past, assume next year
+    if (result < now) {
+      result.setFullYear(year + 1);
+    }
+    return result;
+  }
+
+  // "15 June" or "15 June 2026"
+  const dayMonthPattern = new RegExp(`(\\d{1,2})\\s+${monthPattern}(?:\\s+(\\d{4}))?`, 'i');
+  const dayMonthMatch = msg.match(dayMonthPattern);
+  if (dayMonthMatch) {
+    const day = parseInt(dayMonthMatch[1]);
+    const month = months.indexOf(dayMonthMatch[2].toLowerCase());
+    const year = dayMonthMatch[3] ? parseInt(dayMonthMatch[3]) : now.getFullYear();
+    
+    const result = new Date(year, month, day);
+    if (result < now) {
+      result.setFullYear(year + 1);
+    }
+    return result;
+  }
+
+  // Numeric formats: "15-06-2026", "15/06/2026", "06/15/2026"
+  const numericPattern = /(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/;
+  const numericMatch = msg.match(numericPattern);
+  if (numericMatch) {
+    const part1 = parseInt(numericMatch[1]);
+    const part2 = parseInt(numericMatch[2]);
+    const year = parseInt(numericMatch[3]);
+    
+    // Try DD-MM-YYYY first (common in India)
+    let month = part2 - 1;
+    let day = part1;
+    
+    if (month > 11) {
+      // If month > 11, try MM-DD-YYYY format
+      month = part1 - 1;
+      day = part2;
+    }
+    
+    if (day > 31) {
+      // If day > 31, swap
+      [day, month] = [month + 1, day - 1];
+    }
+    
+    const result = new Date(year, month, day);
+    return result;
+  }
+
+  // Pattern 5: Season/Month names ("August", "summer", "monsoon")
+  const monthMatch = msg.match(new RegExp(monthPattern, 'i'));
+  if (monthMatch) {
+    const month = months.indexOf(monthMatch[0].toLowerCase());
+    const result = new Date(now.getFullYear(), month, 1);
+    
+    // If the month is in the past, move to next year
+    if (result < now) {
+      result.setFullYear(now.getFullYear() + 1);
+    }
+    
+    return result;
+  }
+
+  // Pattern 6: Seasons
+  const seasonMap: Record<string, number> = {
+    'summer': 5, // June
+    'monsoon': 6, // July
+    'autumn': 8, // September
+    'fall': 8,
+    'winter': 11, // December
+    'spring': 2, // March
+  };
+
+  for (const [season, month] of Object.entries(seasonMap)) {
+    if (msg.includes(season)) {
+      const result = new Date(now.getFullYear(), month, 1);
+      if (result < now) {
+        result.setFullYear(now.getFullYear() + 1);
+      }
+      return result;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Format event date for display
+ * Returns human-readable format like "June 15, 2026" or "in 30 days"
+ */
+export function formatEventDate(date: Date): string {
+  if (!date) return 'TBD';
+
+  const now = new Date();
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                   'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+
+  // Calculate days from now
+  const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff > 1 && diff <= 30) return `in ${diff} days`;
+  if (diff > 30 && diff <= 60) return `in ${Math.round(diff / 7)} weeks`;
+
+  return `${month} ${day}, ${year}`;
+}
+
+/**
+ * Check vendor availability on event date
+ * Returns: 'available' | 'unavailable' | 'not_checked'
+ */
+export function checkDateAvailability(
+  vendorId: string,
+  eventDate: Date | null,
+  unavailableDates: Array<{ date: string; reason: string }>
+): 'available' | 'unavailable' | 'not_checked' {
+  if (!eventDate || !vendorId) return 'not_checked';
+
+  const eventDateStr = eventDate.toISOString().split('T')[0]; // "2026-06-15"
+
+  for (const unavailable of unavailableDates) {
+    if (unavailable.date === eventDateStr) {
+      return 'unavailable';
+    }
+  }
+
+  return 'available';
+}
