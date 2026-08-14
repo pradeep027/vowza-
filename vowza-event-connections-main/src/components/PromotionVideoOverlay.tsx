@@ -21,6 +21,7 @@ interface PromotionVideoOverlayProps {
  */
 const PromotionVideoOverlay = memo(
   ({ video, onClose, onViewRecorded }: PromotionVideoOverlayProps) => {
+    console.log('[PromotionVideoOverlay] Component rendering with video:', video.id);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -82,14 +83,20 @@ const PromotionVideoOverlay = memo(
     }[video.display_position];
 
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
-          className={`fixed ${positionClasses} z-50 max-w-sm pointer-events-auto`}
-        >
+      <>
+        {/* DEBUG: Render indicator */}
+        <div style={{position: 'fixed', top: '10px', right: '10px', background: 'yellow', padding: '10px', zIndex: 99999, fontSize: '12px'}}>
+          Video Overlay Active
+        </div>
+        
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className={`fixed ${positionClasses} z-[9999] max-w-sm pointer-events-auto`}
+          >
           {/* Main overlay container */}
           <div className="relative overflow-hidden rounded-2xl bg-black shadow-2xl border border-white/10">
             {/* Video aspect ratio container (16:9) */}
@@ -185,7 +192,8 @@ const PromotionVideoOverlay = memo(
             <p>Click X to close • Hover to unmute</p>
           </div>
         </motion.div>
-      </AnimatePresence>
+        </AnimatePresence>
+      </>
     );
   },
 );

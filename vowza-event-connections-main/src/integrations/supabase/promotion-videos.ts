@@ -191,17 +191,29 @@ export const deletePromotionVideo = async (videoId: string): Promise<void> => {
 export const getActivePromotionVideo = async (
   userId: string,
 ): Promise<PromotionVideoWithViewStatus | null> => {
+  console.log('[promotionVideos] Calling RPC with userId:', userId);
   const { data, error } = await supabase.rpc(
     'get_active_promotion_video',
     { p_user_id: userId },
   );
 
+  console.log('[promotionVideos] RPC raw response - data:', data, 'error:', error);
+
   if (error) {
-    console.error('[promotionVideos] getActivePromotionVideo RPC error:', error);
+    console.error('[promotionVideos] getActivePromotionVideo RPC ERROR:', error.message, error.code, error);
     return null;
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] RPC returned empty or null - data:', data);
+    console.warn('[promotionVideos] This means NO active videos found for this user');
+    console.warn('[promotionVideos] Possible reasons:');
+    console.warn('  1. No videos in auth_promotion_videos table');
+    console.warn('  2. Video is_active = FALSE');
+    console.warn('  3. Video unique_users_reached >= user_limit');
+    return null;
+  }
+  console.log('[promotionVideos] RPC success - returning first video:', data[0]);
   return data[0] as PromotionVideoWithViewStatus;
 };
 
