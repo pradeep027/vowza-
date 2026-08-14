@@ -35,7 +35,10 @@ import {
   extractEventDateFromText,  // NEW Phase 7B
   formatEventDate,           // NEW Phase 7B
   checkDateAvailability,     // NEW Phase 7B
+  extractDietaryPreferencesFromText,  // NEW Phase 7C
+  formatDietaryPreferences,           // NEW Phase 7C
 } from './eventContextCapturer';
+import { filterVendorsByDietaryPreference, formatDietaryFilterMessage, buildDietaryFilterContext } from './dietaryFilterer'; // NEW Phase 7C
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
@@ -513,12 +516,35 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     }
 
     if (dbVendors.length > 0) {
-      const ragContext = buildRAGContext(ragResult);
-      const vendorText = `I found **${dbVendors.length} verified Vowza profiles**:\n\n${ragContext}`;
+      // ─── NEW Phase 7C: Apply dietary preference filtering ─────────────────────
+      const dietaryFilterResult = filterVendorsByDietaryPreference(message, dbVendors, updatedContext);
+      
+      console.log('[Vowza AI Phase 7C] Dietary filtering:', {
+        preferences: dietaryFilterResult.preferences,
+        totalVendors: dietaryFilterResult.matchMetrics.totalVendors,
+        matchingVendors: dietaryFilterResult.matchMetrics.matchingVendors,
+        matchPercentage: dietaryFilterResult.matchMetrics.matchPercentage,
+      });
+      
+      let vendorText = `I found **${dbVendors.length} verified Vowza profiles**:\n\n`;
+      
+      // Add dietary filter context if preferences detected
+      if (dietaryFilterResult.preferences.length > 0) {
+        vendorText += formatDietaryFilterMessage(dietaryFilterResult);
+      }
+      
+      const ragContext = buildRAGContext({ ...ragResult, vendors: dietaryFilterResult.filteredVendors });
+      vendorText += ragContext;
+      
+      // Add note about excluded vendors if any
+      if (dietaryFilterResult.excludedVendors.length > 0) {
+        vendorText += `\n\n💡 **Tip:** ${dietaryFilterResult.excludedVendors.length} caterer(s) don't support your dietary preferences. Let me know if you'd like to see them anyway.`;
+      }
+      
       await streamDeterministic(vendorText, onChunk);
       return {
         fullText: vendorText,
-        aiResponse: { type: 'vendor_results', text: vendorText, data: { dbVendors } },
+        aiResponse: { type: 'vendor_results', text: vendorText, data: { dbVendors: dietaryFilterResult.filteredVendors } },
         updatedContext,
         generatedPlan,
       };

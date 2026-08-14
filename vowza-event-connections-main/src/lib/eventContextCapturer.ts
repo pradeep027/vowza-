@@ -604,3 +604,241 @@ export function checkDateAvailability(
 
   return 'available';
 }
+
+
+// ─── Dietary Preferences Extraction (NEW Phase 7C) ────────────────────────
+/**
+ * Extract dietary preferences from user message
+ * Supports:
+ * - Vegetarian: "veg", "vegetarian"
+ * - Non-veg: "non-veg", "non-vegetarian", "meat"
+ * - Vegan: "vegan"
+ * - Gluten-free: "gluten-free", "gluten free"
+ * - Dairy-free: "dairy-free", "lactose"
+ * - Halal: "halal"
+ * - Kosher: "kosher"
+ * - Jain: "jain"
+ * - Both: "both veg and non-veg", "mixed"
+ */
+export type DietaryPreference = 
+  | 'vegetarian'
+  | 'non-veg'
+  | 'vegan'
+  | 'gluten-free'
+  | 'dairy-free'
+  | 'halal'
+  | 'kosher'
+  | 'jain'
+  | 'both';
+
+export function extractDietaryPreferencesFromText(text: string): DietaryPreference[] {
+  if (!text || typeof text !== 'string') return [];
+
+  const msg = text.toLowerCase().trim();
+  const preferences: Set<DietaryPreference> = new Set();
+
+  // Both veg and non-veg (must check before individual veg/non-veg)
+  if (/both\s+(?:veg|non[\s-]?veg|vegetarian|meat)|(?:veg|non[\s-]?veg).*and.*(?:veg|non[\s-]?veg)|mix(?:ed)?.*(?:veg|non[\s-]?veg)|flexible.*diet/i.test(msg)) {
+    preferences.add('both');
+    return Array.from(preferences);
+  }
+
+  // Vegetarian
+  if (/\bveg(?:etarian)?\b|vegetarian|no\s+meat|no\s+non[\s-]?veg/i.test(msg)) {
+    preferences.add('vegetarian');
+  }
+
+  // Non-veg
+  if (/\bnon[\s-]?veg(?:etarian)?\b|non-vegetarian|meat|chicken|fish|mutton|lamb/i.test(msg)) {
+    preferences.add('non-veg');
+  }
+
+  // Vegan
+  if (/\bvegan\b|no\s+dairy|no\s+eggs|plant[\s-]?based/i.test(msg)) {
+    preferences.add('vegan');
+  }
+
+  // Gluten-free
+  if (/gluten[\s-]?free|celiac|coeliac/i.test(msg)) {
+    preferences.add('gluten-free');
+  }
+
+  // Dairy-free
+  if (/dairy[\s-]?free|lactose[\s-]?(?:free|intolerant)|no\s+dairy|no\s+milk/i.test(msg)) {
+    preferences.add('dairy-free');
+  }
+
+  // Halal
+  if (/\bhalal\b/i.test(msg)) {
+    preferences.add('halal');
+  }
+
+  // Kosher
+  if (/\bkosher\b/i.test(msg)) {
+    preferences.add('kosher');
+  }
+
+  // Jain
+  if (/\bjain\b|jain\s+diet/i.test(msg)) {
+    preferences.add('jain');
+  }
+
+  return Array.from(preferences);
+}
+
+/**
+ * Check if menu item matches dietary preferences
+ * @param menuItem Menu item with category/tags
+ * @param preferences User's dietary preferences
+ * @returns true if menu item is suitable
+ */
+export function isMenuItemSuitableForDiet(
+  menuItem: any,
+  preferences: DietaryPreference[]
+): boolean {
+  if (!preferences || preferences.length === 0) return true;
+
+  const itemTags = (menuItem.tags || []).map((t: string) => t.toLowerCase());
+  const itemCat = (menuItem.category || '').toLowerCase();
+  const itemDesc = (menuItem.description || '').toLowerCase();
+  const itemName = (menuItem.name || '').toLowerCase();
+
+  for (const pref of preferences) {
+    switch (pref) {
+      case 'vegetarian':
+        // Exclude non-veg items
+        if (/meat|chicken|fish|mutton|lamb|beef|pork|shrimp|prawn|non[\s-]?veg|egg|seafood/i.test(itemName + itemDesc + itemCat)) {
+          return false;
+        }
+        if (itemTags.includes('non-veg') || itemTags.includes('meat')) {
+          return false;
+        }
+        break;
+
+      case 'non-veg':
+        // Non-veg preference is usually inclusive, but if mixed, needs meat
+        // This is less restrictive, so we skip explicit rejection
+        break;
+
+      case 'vegan':
+        // Exclude dairy, eggs, meat
+        if (/dairy|milk|cheese|yogurt|butter|cream|egg|meat|fish|honey|non[\s-]?veg/i.test(itemName + itemDesc)) {
+          return false;
+        }
+        if (itemTags.includes('dairy') || itemTags.includes('eggs') || itemTags.includes('meat')) {
+          return false;
+        }
+        break;
+
+      case 'gluten-free':
+        // Exclude items with wheat, bread, pasta unless marked gluten-free
+        if (/wheat|bread|pasta|noodles|flour|gluten|maida/i.test(itemName + itemDesc)) {
+          if (!itemTags.includes('gluten-free')) {
+            return false;
+          }
+        }
+        if (itemTags.includes('contains-gluten')) {
+          return false;
+        }
+        break;
+
+      case 'dairy-free':
+        // Exclude dairy products
+        if (/dairy|milk|cheese|yogurt|butter|cream|paneer|ghee|lactose/i.test(itemName + itemDesc)) {
+          if (!itemTags.includes('dairy-free')) {
+            return false;
+          }
+        }
+        if (itemTags.includes('dairy')) {
+          return false;
+        }
+        break;
+
+      case 'halal':
+        // Check if item is halal or non-halal
+        if (itemTags.includes('non-halal')) {
+          return false;
+        }
+        // If not explicitly tagged, assume acceptable (most Indian food is halal-compatible)
+        break;
+
+      case 'kosher':
+        // Check if item is kosher
+        if (itemTags.includes('non-kosher')) {
+          return false;
+        }
+        break;
+
+      case 'jain':
+        // Jain diet: no root vegetables, no meat, no dairy typically
+        if (/onion|garlic|potato|carrot|radish|meat|fish|dairy|milk|egg|honey/i.test(itemName + itemDesc)) {
+          if (!itemTags.includes('jain')) {
+            return false;
+          }
+        }
+        break;
+
+      case 'both':
+        // Accept both veg and non-veg
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Filter caterers by dietary preference support
+ * @param vendors Caterer vendors
+ * @param preferences User dietary preferences
+ * @returns Caterers that support the preferences
+ */
+export function filterCaterersByDietaryPreferences(
+  vendors: any[],
+  preferences: DietaryPreference[]
+): any[] {
+  if (!preferences || preferences.length === 0) return vendors;
+
+  return vendors.filter(vendor => {
+    // Check if vendor has menu data
+    if (!vendor.menu_items || vendor.menu_items.length === 0) {
+      // If no menu data, can't filter, so include anyway
+      return true;
+    }
+
+    // Check if vendor has at least one suitable menu item
+    const hasSuitableItem = vendor.menu_items.some((item: any) =>
+      isMenuItemSuitableForDiet(item, preferences)
+    );
+
+    return hasSuitableItem;
+  });
+}
+
+/**
+ * Get dietary preference badge/tag for display
+ */
+export function getDietaryPreferenceBadge(preference: DietaryPreference): string {
+  const badges: Record<DietaryPreference, string> = {
+    'vegetarian': '🥬 Vegetarian',
+    'non-veg': '🍗 Non-Veg',
+    'vegan': '🌱 Vegan',
+    'gluten-free': '🚫 Gluten-Free',
+    'dairy-free': '🥛 Dairy-Free',
+    'halal': '☪️ Halal',
+    'kosher': '✡️ Kosher',
+    'jain': '🙏 Jain',
+    'both': '🍽️ Mixed Menu',
+  };
+  return badges[preference] || preference;
+}
+
+/**
+ * Format dietary preferences for display in context
+ */
+export function formatDietaryPreferences(preferences: DietaryPreference[]): string {
+  if (!preferences || preferences.length === 0) return 'No dietary restrictions';
+
+  const badges = preferences.map(p => getDietaryPreferenceBadge(p));
+  return badges.join(' • ');
+}
