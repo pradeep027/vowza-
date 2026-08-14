@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowDown, ArrowUp, Check, Eye, Image as ImageIcon, Loader2, Trash2, Upload, Video } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, Check, Eye, Image as ImageIcon, Loader2, Play, Trash2, Upload, Video, X } from 'lucide-react';
 import { useAdmin } from '@/contexts/AuthContext';
 import {
   createAuthPromoConfig,
@@ -20,6 +20,17 @@ import {
   type AuthPromoMediaType,
   type HomepagePromotionSlotNumber,
 } from '@/integrations/supabase/auth-promo';
+import {
+  uploadPromotionVideo,
+  createPromotionVideo,
+  fetchPromotionVideos,
+  updatePromotionVideo,
+  deletePromotionVideo,
+  deletePromotionVideoFile,
+  notifyPromotionVideoUpdated,
+  validatePromotionVideo,
+  type PromotionVideo,
+} from '@/integrations/supabase/promotion-videos';
 import { toast } from 'sonner';
 
 const DEFAULT_OVERLAY_COLOR = 'rgba(0, 0, 0, 1)';
@@ -223,24 +234,31 @@ export const AdminAuthPromotionalManager: React.FC = () => {
   const { isAdmin } = useAdmin();
   const [config, setConfig] = useState<AuthPromoConfig | null>(null);
   const [homepageMedia, setHomepageMedia] = useState<AuthPromotionMedia[]>([]);
+  const [promotionVideos, setPromotionVideos] = useState<PromotionVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [mediaUploading, setMediaUploading] = useState(false);
+  const [videosUploading, setVideosUploading] = useState(false);
   const [overlayOpacity, setOverlayOpacity] = useState(0.3);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [selectedHomepageMedia, setSelectedHomepageMedia] = useState<SelectedPromotionMedia[]>([]);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const [selectedVideoPreviewUrl, setSelectedVideoPreviewUrl] = useState('');
+  const [videoPreviewModalUrl, setVideoPreviewModalUrl] = useState<string | null>(null);
 
   const loadConfiguration = async () => {
     try {
       setLoading(true);
-      const [nextConfig, nextMedia] = await Promise.all([
+      const [nextConfig, nextMedia, nextVideos] = await Promise.all([
         fetchLatestAuthPromoConfig(),
         fetchAuthPromotionMediaForManagement(),
+        fetchPromotionVideos(),
       ]);
       setConfig(nextConfig);
       setOverlayOpacity(nextConfig?.overlay_opacity ?? 0.3);
       setHomepageMedia(nextMedia);
+      setPromotionVideos(nextVideos);
     } catch (error) {
       console.error('[AdminAuthPromo] Unable to load configuration:', error);
       toast.error('Failed to load the current promotion configuration.');
@@ -514,6 +532,109 @@ export const AdminAuthPromotionalManager: React.FC = () => {
     }
   };
 
+  // ===== VIDEO ADS HANDLERS =====
+
+  const handleVideoFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await validatePromotionVideo(file);
+      setSelectedVideoFile(file);
+      setSelectedVideoPreviewUrl(URL.createObjectURL(file));
+    } catch (error) {
+      event.target.value = '';
+      toast.error(error instanceof Error ? error.message : 'Please choose a valid video file (MP4 or WebM).');
+    }
+  };
+
+  const handleVideoUpload = async () => {
+    if (!selectedVideoFile) return;
+
+    setVideosUploading(true);
+    try {
+      const uploaded = await uploadPromotionVideo(selectedVideoFile);
+      const nextPriority = promotionVideos.length > 0 
+        ? Math.max(...promotionVideos.map(v => v.priority_order)) + 1
+        : 1;
+
+      const created = await createPromotionVideo(
+        uploaded.url,
+        uploaded.path,
+        nextPriority,
+        'bottom-right',
+        15,
+      );
+
+      setPromotionVideos((current) => [...current, created].sort((a, b) => a.priority_order - b.priority_order));
+      setSelectedVideoFile(null);
+      setSelectedVideoPreviewUrl('');
+      notifyPromotionVideoUpdated();
+      toast.success('Promotional video uploaded successfully.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Video upload failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload promotional video.');
+    } finally {
+      setVideosUploading(false);
+    }
+  };
+
+  const handleDeletePromotionVideo = async (video: PromotionVideo) => {
+    setVideosUploading(true);
+    try {
+      await deletePromotionVideo(video.id);
+      setPromotionVideos((current) => current.filter((v) => v.id !== video.id));
+      notifyPromotionVideoUpdated();
+      if (!await deletePromotionVideoFile(video.storage_path)) {
+        toast.warning('Video was removed from the system, but the storage file could not be cleaned up automatically.');
+        return;
+      }
+      toast.success('Promotional video removed.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Video delete failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete promotional video.');
+    } finally {
+      setVideosUploading(false);
+    }
+  };
+
+  const handleToggleVideoActive = async (video: PromotionVideo) => {
+    setVideosUploading(true);
+    try {
+      const updated = await updatePromotionVideo(video.id, { is_active: !video.is_active });
+      setPromotionVideos((current) => current.map((v) => v.id === updated.id ? updated : v));
+      notifyPromotionVideoUpdated();
+      toast.success(updated.is_active ? 'Promotional video activated.' : 'Promotional video deactivated.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Video activation toggle failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to toggle video status.');
+    } finally {
+      setVideosUploading(false);
+    }
+  };
+
+  const handleMoveVideo = async (video: PromotionVideo, direction: -1 | 1) => {
+    const videoIndex = promotionVideos.findIndex((v) => v.id === video.id);
+    const adjacent = promotionVideos[videoIndex + direction];
+    if (videoIndex < 0 || !adjacent) return;
+
+    setVideosUploading(true);
+    try {
+      await Promise.all([
+        updatePromotionVideo(video.id, { priority_order: adjacent.priority_order }),
+        updatePromotionVideo(adjacent.id, { priority_order: video.priority_order }),
+      ]);
+      await loadConfiguration();
+      notifyPromotionVideoUpdated();
+      toast.success('Video priority updated.');
+    } catch (error) {
+      console.error('[AdminAuthPromo] Video reorder failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reorder videos.');
+    } finally {
+      setVideosUploading(false);
+    }
+  };
+
   if (!isAdmin) {
     return <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-red-600"><AlertCircle className="mb-2 h-5 w-5" /><p>Admin access required.</p></div>;
   }
@@ -588,6 +709,229 @@ export const AdminAuthPromotionalManager: React.FC = () => {
           />
         ))}
       </section>
+
+      <section className="space-y-6 rounded-lg border border-border bg-secondary p-6">
+        <div><h2 className="flex items-center gap-2 text-lg font-semibold"><Video className="h-5 w-5" />Promotional Video Ads</h2><p className="mt-1 text-sm text-muted-foreground">Manage promotional videos that appear as overlay advertisements on authenticated pages. Each video can be viewed by up to 15 unique users. Once the limit is reached, the next video activates automatically.</p></div>
+
+        {/* VIDEO UPLOAD FORM */}
+        <div className="rounded-lg border border-border bg-background p-4">
+          {!selectedVideoPreviewUrl ? (
+            <div className="rounded-lg border-2 border-dashed border-border p-6 text-center transition-colors hover:border-maroon/50">
+              <input
+                type="file"
+                accept="video/mp4,video/webm"
+                onChange={handleVideoFileSelect}
+                className="hidden"
+                id="video-upload"
+              />
+              <label htmlFor="video-upload" className="block cursor-pointer">
+                <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+                <p className="font-semibold text-foreground">Upload Video Ad</p>
+                <p className="mt-1 text-xs text-muted-foreground">MP4 or WebM • Max 100MB</p>
+              </label>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="aspect-video overflow-hidden rounded-lg border-2 border-maroon/50 bg-slate-100">
+                <video src={selectedVideoPreviewUrl} muted controls className="h-full w-full object-cover" />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVideoFile(null);
+                    setSelectedVideoPreviewUrl('');
+                  }}
+                  disabled={videosUploading}
+                  className="btn-secondary flex-1 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVideoUpload}
+                  disabled={videosUploading || !selectedVideoFile}
+                  className="btn-primary flex-1 justify-center gap-2 text-sm"
+                >
+                  {videosUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Upload Video
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* VIDEO LIST */}
+        {promotionVideos.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground">PROMOTIONAL VIDEOS ({promotionVideos.length})</p>
+              <button
+                type="button"
+                onClick={() => loadConfiguration()}
+                disabled={videosUploading}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {promotionVideos.map((video, index) => (
+              <div key={video.id} className="rounded-lg border border-border bg-background p-4">
+                <div className="flex gap-4">
+                  {/* Video Thumbnail */}
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-700">
+                    <video
+                      src={video.video_url}
+                      muted
+                      preload="metadata"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setVideoPreviewModalUrl(video.video_url)}
+                      className="absolute m-1 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+                      title="Preview video"
+                    >
+                      <Play className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Video Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="flex items-center gap-2 font-semibold text-sm">
+                          <span>Video {index + 1}</span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              video.is_active
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            {video.is_active ? 'ACTIVE' : 'Inactive'}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Priority: {video.priority_order}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 space-y-1 text-sm">
+                      <p className="text-xs">
+                        <span className="font-semibold text-foreground">Position:</span>{' '}
+                        <span className="text-muted-foreground capitalize">{video.display_position.replace('-', ' ')}</span>
+                      </p>
+                      <p className="text-xs">
+                        <span className="font-semibold text-foreground">Users Reached:</span>{' '}
+                        <span className="text-muted-foreground">{video.unique_users_reached} / {video.user_limit}</span>
+                      </p>
+                      <p className="text-xs">
+                        <span className="font-semibold text-foreground">Remaining:</span>{' '}
+                        <span className="text-muted-foreground">{Math.max(0, video.user_limit - video.unique_users_reached)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setVideoPreviewModalUrl(video.video_url)}
+                      disabled={videosUploading}
+                      className="btn-secondary text-xs px-2.5 py-1.5"
+                      title="Preview this video"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleVideoActive(video)}
+                      disabled={videosUploading}
+                      className="btn-secondary text-xs px-2.5 py-1.5"
+                    >
+                      {video.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePromotionVideo(video)}
+                      disabled={videosUploading}
+                      className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      <Trash2 className="inline h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Priority Controls */}
+                <div className="mt-3 flex gap-1 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    onClick={() => handleMoveVideo(video, -1)}
+                    disabled={videosUploading || index === 0}
+                    className="btn-secondary text-xs px-2.5 py-1.5"
+                    title="Move up"
+                  >
+                    <ArrowUp className="inline h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMoveVideo(video, 1)}
+                    disabled={videosUploading || index === promotionVideos.length - 1}
+                    className="btn-secondary text-xs px-2.5 py-1.5"
+                    title="Move down"
+                  >
+                    <ArrowDown className="inline h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* EMPTY STATE */}
+        {promotionVideos.length === 0 && !videosUploading && (
+          <div className="rounded-lg border border-dashed border-border bg-slate-50 p-6 text-center">
+            <Video className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="font-semibold text-muted-foreground">No promotional videos yet</p>
+            <p className="text-sm text-muted-foreground">Upload a video above to get started</p>
+          </div>
+        )}
+      </section>
+
+      {/* VIDEO PREVIEW MODAL */}
+      {videoPreviewModalUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <div className="relative max-w-2xl w-full">
+            <button
+              type="button"
+              onClick={() => setVideoPreviewModalUrl(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <video
+              src={videoPreviewModalUrl}
+              autoPlay
+              controls
+              muted
+              className="w-full rounded-lg"
+            />
+            <p className="mt-2 text-center text-sm text-gray-400">
+              Admin preview — this view is not counted as a promotion impression
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
