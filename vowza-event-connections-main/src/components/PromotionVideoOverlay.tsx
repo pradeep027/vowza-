@@ -83,20 +83,14 @@ const PromotionVideoOverlay = memo(
     }[video.display_position];
 
     return (
-      <>
-        {/* DEBUG: Render indicator */}
-        <div style={{position: 'fixed', top: '10px', right: '10px', background: 'yellow', padding: '10px', zIndex: 99999, fontSize: '12px'}}>
-          Video Overlay Active
-        </div>
-        
-        <AnimatePresence>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className={`fixed ${positionClasses} z-[9999] max-w-sm pointer-events-auto`}
-          >
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className={`fixed ${positionClasses} z-[9999] max-w-sm pointer-events-auto`}
+        >
           {/* Main overlay container */}
           <div className="relative overflow-hidden rounded-2xl bg-black shadow-2xl border border-white/10">
             {/* Video aspect ratio container (16:9) */}
@@ -192,8 +186,7 @@ const PromotionVideoOverlay = memo(
             <p>Click X to close • Hover to unmute</p>
           </div>
         </motion.div>
-        </AnimatePresence>
-      </>
+      </AnimatePresence>
     );
   },
 );

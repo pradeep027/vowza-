@@ -40,13 +40,23 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
     setIsLoading(true);
     try {
       console.log('[usePromotionVideoAd] Fetching active video for user:', user.id);
+      console.log('[usePromotionVideoAd] About to call getActivePromotionVideo RPC...');
       const activeVideo = await getActivePromotionVideo(user.id);
-      console.log('[usePromotionVideoAd] RPC returned:', activeVideo);
+      console.log('[usePromotionVideoAd] RPC completed. Result:', activeVideo);
+      
+      if (!activeVideo) {
+        console.warn('[usePromotionVideoAd] RPC returned null/undefined - NO VIDEOS AVAILABLE');
+        console.warn('[usePromotionVideoAd] Checking reasons:');
+        console.warn('  - Is there a video in auth_promotion_videos?');
+        console.warn('  - Is it marked as is_active = TRUE?');
+        console.warn('  - Is unique_users_reached < user_limit?');
+      }
+      
       setVideo(activeVideo);
       setHasUserViewed(activeVideo?.has_user_viewed ?? false);
       console.log('[usePromotionVideoAd] State updated - video:', activeVideo, 'hasUserViewed:', activeVideo?.has_user_viewed ?? false);
     } catch (error) {
-      console.error('[usePromotionVideoAd] Failed to fetch active promotion video:', error);
+      console.error('[usePromotionVideoAd] Exception in refresh():', error);
       setVideo(null);
     } finally {
       setIsLoading(false);
