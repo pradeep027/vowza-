@@ -20,6 +20,8 @@ import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, isActiveC
 import { EventBudgetPlanner, formatBudgetAllocation, type EventBudgetPlan } from './eventBudgetPlanner';
 import { recommendPackages, type PackageRecommendation } from './packageMatcher'; // NEW Phase 2B
 import { matchPlanToVendors, formatVendorRecommendationsForPlan } from './vendorMatcher'; // NEW Phase 5
+import { detectModificationIntent, removeService, adjustServiceBudget, rebalancePlanBudget, setPriority, formatModificationResponse } from './eventPlanMutator'; // NEW Phase 6
+import { generateTradeOffOptions, formatTradeOffResponse, applyTradeOff, estimateBudgetGap } from './tradeOffOptimizer'; // NEW Phase 6
 import type { PlannerContext, AIResponse, ChatMessage } from './aiPlannerTypes';
 import {
   calculateContextReadiness,
@@ -388,6 +390,61 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
         updatedContext,
         generatedPlan,
       };
+    }
+  }
+
+  // ─── PHASE 6: Check if user wants to modify existing plan ──────────────────
+  if (currentPlan && currentPlan.allocations && currentPlan.allocations.length > 0) {
+    const modification = detectModificationIntent(message, currentPlan);
+    
+    if (modification) {
+      console.log('[Vowza AI Phase 6] Detected modification:', { type: modification.type, target: modification.target });
+      
+      let result: any = null;
+      let success = false;
+
+      if (modification.type === 'remove_service') {
+        result = removeService(currentPlan, modification.target);
+        success = result.success;
+      } else if (modification.type === 'adjust_budget') {
+        if (modification.value) {
+          result = adjustServiceBudget(currentPlan, modification.target, modification.value);
+          success = result.success;
+        }
+      } else if (modification.type === 'rebalance_budget') {
+        if (modification.value) {
+          result = rebalancePlanBudget(currentPlan, modification.value);
+          success = result.success;
+        }
+      } else if (modification.type === 'change_priority') {
+        result = setPriority(currentPlan, modification.target, 'high');
+        success = result.success;
+      }
+
+      if (success && result && result.modifiedPlan) {
+        const modifiedPlan = result.modifiedPlan;
+        let displayText = result.message;
+
+        // Check if new plan exceeds budget and suggest trade-offs
+        const gap = estimateBudgetGap(modifiedPlan);
+        if (gap.gap > 0) {
+          const tradeOffs = generateTradeOffOptions(modifiedPlan);
+          if (tradeOffs.length > 0) {
+            displayText += formatTradeOffResponse(tradeOffs, modifiedPlan);
+          } else {
+            displayText += '\n\n' + gap.message;
+          }
+        }
+
+        await streamDeterministic(displayText, onChunk);
+        return {
+          fullText: displayText,
+          aiResponse: { type: 'budget_plan', text: displayText, data: { plan: modifiedPlan } },
+          updatedContext,
+          generatedPlan: modifiedPlan,
+          recommendedPackages: [],
+        };
+      }
     }
   }
 
