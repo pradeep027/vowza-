@@ -299,6 +299,27 @@ export type ResponseType =
   | "negotiation" | "risk_analysis" | "success_score"
   | "full_plan" | "wedding_plan";
 
+// ─── Planning State (NEW in Phase 2A) ──────────────────────────────────────────
+export enum PlanningState {
+  GATHERING_INFO = 'gathering_info',           // Asking for missing context
+  SUFFICIENT_CONTEXT = 'sufficient_context',   // Have event + budget/city/guests
+  PLANNING = 'planning',                       // Generating complete plan
+  CUSTOMIZING = 'customizing',                 // Customer modifying plan
+  DISCOVERING_VENDORS = 'discovering_vendors', // Showing vendor options
+  COMPLETE = 'complete',                       // Plan ready
+}
+
+export interface PlanningStateData {
+  state: PlanningState;
+  completedSteps: string[];              // ["extracted_event_type", "estimated_budget", ...]
+  missingInfo: (keyof PlannerContext)[]; // ["budget", "city"]
+  readiness: number;                     // 0-100 (how ready to generate plan)
+}
+
+// ─── Aliased from eventBudgetPlanner for convenience ────────────────────────────
+export type BudgetAllocation = import('./eventBudgetPlanner').BudgetAllocation;
+export type EventBudgetPlan = import('./eventBudgetPlanner').EventBudgetPlan;
+
 export interface AIResponse {
   type: ResponseType;
   text: string;

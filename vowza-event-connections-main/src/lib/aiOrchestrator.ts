@@ -10,8 +10,9 @@
 //
 // This replaces the old switch/case decision tree entirely.
 
-import type { ChatMessage, PlannerContext } from './aiPlannerTypes';
+import type { ChatMessage, PlannerContext, PlanningStateData, EventBudgetPlan } from './aiPlannerTypes';
 import { fmt } from './aiPlanner';
+import { EventBudgetPlanner } from './eventBudgetPlanner';
 
 // ── Intent categories ─────────────────────────────────────────────────────────
 export type Intent =
@@ -306,6 +307,83 @@ function determineNextQuestion(
   if (intent === 'find_vendors') return null;
 
   return null;
+}
+
+// ── Calculate Planning Readiness (NEW in Phase 2A) ──────────────────────────────
+// Returns a score 0-100 indicating how ready we are to generate a full plan.
+// Threshold: >= 60% means we have sufficient context to generate meaningful allocation.
+export function calculatePlanningReadiness(ctx: PlannerContext): {
+  readiness: number;
+  missingFields: (keyof PlannerContext)[];
+  isSufficient: boolean;
+} {
+  let score = 0;
+  const missing: (keyof PlannerContext)[] = [];
+
+  // Event type is ALWAYS required (25 points)
+  if (ctx.eventType) score += 25;
+  else missing.push('eventType');
+
+  // Budget (20 points) — OR city (15) — OR guests (15)
+  // Need at least ONE of these three to make realistic allocation
+  let contextScore = 0;
+  if (ctx.budget) contextScore += 20;
+  else missing.push('budget');
+
+  if (ctx.city) contextScore += 15;
+  else missing.push('city');
+
+  if (ctx.guestCount) contextScore += 15;
+  else missing.push('guestCount');
+
+  // Take the best combo
+  if (contextScore >= 15) score += 20; // Has at least one detail
+  else score += 0;
+
+  // Luxury level helps but is optional (15 points)
+  if (ctx.luxuryLevel) score += 15;
+
+  // Date is nice-to-have (10 points)
+  if (ctx.eventDate) score += 10;
+
+  // Food pref, style, venue type are nice-to-have (each 5 points)
+  if (ctx.foodPreference) score += 5;
+  if (ctx.styleVibe) score += 5;
+  if (ctx.venueType) score += 5;
+
+  return {
+    readiness: Math.min(100, score),
+    missingFields: missing,
+    isSufficient: score >= 60, // >= 60% is "go generate a plan"
+  };
+}
+
+// ── Extract Plan State (NEW in Phase 2A) ───────────────────────────────────────
+export function extractPlanState(
+  ctx: PlannerContext,
+  currentPlan: EventBudgetPlan | null
+): PlanningStateData {
+  const { readiness, missingFields, isSufficient } = calculatePlanningReadiness(ctx);
+  
+  const completedSteps: string[] = [];
+  if (ctx.eventType) completedSteps.push('extracted_event_type');
+  if (ctx.budget) completedSteps.push('extracted_budget');
+  if (ctx.city) completedSteps.push('extracted_city');
+  if (ctx.guestCount) completedSteps.push('extracted_guests');
+  if (ctx.eventDate) completedSteps.push('extracted_date');
+  if (currentPlan) completedSteps.push('generated_plan');
+
+  let state: import('./aiPlannerTypes').PlanningState;
+  if (currentPlan) state = 'COMPLETE' as any;
+  else if (isSufficient) state = 'PLANNING' as any;
+  else state = 'GATHERING_INFO' as any;
+
+  return {
+    state,
+    completedSteps,
+    missingInfo: missingFields,
+    readiness,
+  };
 }
 
 function extractEventDate(text: string): string | undefined {

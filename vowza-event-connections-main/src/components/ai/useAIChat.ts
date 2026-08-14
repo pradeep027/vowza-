@@ -71,6 +71,7 @@ export function useAIChat() {
   const [conversationId,  setConversationId]   = useState<string | null>(loadConvId);
   const [conversations,   setConversations]    = useState<ConversationRow[]>([]);
   const [historyLoading,  setHistoryLoading]   = useState(false);
+  const [currentPlan,     setCurrentPlan]      = useState<any>(null); // NEW: EventBudgetPlan from Phase 2A
   const abortRef     = useRef(false);
   const requestEpochRef = useRef(0);
   // ─── Keep a ref that always holds the latest messages array ─────────────────
@@ -78,11 +79,13 @@ export function useAIChat() {
   const messagesRef  = useRef<ChatMessage[]>([]);
   const contextRef   = useRef<PlannerContext>(loadContext());
   const convIdRef    = useRef<string | null>(loadConvId());
+  const planRef      = useRef<any>(null); // NEW: Phase 2A
 
   // Keep refs in sync with state
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { contextRef.current  = context;  }, [context]);
   useEffect(() => { convIdRef.current   = conversationId; }, [conversationId]);
+  useEffect(() => { planRef.current     = currentPlan; }, [currentPlan]); // NEW: Phase 2A
 
   // ── On mount: restore conversation from DB if user is logged in ─────────────
   useEffect(() => {
@@ -330,6 +333,7 @@ export function useAIChat() {
         message: userText,
         history: currentMessages,
         context: currentContext,
+        currentPlan: planRef.current, // NEW: Phase 2A - pass current plan
         onChunk: ({ delta, done }) => {
           if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
           if (!done) {
@@ -346,6 +350,12 @@ export function useAIChat() {
         // This runs after sendMessage fully resolves — result is safe to use here.
         finalAIResponse = res.aiResponse;
         finalContext     = res.updatedContext;
+        // NEW: Phase 2A - capture generated plan if available
+        if (res.generatedPlan) {
+          planRef.current = res.generatedPlan;
+          setCurrentPlan(res.generatedPlan);
+          console.log('[Vowza AI Phase 2A] Plan generated and stored:', res.generatedPlan);
+        }
         // Use accumulated text (what was streamed) — fall back to res.fullText only
         // if streaming somehow produced nothing (e.g. very fast deterministic reply).
         const finalText = accumulated || res.fullText;
@@ -441,6 +451,10 @@ export function useAIChat() {
     contextRef.current = {};
     setContext({});
     sessionStorage.removeItem(CTX_KEY);
+    
+    // NEW Phase 2A: Reset plan as well
+    planRef.current = null;
+    setCurrentPlan(null);
   }, []);
 
   const clearContext = useCallback(() => {
@@ -456,6 +470,7 @@ export function useAIChat() {
     conversationId,
     conversations,
     historyLoading,
+    currentPlan,           // NEW: Phase 2A
     send,
     editAndResend,
     regenerateLastResponse,
