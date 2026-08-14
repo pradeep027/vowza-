@@ -184,6 +184,59 @@ export const deletePromotionVideo = async (videoId: string): Promise<void> => {
 // ============================================================================
 
 /**
+ * Get all eligible promotion videos for a user.
+ * Returns all active videos that haven't reached their user limit.
+ * Use for random selection among eligible videos.
+ */
+export const getAllEligiblePromotionVideos = async (
+  userId: string,
+): Promise<PromotionVideoWithViewStatus[]> => {
+  console.log('[promotionVideos] Fetching all eligible videos for user:', userId);
+  const { data, error } = await supabase
+    .from('auth_promotion_videos')
+    .select(`
+      id,
+      video_url,
+      priority_order,
+      display_position,
+      user_limit,
+      unique_users_reached,
+      is_active
+    `)
+    .eq('is_active', true)
+    .lt('unique_users_reached', 'user_limit');
+
+  if (error) {
+    console.error('[promotionVideos] Error fetching eligible videos:', error);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] No eligible videos found');
+    return [];
+  }
+
+  // Enrich each video with has_user_viewed flag
+  const enrichedVideos: PromotionVideoWithViewStatus[] = await Promise.all(
+    data.map(async (video) => {
+      const { data: viewExists } = await supabase
+        .from('auth_promotion_video_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('video_id', video.id)
+        .eq('user_id', userId);
+
+      return {
+        ...video,
+        has_user_viewed: (viewExists?.length ?? 0) > 0,
+      } as PromotionVideoWithViewStatus;
+    })
+  );
+
+  console.log('[promotionVideos] ✅ Found', enrichedVideos.length, 'eligible videos for random selection');
+  return enrichedVideos;
+};
+
+/**
  * Get the currently active promotion video for a user.
  * Returns video details + whether user has already viewed it.
  * If user has viewed all active videos, returns null/empty.
