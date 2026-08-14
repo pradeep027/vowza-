@@ -1,9 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Checks if the current user can book a package owned by a vendor.
+ * BOOKING GUARD - Frontend self-booking prevention
  * 
- * RULE: A vendor/artist cannot book their own packages.
+ * ⚠️ IMPORTANT: This is a UX guard only. Backend RLS policies provide the actual security.
+ * 
+ * BUSINESS RULE:
+ * - Artist A creates Package A → Artist A CANNOT book Package A
+ * - Artist A CAN book Artist B's packages
+ * - Normal customers can book any package
+ * 
+ * IMPLEMENTATION:
+ * - This frontend check prevents the booking UI from being submitted
+ * - Backend RLS policies reject any self-booking attempts that bypass this guard
+ * - Even if frontend is manipulated, backend RLS will block the booking
+ * 
+ * Checks if the current user can book a package owned by a vendor.
  * 
  * @param providerId - The provider/vendor ID who owns the package
  * @returns true if user CAN book, false if user CANNOT book (owner trying to self-book)
