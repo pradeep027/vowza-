@@ -40,6 +40,7 @@ import {
 } from './eventContextCapturer';
 import { filterVendorsByDietaryPreference, formatDietaryFilterMessage, buildDietaryFilterContext } from './dietaryFilterer'; // NEW Phase 7C
 import { formatDetailedComparison, formatComparisonTable, createComparisonCard } from './vendorComparison'; // NEW Phase 7D
+import { formatAdminPackageRecommendation, formatAdminVsCustomComparison, shouldPrioritizeAdminPackage, buildAdminPackageContext } from './adminPackageHandler'; // NEW Phase 7E
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
@@ -209,8 +210,21 @@ async function formatPackageRecommendationResponse(plan: EventBudgetPlan): Promi
   packages: import('./packageMatcher').AdminEventPackage[];
 }> {
   const rec = await recommendPackages(plan);
+  
+  // ─── NEW Phase 7E: Admin Package Distinction ────────────────────────────────
+  // Check if admin event packages are available for prioritization
+  let displayText = rec.displayText;
+  
+  // TODO: Fetch admin_event_packages from database
+  // For now, we have placeholder support that integrates when admin packages are retrieved
+  // Integration point: when admin packages are fetched, use:
+  //   - shouldPrioritizeAdminPackage() to decide if admin package should be recommended first
+  //   - formatAdminPackageRecommendation() to format admin package with savings
+  //   - formatAdminVsCustomComparison() to show side-by-side comparison
+  //   - buildAdminPackageContext() to add admin package context to system prompt
+  
   return {
-    displayText: rec.displayText,
+    displayText,
     packages: rec.packages || [],
   };
 }

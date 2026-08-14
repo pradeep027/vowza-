@@ -46,6 +46,7 @@ export interface OrchestrationResult {
   responseStrategy: ResponseStrategy;
   contextSummary:   string;         // what we know so far — injected into LLM
   shouldAskNext:    string | null;  // next question if info is missing
+  adminPackageContext?: string;     // NEW Phase 7E: admin packages context
 }
 
 export type ResponseStrategy =
@@ -660,6 +661,8 @@ Conversation turns so far: ${turnCount}
 Detected intent this turn: ${result.intent}
 
 ${ragContext ? `\nRAG CONTEXT — REAL VOWZA MARKETPLACE DATA:\n${ragContext}\n\nWhen answering vendor questions, cite these real vendors by name and include their profile links.\n` : ''}
+
+${result.adminPackageContext ? `\nADMIN EVENT PACKAGES — Phase 7E:\n${result.adminPackageContext}\n` : ''}
 
 RESPONSE STYLE:
 - Conversational, direct, helpful
