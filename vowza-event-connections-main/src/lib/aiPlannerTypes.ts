@@ -356,3 +356,103 @@ export interface QuickPrompt {
   prompt: string;
   icon:   string;
 }
+
+// ─── NEW Phase 4: Structured Event Plan (Active Planning Object) ──────────────
+/**
+ * This is the main plan object that persists across turns.
+ * When user says "remove DJ" or "increase photography", this plan is updated.
+ */
+export interface ServiceLine {
+  category: string;              // "Photography", "Catering", "DJ"
+  required: boolean;             // true = must have
+  optional: boolean;             // true = can customize
+  estimatedCost: number;         // From vendor database or estimate
+  allocatedBudget?: number;      // What planner allocated
+  reason?: string;               // Why this amount?
+}
+
+export interface SelectedVendor {
+  vendorId: string;              // Real Supabase provider ID only
+  vendorName: string;
+  category: string;
+  city: string;
+  allocatedBudget: number;
+  basePrice?: number;
+  matchScore?: number;           // Scoring from matcher
+  matchReasons?: string[];       // Why this vendor?
+}
+
+export interface SelectedPackage {
+  packageId: string;             // Real admin package ID
+  packageName: string;           // "Silver Wedding"
+  tier: 'silver' | 'gold' | 'platinum';
+  basePrice: number;
+  includedServices: string[];
+  optionalServices: string[];
+  removedOptionals?: string[];   // Up to 2 can be removed
+  totalPrice: number;
+}
+
+export interface TradeOffOption {
+  label: string;                 // "Option A", "Option B"
+  description: string;           // "Reduce decoration"
+  changes: string[];             // List of changes
+  savingsAmount: number;         // How much savings?
+  newTotalBudget: number;
+  reasoning?: string;
+}
+
+export interface Customization {
+  timestamp: Date;
+  userMessage: string;           // What user said
+  change: string;                // What was modified?
+  oldValue?: any;
+  newValue?: any;
+  impactOnBudget: number;        // +/- impact
+  reasoning?: string;
+}
+
+/**
+ * Complete structured event plan.
+ * This is what gets displayed to user, modified by user, and persisted in DB.
+ */
+export interface StructuredEventPlan {
+  // Immutable event definition
+  eventType: string;
+  city: string;
+  guestCount: number;
+  totalBudget: number;
+  date?: string;
+  style?: string;
+  
+  // Service breakdown
+  services: ServiceLine[];
+  
+  // Budget allocation
+  allocations: BudgetAllocation[];
+  totalAllocated: number;
+  remaining: number;
+  isFeasible: boolean;
+  feasibilityNotes?: string[];
+  
+  // Selected vendors (real IDs only, NO fabrication)
+  selectedVendors: SelectedVendor[];
+  
+  // Selected packages (real package IDs only)
+  selectedPackages: SelectedPackage[];
+  
+  // Trade-off scenarios (if over budget)
+  tradeOffOptions?: TradeOffOption[];
+  
+  // User decisions & customizations
+  customizations: Customization[];
+  
+  // Recommendations from planner
+  recommendations: string[];
+  
+  // Metadata
+  generatedAt: Date;
+  modifiedAt: Date;
+  versionNumber: number;
+  generatedBy: 'ai' | 'user';
+}

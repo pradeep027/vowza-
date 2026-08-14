@@ -19,7 +19,18 @@ import { dedupeVerifiedDBVendors } from './vendorTrust';
 import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, isActiveCategoryListRequest, nextSoftFollowUp, calculatePlanningReadiness, extractPlanState } from './aiOrchestrator';
 import { EventBudgetPlanner, formatBudgetAllocation, type EventBudgetPlan } from './eventBudgetPlanner';
 import { recommendPackages, type PackageRecommendation } from './packageMatcher'; // NEW Phase 2B
+import { matchPlanToVendors, formatVendorRecommendationsForPlan } from './vendorMatcher'; // NEW Phase 5
 import type { PlannerContext, AIResponse, ChatMessage } from './aiPlannerTypes';
+import {
+  calculateContextReadiness,
+  getNextContextQuestion,
+  formatContextQuestion,
+  getMissingEssentialFields,
+  extractEventTypeFromText,
+  extractCityFromText,
+  extractBudgetFromText,
+  extractGuestCountFromText,
+} from './eventContextCapturer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
@@ -195,6 +206,34 @@ async function formatPackageRecommendationResponse(plan: EventBudgetPlan): Promi
   };
 }
 
+// ─── PHASE 4: Extract context from user message ─────────────────────────────
+function extractContextFromMessage(message: string, currentContext: PlannerContext): Partial<PlannerContext> {
+  const extracted: Partial<PlannerContext> = {};
+  
+  // Try to extract each essential field
+  const eventType = extractEventTypeFromText(message);
+  if (eventType && !currentContext.eventType) {
+    extracted.eventType = eventType;
+  }
+  
+  const city = extractCityFromText(message);
+  if (city && !currentContext.city) {
+    extracted.city = city;
+  }
+  
+  const budget = extractBudgetFromText(message);
+  if (budget && !currentContext.budget) {
+    extracted.budget = budget;
+  }
+  
+  const guestCount = extractGuestCountFromText(message);
+  if (guestCount && !currentContext.guestCount) {
+    extracted.guestCount = guestCount;
+  }
+  
+  return extracted;
+}
+
 // ── No-vendors → keep planning naturally ──────────────────────────────────────
 function buildContinuePlanningMessage(ctx: PlannerContext): string {
   const followUp = nextSoftFollowUp(ctx);
@@ -202,6 +241,39 @@ function buildContinuePlanningMessage(ctx: PlannerContext): string {
     ? followUp
     : `Want me to start with a **budget breakdown**, a **timeline**, or **decoration ideas** for your ${ctx.eventType ?? 'event'}?`;
   return `${NO_VENDORS_FOUND_MESSAGE}\n\n${closing}`;
+}
+
+// ─── PHASE 4: Check if context is sufficient, or ask for next essential ──────
+async function checkContextReadinessAndRespond(
+  context: PlannerContext,
+  onChunk: StreamCallback
+): Promise<{ shouldContinue: boolean; response: SendResult | null }> {
+  const readiness = calculateContextReadiness(context);
+  
+  console.log('[Vowza AI Phase 4] Context readiness check:', {
+    readiness: readiness.readiness,
+    isSufficient: readiness.isSufficient,
+    missing: readiness.missingEssentials,
+  });
+  
+  // If context is insufficient, ask for the next essential field
+  if (!readiness.isSufficient && readiness.nextQuestion) {
+    const questionText = formatContextQuestion(readiness.nextQuestion, context);
+    await streamDeterministic(questionText, onChunk);
+    
+    return {
+      shouldContinue: false,
+      response: {
+        fullText: questionText,
+        aiResponse: { type: 'question', text: questionText },
+        updatedContext: context,
+        generatedPlan: undefined,
+        recommendedPackages: [],
+      },
+    };
+  }
+  
+  return { shouldContinue: true, response: null };
 }
 
 export const VENDOR_SEARCH_UNAVAILABLE_MESSAGE =
@@ -249,9 +321,25 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const useEdge = import.meta.env.VITE_USE_AI_PROXY !== 'false';
 
+  // ─── PHASE 4: Extract context from message ────────────────────────────────────
+  const extractedContext = extractContextFromMessage(message, context);
+  const contextWithExtraction = { ...context, ...extractedContext };
+  
+  console.log('[Vowza AI Phase 4] Extracted context:', {
+    extracted: extractedContext,
+    total: contextWithExtraction,
+  });
+
+  // ─── PHASE 4: Check if context is sufficient for planning ───────────────────
+  // If not, ask for the next essential field and return early
+  const readinessCheck = await checkContextReadinessAndRespond(contextWithExtraction, onChunk);
+  if (!readinessCheck.shouldContinue && readinessCheck.response) {
+    return readinessCheck.response;
+  }
+
   // 1. Orchestrate this turn
-  const orch = orchestrate(message, context, history);
-  const { response: vedaResponse, updatedContext } = await processMessage(message, context, history);
+  const orch = orchestrate(message, contextWithExtraction, history);
+  const { response: vedaResponse, updatedContext } = await processMessage(message, contextWithExtraction, history);
 
   // ─── PHASE 2A: Check planning readiness and generate plan if sufficient ─────
   const readiness = calculatePlanningReadiness(updatedContext);
@@ -353,8 +441,44 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   if (generatedPlan && readiness.isSufficient) {
     const planText = formatBudgetPlanResponse(generatedPlan);
     
+    // ─── PHASE 5: Match real vendors to the plan ──────────────────────────────
+    let vendorMatches = [];
+    let vendorText = '';
+    try {
+      // Retrieve vendors from database for this event type and city
+      const ragResult = await retrieveVendors(
+        `${generatedPlan.eventType} ${generatedPlan.city} vendors`,
+        updatedContext,
+        20,  // Get more vendors for better matching
+        {
+          professions: [],
+          city: generatedPlan.city,
+          priceMax: Math.max(...generatedPlan.allocations.map(a => a.allocatedAmount)),
+        }
+      );
+      
+      const dbVendors = dedupeVerifiedDBVendors(ragResult.vendors);
+      
+      if (dbVendors.length > 0) {
+        // Match vendors to allocations
+        vendorMatches = matchPlanToVendors(generatedPlan, dbVendors, 2); // Top 2 per category
+        vendorText = formatVendorRecommendationsForPlan(vendorMatches);
+        
+        console.log('[Vowza AI Phase 5] Vendor matching:', {
+          totalVendorsRetrieved: dbVendors.length,
+          matched: vendorMatches.length,
+          categories: [...new Set(vendorMatches.map(v => v.category))].length,
+        });
+      } else {
+        console.log('[Vowza AI Phase 5] No vendors found for matching');
+      }
+    } catch (err) {
+      console.warn('[Vowza AI Phase 5] Vendor matching error:', err);
+      // Continue without vendors — plan is still valid
+    }
+    
     // NEW Phase 2C: Add package recommendation with real packages
-    let fullText = planText;
+    let fullText = planText + vendorText;
     let recommendedPackages: any[] = [];
     try {
       const packageRec = await formatPackageRecommendationResponse(generatedPlan);
@@ -375,7 +499,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     await streamDeterministic(fullText, onChunk);
     return {
       fullText,
-      aiResponse: { type: 'budget_plan', text: fullText, data: { plan: generatedPlan } },
+      aiResponse: { type: 'budget_plan', text: fullText, data: { plan: generatedPlan, dbVendors: vendorMatches } },
       updatedContext,
       generatedPlan,
       recommendedPackages,  // NEW Phase 2C
