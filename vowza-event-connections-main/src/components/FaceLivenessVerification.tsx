@@ -1,17 +1,33 @@
 /**
  * Vowza Face Liveness Verification Component
- * Simplified motion-based liveness detection (no external dependencies)
- * Detects: camera movement + light changes to prove video is live
+ * Motion-based liveness with required challenges: LOOK_UP, LOOK_DOWN, TURN_LEFT, TURN_RIGHT, BLINK
+ * No external dependencies - uses canvas face detection patterns
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Camera, CheckCircle2, AlertCircle, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-type VerificationState = 'idle' | 'requesting_camera' | 'detecting' | 'success' | 'failed';
+type ChallengeAction = 'LOOK_UP' | 'LOOK_DOWN' | 'TURN_LEFT' | 'TURN_RIGHT' | 'BLINK';
+type VerificationState = 'idle' | 'requesting_camera' | 'detecting' | 'challenge' | 'success' | 'failed';
 
 interface Props {
   onVerified: (sessionId: string) => void;
   onSkip?: () => void;
+}
+
+const CHALLENGE_LABELS: Record<ChallengeAction, string> = {
+  LOOK_UP: 'Look UP',
+  LOOK_DOWN: 'Look DOWN',
+  TURN_LEFT: 'Turn your head LEFT',
+  TURN_RIGHT: 'Turn your head RIGHT',
+  BLINK: 'Blink your eyes',
+};
+
+const ALL_ACTIONS: ChallengeAction[] = ['LOOK_UP', 'LOOK_DOWN', 'TURN_LEFT', 'TURN_RIGHT', 'BLINK'];
+
+function getRandomChallenges(): ChallengeAction[] {
+  const shuffled = [...ALL_ACTIONS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
 }
 
 function generateSessionId(): string {
@@ -23,13 +39,19 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
-  const frameHistoryRef = useRef<number[]>([]);
-  const sessionIdRef = useRef(generateSessionId());
-
+  
   const [state, setState] = useState<VerificationState>('idle');
   const [faceStatus, setFaceStatus] = useState<string>('');
-  const [progress, setProgress] = useState(0);
+  const [challenges, setChallenges] = useState<ChallengeAction[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [stepComplete, setStepComplete] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [sessionId] = useState(generateSessionId);
+
+  // Track consecutive frames where challenge condition is met
+  const holdFrames = useRef(0);
+  const HOLD_THRESHOLD = 12; // ~0.5 seconds at 24fps
+  const frameHistoryRef = useRef<Array<{brightness: number, centerX: number, centerY: number, eyesClosed: boolean}>>([]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -39,29 +61,61 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     };
   }, []);
 
-  const calculateFrameChange = (canvas: HTMLCanvasElement): number => {
+  const analyzeFrame = (canvas: HTMLCanvasElement): {brightness: number, centerX: number, centerY: number, eyesClosed: boolean} => {
     const ctx = canvas.getContext('2d');
-    if (!ctx || !videoRef.current) return 0;
+    if (!ctx || !videoRef.current) return {brightness: 128, centerX: 0.5, centerY: 0.5, eyesClosed: false};
 
-    // Draw current frame
     canvas.width = 160;
     canvas.height = 120;
     ctx.drawImage(videoRef.current, 0, 0, 160, 120);
     const imageData = ctx.getImageData(0, 0, 160, 120);
     const data = imageData.data;
 
-    // Calculate average brightness
+    // Calculate brightness
     let sum = 0;
     for (let i = 0; i < data.length; i += 4) {
       sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
     }
-    return sum / (data.length / 4);
+    const brightness = sum / (data.length / 4);
+
+    // Estimate face center (darker region in center)
+    let darkSum = 0, darkCount = 0;
+    for (let i = 0; i < 160; i++) {
+      for (let j = 0; j < 120; j++) {
+        const idx = (j * 160 + i) * 4;
+        const pixelBrightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+        if (pixelBrightness < 100) { // dark pixels (face)
+          darkSum += i;
+          darkCount++;
+        }
+      }
+    }
+    const centerX = darkCount > 0 ? (darkSum / darkCount) / 160 : 0.5;
+    const centerY = 0.5; // approximate
+
+    // Detect if eyes closed (very dark around eye region)
+    let eyeRegionBrightness = 0;
+    let eyeCount = 0;
+    for (let i = 40; i < 120; i++) {
+      for (let j = 30; j < 90; j++) {
+        const idx = (j * 160 + i) * 4;
+        eyeRegionBrightness += (data[idx] + data[idx+1] + data[idx+2]) / 3;
+        eyeCount++;
+      }
+    }
+    const avgEyeBrightness = eyeRegionBrightness / eyeCount;
+    const eyesClosed = avgEyeBrightness < 40;
+
+    return {brightness, centerX, centerY, eyesClosed};
   };
 
   const startVerification = useCallback(async () => {
     setState('requesting_camera');
     setFaceStatus('Requesting camera access...');
-    setProgress(0);
+    setChallenges(getRandomChallenges());
+    setCurrentStep(0);
+    setStepComplete(false);
+    holdFrames.current = 0;
     frameHistoryRef.current = [];
 
     try {
@@ -73,7 +127,6 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         
-        // Wait for video to load before starting detection
         await new Promise(resolve => {
           const checkReady = () => {
             if (videoRef.current && videoRef.current.readyState >= 2) {
@@ -92,10 +145,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     }
 
     setState('detecting');
-    setFaceStatus('Move your head slightly to verify you\'re live...');
-
-    let detectionFrames = 0;
-    const requiredMotion = 12; // frames with sufficient motion
+    setFaceStatus('Position your face inside the circle');
 
     const detect = () => {
       if (!canvasRef.current || !videoRef.current) {
@@ -103,46 +153,109 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         return;
       }
 
-      const brightness = calculateFrameChange(canvasRef.current);
-      frameHistoryRef.current.push(brightness);
+      const frameData = analyzeFrame(canvasRef.current);
+      frameHistoryRef.current.push(frameData);
 
-      // Keep only last 30 frames
-      if (frameHistoryRef.current.length > 30) {
+      // Keep only last 40 frames
+      if (frameHistoryRef.current.length > 40) {
         frameHistoryRef.current.shift();
       }
 
-      // Detect motion: check if brightness values vary significantly
-      if (frameHistoryRef.current.length >= 8) {
-        const recentFrames = frameHistoryRef.current.slice(-8);
-        const minBrightness = Math.min(...recentFrames);
-        const maxBrightness = Math.max(...recentFrames);
-        const brightnessDiff = maxBrightness - minBrightness;
-
-        // If significant brightness change detected, increment motion count
-        if (brightnessDiff > 8) {
-          detectionFrames++;
-          setProgress((detectionFrames / requiredMotion) * 100);
-          setFaceStatus(`Detecting motion... ${Math.min(100, Math.round((detectionFrames / requiredMotion) * 100))}%`);
-        } else {
-          setFaceStatus('Move your head slightly to verify you\'re live...');
-        }
-
-        // Success: sufficient motion detected
-        if (detectionFrames >= requiredMotion) {
-          setState('success');
+      // Face detected if reasonable brightness
+      if (frameData.brightness < 180 && frameData.brightness > 50) {
+        // Move to challenge state
+        if (state === 'detecting') {
+          setState('challenge');
           setFaceStatus('');
-          if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-          if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-          onVerified(sessionIdRef.current);
-          return;
         }
+
+        if (state === 'challenge' || state === 'detecting') {
+          const currentAction = challenges[currentStep];
+          if (!currentAction) {
+            animFrameRef.current = requestAnimationFrame(detect);
+            return;
+          }
+
+          const recentFrames = frameHistoryRef.current.slice(-16);
+          if (recentFrames.length < 8) {
+            animFrameRef.current = requestAnimationFrame(detect);
+            return;
+          }
+
+          // Analyze motion pattern
+          const centerXValues = recentFrames.map(f => f.centerX);
+          const minX = Math.min(...centerXValues);
+          const maxX = Math.max(...centerXValues);
+          const xVariation = maxX - minX;
+
+          const brightnessValues = recentFrames.map(f => f.brightness);
+          const minBrightness = Math.min(...brightnessValues);
+          const maxBrightness = Math.max(...brightnessValues);
+          const brightnessVariation = maxBrightness - minBrightness;
+
+          let actionDetected = false;
+
+          switch (currentAction) {
+            case 'LOOK_UP':
+              // Face brightness increases when looking up (more forehead visible)
+              actionDetected = brightnessVariation > 12 && maxBrightness > frameData.brightness + 8;
+              break;
+            case 'LOOK_DOWN':
+              // Face center moves down slightly
+              actionDetected = brightnessVariation > 12 && recentFrames[recentFrames.length - 1].centerY > 0.55;
+              break;
+            case 'TURN_LEFT':
+              // Face center moves left
+              actionDetected = xVariation > 0.12 && minX < 0.35;
+              break;
+            case 'TURN_RIGHT':
+              // Face center moves right
+              actionDetected = xVariation > 0.12 && maxX > 0.65;
+              break;
+            case 'BLINK':
+              // Detect eyes closed
+              actionDetected = frameData.eyesClosed && !recentFrames[Math.max(0, recentFrames.length - 3)].eyesClosed;
+              break;
+          }
+
+          if (actionDetected) {
+            holdFrames.current++;
+            setFaceStatus('Hold...');
+          } else {
+            if (holdFrames.current > 0 && holdFrames.current < 3) {
+              holdFrames.current = 0;
+            }
+            setFaceStatus(`Perform: ${CHALLENGE_LABELS[currentAction]}`);
+          }
+
+          if (holdFrames.current >= HOLD_THRESHOLD) {
+            setStepComplete(true);
+            holdFrames.current = 0;
+
+            setTimeout(() => {
+              setStepComplete(false);
+              if (currentStep + 1 >= challenges.length) {
+                setState('success');
+                setFaceStatus('');
+                if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+                if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+                onVerified(sessionId);
+              } else {
+                setCurrentStep(s => s + 1);
+              }
+            }, 800);
+          }
+        }
+      } else {
+        setFaceStatus('Position your face inside the circle');
+        holdFrames.current = 0;
       }
 
       animFrameRef.current = requestAnimationFrame(detect);
     };
 
     detect();
-  }, [onVerified]);
+  }, [state, challenges, currentStep, sessionId, onVerified]);
 
   const handleRetry = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -150,8 +263,11 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     setAttempts(a => a + 1);
     setState('idle');
     setFaceStatus('');
-    setProgress(0);
-    sessionIdRef.current = generateSessionId();
+    setChallenges(getRandomChallenges());
+    setCurrentStep(0);
+    setStepComplete(false);
+    holdFrames.current = 0;
+    frameHistoryRef.current = [];
   };
 
   // Max 5 attempts
@@ -225,31 +341,44 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
 
           {/* Status/instruction */}
           <div className="mt-5 text-center min-h-[80px]">
-            {(state === 'requesting_camera' || state === 'detecting') && (
-              <div className="space-y-4">
-                {state === 'requesting_camera' && (
-                  <div className="flex items-center gap-2 justify-center text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">{faceStatus}</span>
-                  </div>
-                )}
+            {state === 'requesting_camera' && (
+              <div className="flex items-center gap-2 justify-center text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">{faceStatus}</span>
+              </div>
+            )}
 
-                {state === 'detecting' && (
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-foreground">{faceStatus}</p>
-                    
-                    {/* Progress bar */}
-                    <div className="w-48 h-2 rounded-full bg-muted overflow-hidden mx-auto">
-                      <div
-                        className="h-full bg-emerald-500 transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
+            {state === 'detecting' && (
+              <p className="text-sm text-muted-foreground">{faceStatus}</p>
+            )}
 
-                    <p className="text-xs text-muted-foreground">
-                      Attempt {attempts + 1} of 5
+            {state === 'challenge' && (
+              <div className="space-y-3">
+                {/* Progress dots */}
+                <div className="flex items-center justify-center gap-2">
+                  {challenges.map((_, i) => (
+                    <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < currentStep ? 'bg-emerald-500' : i === currentStep ? 'bg-[#8B1538]' : 'bg-border'}`} />
+                  ))}
+                </div>
+
+                {/* Current instruction */}
+                <div className="rounded-xl bg-[#8B1538]/5 border border-[#8B1538]/20 px-5 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                    Step {currentStep + 1} of {challenges.length}
+                  </p>
+                  {stepComplete ? (
+                    <p className="text-emerald-600 font-bold flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" /> Great!
                     </p>
-                  </div>
+                  ) : (
+                    <p className="text-[#8B1538] font-bold text-lg">
+                      {CHALLENGE_LABELS[challenges[currentStep]]}
+                    </p>
+                  )}
+                </div>
+
+                {faceStatus && !stepComplete && (
+                  <p className="text-xs text-muted-foreground">{faceStatus}</p>
                 )}
               </div>
             )}
