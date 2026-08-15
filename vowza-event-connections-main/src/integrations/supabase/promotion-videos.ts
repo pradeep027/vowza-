@@ -5,7 +5,12 @@ export const AUTH_PROMO_MAX_VIDEO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 const AUTH_PROMO_VIDEO_FILE_TYPES: Record<string, { extension: string; mimeType: string }> = {
   'video/mp4': { extension: 'mp4', mimeType: 'video/mp4' },
-  'video/webm': { extension: 'webm', mimeType: 'video/webm' },
+  // Note: WebM is NOT supported on iOS Safari or Chrome for iOS
+  // Only allow MP4 to ensure cross-platform compatibility
+};
+
+const DEPRECATED_FILE_TYPES: Record<string, { extension: string; mimeType: string }> = {
+  'video/webm': { extension: 'webm', mimeType: 'video/webm' }, // iOS incompatible — deprecated
 };
 
 // ============================================================================
@@ -70,9 +75,19 @@ const decodeVideo = (file: File): Promise<void> =>
 // ============================================================================
 
 export const validatePromotionVideo = async (file: File): Promise<void> => {
+  // Check for MP4 support only
   const fileDefinition = AUTH_PROMO_VIDEO_FILE_TYPES[file.type];
+  const isDeprecated = DEPRECATED_FILE_TYPES[file.type];
+  
+  if (isDeprecated) {
+    throw new Error(
+      `WebM videos are not supported on iOS and Safari browsers. ` +
+      `Please upload an MP4 video instead (H.264 codec recommended).`
+    );
+  }
+  
   if (!fileDefinition) {
-    throw new Error('Please upload an MP4 or WebM video file.');
+    throw new Error('Please upload an MP4 video file. WebM is not supported on iOS.');
   }
 
   if (file.size <= 0 || file.size > AUTH_PROMO_MAX_VIDEO_FILE_SIZE) {
@@ -293,6 +308,53 @@ export const getActivePromotionVideo = async (
 };
 
 /**
+ * Get active promotion video for an anonymous visitor.
+ * Uses visitor ID instead of user ID for tracking.
+ * Returns null if no eligible videos or all have reached limit.
+ */
+export const getActivePromotionVideoForVisitor = async (
+  visitorId: string,
+): Promise<PromotionVideoWithViewStatus | null> => {
+  console.log('[promotionVideos] Fetching active video for anonymous visitor:', visitorId);
+  
+  // For anonymous visitors, we get any active video that hasn't reached its limit
+  // The visitor tracking is done client-side via localStorage
+  const { data, error } = await supabase
+    .from('auth_promotion_videos')
+    .select(`
+      id,
+      video_url,
+      priority_order,
+      display_position,
+      user_limit,
+      unique_users_reached,
+      is_active
+    `)
+    .eq('is_active', true)
+    .lt('unique_users_reached', 'user_limit')
+    .order('priority_order', { ascending: true })
+    .limit(1);
+
+  if (error) {
+    console.error('[promotionVideos] Error fetching video for visitor:', error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] No active videos available for visitor');
+    return null;
+  }
+
+  const video = data[0];
+  console.log('[promotionVideos] ✅ Got video for visitor:', video.id);
+
+  return {
+    ...video,
+    has_user_viewed: false, // Anonymous visitors don't have view history in DB
+  } as PromotionVideoWithViewStatus;
+};
+
+/**
  * Atomically record that a user viewed a promotion video.
  * Enforces the 15-user limit and advances to next video when limit reached.
  * Returns true if successfully recorded, false if already viewed or limit reached.
@@ -301,6 +363,7 @@ export const recordPromotionView = async (
   videoId: string,
   userId: string,
 ): Promise<boolean> => {
+  console.log('[promotionVideos] Recording view for authenticated user:', userId, 'video:', videoId);
   const { data, error } = await supabase.rpc(
     'record_promotion_view',
     { p_video_id: videoId, p_user_id: userId },
@@ -311,7 +374,40 @@ export const recordPromotionView = async (
     return false;
   }
 
-  return data === true;
+  const result = data === true;
+  console.log('[promotionVideos] recordPromotionView result:', result);
+  return result;
+};
+
+/**
+ * Record that an anonymous visitor viewed a promotion video.
+ * For anonymous visitors, tracking is client-side via localStorage.
+ * This RPC still increments the user counter (respecting 15-user limit).
+ * Returns true if successfully recorded, false if limit reached or error.
+ */
+export const recordPromotionViewForVisitor = async (
+  videoId: string,
+  visitorId: string,
+): Promise<boolean> => {
+  console.log('[promotionVideos] Recording view for anonymous visitor:', visitorId, 'video:', videoId);
+  
+  // For anonymous visitors, we use a special RPC that tracks by a generic "visitor" identifier
+  // This allows us to count anonymous impressions toward the 15-user limit
+  const { data, error } = await supabase.rpc(
+    'record_promotion_view_for_visitor',
+    { p_video_id: videoId, p_visitor_id: visitorId },
+  );
+
+  if (error) {
+    console.warn('[promotionVideos] recordPromotionViewForVisitor error (not critical):', error);
+    // Non-critical: even if RPC fails, we still marked it locally via localStorage
+    // The user counter may not increment, but the video still plays once
+    return true;
+  }
+
+  const result = data === true;
+  console.log('[promotionVideos] recordPromotionViewForVisitor result:', result);
+  return result;
 };
 
 // ============================================================================

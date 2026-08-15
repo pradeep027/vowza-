@@ -282,17 +282,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = useCallback(async (): Promise<{ error: AuthError | Error | null }> => {
     try {
+      console.log('[AuthContext] Initiating Google OAuth sign-in');
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log('[AuthContext] OAuth redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       });
+      
+      if (error) {
+        console.error('[AuthContext] Google OAuth error:', {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+        });
+      } else {
+        console.log('[AuthContext] ✅ Google OAuth initiated, redirecting to Google...');
+      }
+      
       return { error };
     } catch (error) {
-      return {
-        error: error instanceof Error ? error : new Error('Google sign-in could not be started.'),
-      };
+      console.error('[AuthContext] Google sign-in exception:', error);
+      const err = error instanceof Error 
+        ? error 
+        : new Error('Google sign-in could not be started. Please check your internet connection or try again.');
+      return { error: err };
     }
   }, []);
 

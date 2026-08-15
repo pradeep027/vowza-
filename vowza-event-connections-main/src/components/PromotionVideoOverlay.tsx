@@ -160,12 +160,19 @@ const PromotionVideoOverlay = memo(
             {/* Video aspect ratio container (16:9) */}
             <div className="aspect-video relative overflow-hidden bg-black">
               {hasError ? (
-                // Fallback if video fails to load
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black gap-3">
-                  <div className="text-white/70 text-center px-4">
-                    <p className="text-sm font-semibold">Video Unavailable</p>
-                    <p className="text-xs text-white/50 mt-1">Please try again later</p>
+                // Error state — keep card visible instead of blank black box
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black gap-4">
+                  <div className="text-center px-6">
+                    <p className="text-white text-sm font-semibold">Video Temporarily Unavailable</p>
+                    <p className="text-white/60 text-xs mt-2">The video couldn't load. Please try again later or close this ad.</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="px-4 py-2 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                  >
+                    Close Ad
+                  </button>
                 </div>
               ) : (
                 <>
