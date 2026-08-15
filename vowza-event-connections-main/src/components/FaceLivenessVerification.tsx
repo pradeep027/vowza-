@@ -240,9 +240,16 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
 
     try {
       console.log('[HumanCheck] Importing FaceMesh...');
-      const { FaceMesh } = await import('@mediapipe/face_mesh');
-      console.log('[HumanCheck] FaceMesh imported successfully');
-      console.log('[HumanCheck] FaceMesh type:', typeof FaceMesh);
+      const FaceMeshModule = await import('@mediapipe/face_mesh');
+      console.log('[HumanCheck] Module imported:', FaceMeshModule);
+      
+      // Try default export first, then named export
+      const FaceMesh = FaceMeshModule.default || FaceMeshModule.FaceMesh;
+      console.log('[HumanCheck] FaceMesh constructor:', typeof FaceMesh);
+
+      if (!FaceMesh || typeof FaceMesh !== 'function') {
+        throw new Error(`FaceMesh is not a constructor. Received: ${typeof FaceMesh}`);
+      }
 
       const locateFile = (file: string) => {
         const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
