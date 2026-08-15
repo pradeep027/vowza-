@@ -342,14 +342,77 @@ export const getAllEligiblePromotionVideos = async (
 };
 
 /**
+ * ✨ NEW: Get a RANDOMLY selected eligible promotion video for an authenticated user.
+ * Uses get_random_eligible_promotion_video() RPC which selects from ALL eligible videos.
+ * This fixes the issue where Video 1 (priority_order=1) was always selected.
+ * 
+ * Returns: one random eligible video OR null if none available
+ * Eligible = is_active AND unique_users_reached < user_limit
+ */
+export const getRandomEligiblePromotionVideo = async (
+  userId: string,
+): Promise<PromotionVideoWithViewStatus | null> => {
+  console.log('[promotionVideos] 🎲 Calling get_random_eligible_promotion_video RPC with userId:', userId);
+  const { data, error } = await supabase.rpc(
+    'get_random_eligible_promotion_video',
+    { p_user_id: userId },
+  );
+
+  console.log('[promotionVideos] RPC raw response - data:', data, 'error:', error);
+
+  if (error) {
+    console.error('[promotionVideos] getRandomEligiblePromotionVideo RPC ERROR:', error.message, error.code, error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] RPC returned empty or null - no eligible videos');
+    console.warn('[promotionVideos] Possible reasons:');
+    console.warn('  1. No videos in auth_promotion_videos table');
+    console.warn('  2. All videos have is_active = FALSE');
+    console.warn('  3. All videos have reached their 15-user limit');
+    return null;
+  }
+  
+  const video = data[0] as PromotionVideoWithViewStatus;
+  console.log('[promotionVideos] ✅ 🎲 Random RPC success - selected video:', {
+    id: video.id,
+    video_url: video.video_url,
+    priority_order: video.priority_order,
+    has_user_viewed: video.has_user_viewed,
+    unique_users_reached: video.unique_users_reached,
+    user_limit: video.user_limit,
+    is_active: video.is_active,
+    display_position: video.display_position,
+  });
+  
+  // Validate URL is not empty
+  if (!video.video_url) {
+    console.error('[promotionVideos] ❌ ERROR: video_url is empty/null!');
+    return null;
+  }
+  
+  // Check if URL looks valid
+  if (!video.video_url.includes('supabase.co') && !video.video_url.startsWith('http')) {
+    console.error('[promotionVideos] ❌ ERROR: video_url looks invalid:', video.video_url);
+  }
+  
+  return video;
+};
+
+/**
  * Get the currently active promotion video for a user.
+ * ⚠️ DEPRECATED: Uses deterministic priority_order ordering (always returns Video 1)
+ * Use getRandomEligiblePromotionVideo() for random selection instead.
  * Returns video details + whether user has already viewed it.
  * If user has viewed all active videos, returns null/empty.
  */
 export const getActivePromotionVideo = async (
   userId: string,
 ): Promise<PromotionVideoWithViewStatus | null> => {
-  console.log('[promotionVideos] Calling RPC with userId:', userId);
+  console.log('[promotionVideos] ⚠️ DEPRECATED: Calling get_active_promotion_video RPC (deterministic, not random)');
+  console.log('[promotionVideos] Use getRandomEligiblePromotionVideo() instead for random selection');
+  
   const { data, error } = await supabase.rpc(
     'get_active_promotion_video',
     { p_user_id: userId },
@@ -398,14 +461,17 @@ export const getActivePromotionVideo = async (
 };
 
 /**
- * Get active promotion video for an anonymous visitor.
- * Uses visitor ID instead of user ID for tracking.
- * Returns null if no eligible videos or all have reached limit.
+ * ✨ FIXED: Get a RANDOMLY selected eligible promotion video for anonymous visitors.
+ * Changed from ORDER BY priority_order to ORDER BY RANDOM() for true random selection.
+ * This fixes the issue where Video 1 (priority_order=1) was always selected.
+ * 
+ * Returns: one random eligible video OR null if none available
+ * Eligible = is_active AND unique_users_reached < user_limit
  */
 export const getActivePromotionVideoForVisitor = async (
   visitorId: string,
 ): Promise<PromotionVideoWithViewStatus | null> => {
-  console.log('[promotionVideos] Fetching active video for anonymous visitor:', visitorId);
+  console.log('[promotionVideos] 🎲 Fetching RANDOM eligible video for anonymous visitor:', visitorId);
   
   // For anonymous visitors, we get any active video that hasn't reached its limit
   // The visitor tracking is done client-side via localStorage
@@ -422,7 +488,7 @@ export const getActivePromotionVideoForVisitor = async (
     `)
     .eq('is_active', true)
     .lt('unique_users_reached', 'user_limit')
-    .order('priority_order', { ascending: true })
+    .order('random')  // 🎲 RANDOM SELECTION FROM ALL ELIGIBLE VIDEOS
     .limit(1);
 
   if (error) {
@@ -431,12 +497,17 @@ export const getActivePromotionVideoForVisitor = async (
   }
 
   if (!data || data.length === 0) {
-    console.warn('[promotionVideos] No active videos available for visitor');
+    console.warn('[promotionVideos] No active eligible videos available for visitor');
     return null;
   }
 
   const video = data[0];
-  console.log('[promotionVideos] ✅ Got video for visitor:', video.id);
+  console.log('[promotionVideos] ✅ 🎲 Got RANDOM video for visitor:', {
+    id: video.id,
+    priority_order: video.priority_order,
+    unique_users_reached: video.unique_users_reached,
+    user_limit: video.user_limit,
+  });
 
   return {
     ...video,

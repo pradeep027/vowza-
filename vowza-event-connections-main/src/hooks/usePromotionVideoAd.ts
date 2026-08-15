@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  getRandomPromotionVideo,
-  getRandomPromotionVideoForVisitor,
+  getRandomEligiblePromotionVideo,
+  getActivePromotionVideoForVisitor,
+  recordPromotionView,
+  recordPromotionViewForVisitor,
   type PromotionVideoWithViewStatus,
   PROMOTION_VIDEO_UPDATED_EVENT,
 } from '@/integrations/supabase/promotion-videos';
@@ -143,52 +145,49 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
 
   const refresh = useCallback(async () => {
     const isAuth = !!user?.id;
-    console.log('[usePromotionVideoAd] refresh() called - authenticated:', isAuth, 'visitorId:', visitorId);
-    
-    // IMPORTANT: Remove one-time display limit (show ad every time)
-    // Users should see promotional content multiple times for maximum engagement
+    console.log('[usePromotionVideoAd] 🎲 refresh() called - authenticated:', isAuth, 'visitorId:', visitorId);
     
     // Determine which flow to use
     if (isAuth) {
       // ─── AUTHENTICATED USER FLOW ──────────────────────────────────────────
-      console.log('[usePromotionVideoAd] Using authenticated user flow');
+      console.log('[usePromotionVideoAd] 🎲 Using authenticated user flow with RANDOM selection');
 
       setIsLoading(true);
       try {
-        // Get random video from all active videos (no limit on number of times user sees it)
-        const randomVideo = await getRandomPromotionVideo();
+        // Get RANDOM video from all eligible videos (using new RPC)
+        const randomVideo = await getRandomEligiblePromotionVideo(user.id);
         if (!randomVideo) {
           console.warn('[usePromotionVideoAd] No available videos for authenticated user');
           setVideo(null);
         } else {
-          console.log('[usePromotionVideoAd] ✅ Got random video for authenticated user:', randomVideo.id);
+          console.log('[usePromotionVideoAd] ✅ 🎲 Got random video for authenticated user:', randomVideo.id);
           setVideo(randomVideo);
-          setHasUserViewed(false); // Reset — show every time
+          setHasUserViewed(randomVideo.has_user_viewed ?? false);
         }
       } catch (error) {
-        console.error('[usePromotionVideoAd] Exception fetching video (auth):', error);
+        console.error('[usePromotionVideoAd] Exception fetching random video (auth):', error);
         setVideo(null);
       } finally {
         setIsLoading(false);
       }
     } else if (visitorId) {
       // ─── ANONYMOUS VISITOR FLOW ───────────────────────────────────────────
-      console.log('[usePromotionVideoAd] Using anonymous visitor flow');
+      console.log('[usePromotionVideoAd] 🎲 Using anonymous visitor flow with RANDOM selection');
 
       setIsLoading(true);
       try {
-        // Get random video from all active videos (no limit on number of times visitor sees it)
-        const randomVideo = await getRandomPromotionVideoForVisitor();
+        // Get RANDOM video from all eligible videos
+        const randomVideo = await getActivePromotionVideoForVisitor(visitorId);
         if (!randomVideo) {
           console.warn('[usePromotionVideoAd] No available videos for anonymous visitor');
           setVideo(null);
         } else {
-          console.log('[usePromotionVideoAd] ✅ Got random video for anonymous visitor:', randomVideo.id);
+          console.log('[usePromotionVideoAd] ✅ 🎲 Got random video for anonymous visitor:', randomVideo.id);
           setVideo(randomVideo);
-          setHasUserViewed(false); // Reset — show every time
+          setHasUserViewed(false);
         }
       } catch (error) {
-        console.error('[usePromotionVideoAd] Exception fetching video (visitor):', error);
+        console.error('[usePromotionVideoAd] Exception fetching random video (visitor):', error);
         setVideo(null);
       } finally {
         setIsLoading(false);
@@ -206,11 +205,61 @@ export function usePromotionVideoAd(): UsePromotionVideoAdResult {
       return false;
     }
 
-    // With no-limit strategy, we don't need to track views or prevent repeats
-    // Just log that the video was viewed and continue
-    console.log('[usePromotionVideoAd] Video viewed:', video.id);
-    return true;
-  }, [video?.id]);
+    const isAuth = !!user?.id;
+    
+    if (isAuth) {
+      // ─── AUTHENTICATED USER: Record in database ──────────────────────────
+      if (!user?.id) return false;
+
+      if (hasUserViewed) {
+        console.log('[usePromotionVideoAd] recordView() skipped - authenticated user already counted');
+        return false;
+      }
+
+      try {
+        console.log('[usePromotionVideoAd] Recording view for authenticated user:', user.id, 'video:', video.id);
+        const recorded = await recordPromotionView(video.id, user.id);
+        
+        if (recorded) {
+          console.log('[usePromotionVideoAd] ✅ View recorded (auth) - enforcing 15-user limit');
+          setHasUserViewed(true);
+          // Don't refresh here — let admin or next page load get next video
+        } else {
+          console.warn('[usePromotionVideoAd] recordPromotionView (auth) returned FALSE');
+        }
+        return recorded;
+      } catch (error) {
+        console.error('[usePromotionVideoAd] Failed to record view (auth):', error);
+        return false;
+      }
+    } else if (visitorId) {
+      // ─── ANONYMOUS VISITOR: Record with visitor ID ────────────────────────
+      if (hasUserViewed) {
+        console.log('[usePromotionVideoAd] recordView() skipped - anonymous visitor already counted');
+        return false;
+      }
+
+      try {
+        console.log('[usePromotionVideoAd] Recording view for anonymous visitor:', visitorId, 'video:', video.id);
+        const recorded = await recordPromotionViewForVisitor(video.id, visitorId);
+        
+        if (recorded) {
+          console.log('[usePromotionVideoAd] ✅ View recorded (visitor) - enforcing 15-user limit');
+          setHasUserViewed(true);
+          // Don't refresh here — let next page load get next video
+        } else {
+          console.warn('[usePromotionVideoAd] recordPromotionViewForVisitor returned FALSE');
+        }
+        return recorded;
+      } catch (error) {
+        console.error('[usePromotionVideoAd] Failed to record view (visitor):', error);
+        return false;
+      }
+    } else {
+      console.log('[usePromotionVideoAd] recordView() - no user or visitor ID');
+      return false;
+    }
+  }, [video?.id, user?.id, visitorId, hasUserViewed]);
 
   // Fetch active video on mount and when auth state changes
   useEffect(() => {
