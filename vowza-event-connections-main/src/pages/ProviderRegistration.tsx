@@ -306,7 +306,7 @@ export default function ProviderRegistration() {
         return !!(s2.experience && aboutOk && s2.selfieBlob);
       }
       case 3: return s3.portfolioFiles.length >= 2;
-      case 4: return !!(s4.aadhaarStatus === 'verified' && s4.panStatus === 'verified' && (s4.govtIdStatus === 'idle' || s4.govtIdStatus === 'verified') && s4.termsAccepted && s4.aadhaarStatus !== 'processing' && s4.panStatus !== 'processing');
+      case 4: return !!(s4.aadhaarStatus === 'verified' && (s4.panStatus === 'idle' || s4.panStatus === 'verified') && (s4.govtIdStatus === 'idle' || s4.govtIdStatus === 'verified') && s4.termsAccepted && s4.aadhaarStatus !== 'processing' && s4.panStatus !== 'processing');
       case 5: return livenessVerified;
       case 6: return true;
       default: return false;
@@ -355,9 +355,8 @@ export default function ProviderRegistration() {
         if (s4.aadhaarStatus === 'idle') errors.aadhaar = 'Please upload your Aadhaar Card';
         else if (s4.aadhaarStatus === 'processing') errors.aadhaar = 'Aadhaar verification is still in progress';
         else if (s4.aadhaarStatus !== 'verified') errors.aadhaar = s4.aadhaarMessage || 'Aadhaar Card could not be verified. Please upload a valid Aadhaar.';
-        if (s4.panStatus === 'idle') errors.pan = 'Please upload your PAN Card';
-        else if (s4.panStatus === 'processing') errors.pan = 'PAN verification is still in progress';
-        else if (s4.panStatus !== 'verified') errors.pan = s4.panMessage || 'PAN Card could not be verified. Please upload a valid PAN Card.';
+        // PAN is now optional - only validate if user has uploaded one
+        if (s4.panFile && s4.panStatus !== 'idle' && s4.panStatus !== 'verified') errors.pan = s4.panMessage || 'PAN Card could not be verified. Please upload a valid PAN Card.';
         if (s4.govtIdFile && s4.govtIdStatus !== 'idle' && s4.govtIdStatus !== 'verified') errors.govtId = s4.govtIdMessage || 'The uploaded Government ID could not be verified.';
         if (!s4.termsAccepted) errors.terms = 'Please accept the terms and conditions';
         break;
@@ -970,7 +969,7 @@ function Step4Form({ s4, setS4 }: {
         <DocumentUploadCard
           label="PAN Card"
           documentType="pan"
-          required
+          required={false}
           onVerified={handlePanVerified}
           onCleared={() => setS4(p => ({ ...p, panFile: null, panPreview: '', panStatus: 'idle', panMessage: '' }))}
           currentStatus={s4.panStatus}
