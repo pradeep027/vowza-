@@ -217,8 +217,8 @@ export default function ProviderRegistration() {
       faceMesh.setOptions({
         maxNumFaces: 1,
         refineLandmarks: true,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
       });
 
       // Handle face detection results
@@ -241,7 +241,9 @@ export default function ProviderRegistration() {
       detect();
     } catch (err) {
       console.error('Failed to initialize face detection:', err);
-      toast.error('Face detection unavailable. Camera capture will proceed without validation.');
+      // Fallback: enable capture without validation
+      setFaceQualityOk(true);
+      setFaceStatus('Face detection unavailable. Manual capture enabled.');
     }
   };
 
@@ -254,12 +256,24 @@ export default function ProviderRegistration() {
       setFaceQualityOk(false);
       setFaceStatus('Loading face detection...');
       
+      // Add timeout to fallback if face detection takes too long
+      const detectionTimeoutId = setTimeout(() => {
+        if (faceQualityOk === false && faceStatus === 'Loading face detection...') {
+          setFaceStatus('Face detection ready. Position your face to enable capture.');
+        }
+      }, 3000);
+      
       setTimeout(async () => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
           // Initialize face detection after video starts
-          await initializeFaceDetection();
+          try {
+            await initializeFaceDetection();
+          } catch (err) {
+            console.error('Face detection init error:', err);
+            clearTimeout(detectionTimeoutId);
+          }
         }
       }, 100);
     } catch {
