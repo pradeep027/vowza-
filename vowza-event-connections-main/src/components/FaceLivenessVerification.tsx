@@ -52,6 +52,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   const streamRef = useRef<MediaStream | null>(null);
   const faceMeshRef = useRef<any>(null);
   const animFrameRef = useRef<number>(0);
+  const stateRef = useRef<VerificationState>('idle');
 
   const [state, setState] = useState<VerificationState>('idle');
   const [faceStatus, setFaceStatus] = useState<string>('');
@@ -64,6 +65,11 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   const holdFrames = useRef(0);
   const HOLD_THRESHOLD = 12; // ~0.5 seconds at 24fps
 
+  // Keep stateRef in sync with state
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -73,11 +79,14 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     };
   }, []);
 
-  // Define onResults first so it can be used in startVerification
+  // Define onResults WITHOUT state in dependencies - use stateRef instead
   const onResults = useCallback((results: any) => {
     if (!results.multiFaceLandmarks) return;
 
     const faces = results.multiFaceLandmarks;
+    const currentState = stateRef.current;
+
+    console.log('[HumanCheck] Result received. Face count:', faces.length, 'State:', currentState);
 
     if (faces.length === 0) {
       setFaceStatus('Face not detected. Please position your face inside the circle.');
@@ -92,64 +101,86 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     }
 
     const landmarks = faces[0];
-
-    // Check face is centered and properly sized (relaxed bounds to allow more positions)
     const noseTip = landmarks[1];
+
+    // Check face is centered
     const isCentered = noseTip.x > 0.1 && noseTip.x < 0.9 && noseTip.y > 0.05 && noseTip.y < 0.95;
     
     if (!isCentered) {
+      console.log('[HumanCheck] Face not centered. Position:', { x: noseTip.x, y: noseTip.y });
       setFaceStatus('Move your face to the center');
       holdFrames.current = 0;
       return;
     }
 
-    // Face detected and centered, transition to first action
-    if (state === 'detecting') {
-      console.log('[HumanCheck] Face centered, transitioning to left_required');
+    console.log('[HumanCheck] Face centered');
+
+    // Face detected and centered - transition from detecting state
+    if (currentState === 'detecting') {
+      console.log('[HumanCheck] Transitioning from detecting to left_required');
       setState('left_required');
       setFaceStatus('');
+      return;
     }
 
-    if (state !== 'left_required' && state !== 'left_completed' && state !== 'right_required' && state !== 'right_completed' && state !== 'up_required') {
+    // Only process pose if we're in an active liveness state
+    if (!['left_required', 'left_completed', 'right_required', 'right_completed', 'up_required'].includes(currentState)) {
       return;
     }
 
     const { pitch, yaw } = estimateHeadPose(landmarks);
     let actionDetected = false;
 
+    console.log('[HumanCheck] Head pose - Yaw:', yaw.toFixed(2), 'Pitch:', pitch.toFixed(2), 'State:', currentState);
+
     // Detect movement based on current step
-    switch (state) {
+    switch (currentState) {
       case 'left_required':
         // TURN LEFT: yaw should be negative (< -0.18)
         actionDetected = yaw < -0.18;
-        if (actionDetected) setFaceStatus('Hold...');
-        else setFaceStatus('Turn your head LEFT');
+        if (actionDetected) {
+          console.log('[HumanCheck] LEFT movement detected');
+          setFaceStatus('Hold...');
+        } else {
+          setFaceStatus('Turn your head LEFT');
+        }
         break;
 
       case 'right_required':
         // TURN RIGHT: yaw should be positive (> 0.18)
         actionDetected = yaw > 0.18;
-        if (actionDetected) setFaceStatus('Hold...');
-        else setFaceStatus('Turn your head RIGHT');
+        if (actionDetected) {
+          console.log('[HumanCheck] RIGHT movement detected');
+          setFaceStatus('Hold...');
+        } else {
+          setFaceStatus('Turn your head RIGHT');
+        }
         break;
 
       case 'up_required':
         // LOOK UP: pitch should be negative (< -0.15)
         actionDetected = pitch < -0.15;
-        if (actionDetected) setFaceStatus('Hold...');
-        else setFaceStatus('Look UP');
+        if (actionDetected) {
+          console.log('[HumanCheck] UP movement detected');
+          setFaceStatus('Hold...');
+        } else {
+          setFaceStatus('Look UP');
+        }
         break;
     }
 
     if (actionDetected) {
       holdFrames.current++;
+      console.log('[HumanCheck] Hold frames:', holdFrames.current);
     } else {
       if (holdFrames.current > 0 && holdFrames.current < 3) {
         holdFrames.current = 0;
+        console.log('[HumanCheck] Hold reset (< 3 frames)');
       }
     }
 
     if (holdFrames.current >= HOLD_THRESHOLD) {
+      console.log('[HumanCheck] Action complete! Current state:', currentState);
       holdFrames.current = 0;
       setStepComplete(true);
 
@@ -157,22 +188,26 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         setStepComplete(false);
 
         // Progress through sequence
-        if (state === 'left_required') {
+        if (currentState === 'left_required') {
+          console.log('[HumanCheck] Transitioning: left_required → left_completed → right_required');
           setState('left_completed');
           setTimeout(() => setState('right_required'), 400);
-        } else if (state === 'right_required') {
+        } else if (currentState === 'right_required') {
+          console.log('[HumanCheck] Transitioning: right_required → right_completed → up_required');
           setState('right_completed');
           setTimeout(() => setState('up_required'), 400);
-        } else if (state === 'up_required') {
+        } else if (currentState === 'up_required') {
+          console.log('[HumanCheck] Transitioning: up_required → success');
           setState('success');
           setFaceStatus('');
           if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
           if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+          console.log('[HumanCheck] Verification complete! Session ID:', sessionId);
           onVerified(sessionId);
         }
       }, 800);
     }
-  }, [state, sessionId, onVerified]);
+  }, [onVerified, sessionId]);
 
   const startVerification = useCallback(async () => {
     console.log('[HumanCheck] Starting verification...');
