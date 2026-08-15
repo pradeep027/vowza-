@@ -198,19 +198,14 @@ const PromotionVideoOverlay = memo(
             {/* Video aspect ratio container (16:9) */}
             <div className="aspect-video relative overflow-hidden bg-black">
               {hasError ? (
-                // Error state — keep card visible instead of blank black box
+                // ⚠️ Video failed to load — show graceful fallback
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black gap-4">
                   <div className="text-center px-6">
-                    <p className="text-white text-sm font-semibold">Video Temporarily Unavailable</p>
-                    <p className="text-white/60 text-xs mt-2">The video couldn't load. Please try again later or close this ad.</p>
+                    <div className="mb-3 text-4xl">📹</div>
+                    <p className="text-white text-sm font-semibold">Video Not Available</p>
+                    <p className="text-white/60 text-xs mt-2">This promotional video couldn't load.</p>
+                    <p className="text-white/50 text-xs mt-1">Check your connection or try again later.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="px-4 py-2 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                  >
-                    Close Ad
-                  </button>
                 </div>
               ) : (
                 <>
@@ -225,7 +220,8 @@ const PromotionVideoOverlay = memo(
                     disablePictureInPicture
                     onPlay={handlePlayStart}
                     onError={(e) => {
-                      console.error('[PromotionVideoOverlay] Video error:', videoRef.current?.error?.message);
+                      console.error('[PromotionVideoOverlay] Video error:', videoRef.current?.error?.message, 'Error code:', videoRef.current?.error?.code);
+                      console.warn('[PromotionVideoOverlay] Video URL was:', video.video_url);
                       setHasError(true);
                     }}
                     className="absolute inset-0 w-full h-full object-contain"

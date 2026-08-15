@@ -236,8 +236,8 @@ const AppContent = () => {
         </Routes>
       </Suspense>
 
-      {/* Global overlays — always visible regardless of route */}
-      {video && showOverlay && (
+      {/* Global overlays — always visible when video available OR loading */}
+      {(video || isLoading) && showOverlay && video && (
         <PromotionVideoOverlay
           video={video}
           onClose={handleClose}
