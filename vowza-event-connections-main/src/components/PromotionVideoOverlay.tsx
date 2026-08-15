@@ -114,7 +114,10 @@ const PromotionVideoOverlay = memo(
           video.playsinline = true;
           setIsMuted(false);
           
-          await video.play();
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            await playPromise;
+          }
           console.log('[PromotionVideoOverlay] ✅ Unmuted autoplay succeeded');
           return;
         } catch (err) {
@@ -128,7 +131,10 @@ const PromotionVideoOverlay = memo(
             video.playsinline = true;
             setIsMuted(true);
             
-            await video.play();
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              await playPromise;
+            }
             console.log('[PromotionVideoOverlay] ✅ Muted autoplay succeeded (iOS/restrictive browser)');
             return;
           } catch (err2) {
@@ -209,20 +215,38 @@ const PromotionVideoOverlay = memo(
                 </div>
               ) : (
                 <>
-                  {/* Video element */}
+                  {/* Video element — with multiple fallback strategies for mobile */}
                   <video
                     ref={videoRef}
                     src={video.video_url}
                     muted={isMuted}
+                    autoPlay
                     playsInline
-                    preload="metadata"
+                    preload="auto"
                     controlsList="nodownload noplaybackrate nofullscreen"
                     disablePictureInPicture
+                    poster={undefined}  // No poster — show video immediately
+                    crossOrigin="anonymous"
                     onPlay={handlePlayStart}
                     onError={(e) => {
                       console.error('[PromotionVideoOverlay] Video error:', videoRef.current?.error?.message, 'Error code:', videoRef.current?.error?.code);
                       console.warn('[PromotionVideoOverlay] Video URL was:', video.video_url);
+                      console.warn('[PromotionVideoOverlay] Video readyState:', videoRef.current?.readyState);
+                      console.warn('[PromotionVideoOverlay] Video networkState:', videoRef.current?.networkState);
                       setHasError(true);
+                    }}
+                    onCanPlay={() => {
+                      console.log('[PromotionVideoOverlay] ✅ Video can play (data loaded)');
+                    }}
+                    onLoadedMetadata={() => {
+                      console.log('[PromotionVideoOverlay] ✅ Video metadata loaded - duration:', videoRef.current?.duration);
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      backgroundColor: 'black',
+                      display: 'block', // Force block display
                     }}
                     className="absolute inset-0 w-full h-full object-contain"
                     aria-label="Promotional video"
