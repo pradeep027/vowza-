@@ -97,35 +97,73 @@ const PromotionVideoOverlay = memo(
       autoplayAttemptedRef.current = true;
       const video = videoRef.current;
 
-      // Strategy: Try unmuted first, then muted, then show fallback
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // AGGRESSIVE PLAYBACK STRATEGY FOR ALL PHONES:
+      // Attempt 1: Unmuted autoplay (desktop/Chrome Android)
+      // Attempt 2: Muted autoplay (iOS Safari, restrictive browsers)
+      // Attempt 3: Preload with blob fallback (network failures)
+      // Attempt 4: Show "Tap to Play" (completely blocked autoplay)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      
       const attemptPlay = async () => {
         try {
-          // First attempt: unmuted autoplay
-          console.log('[PromotionVideoOverlay] Attempting unmuted autoplay...');
+          // ────── ATTEMPT 1: Unmuted Autoplay ──────
+          console.log('[PromotionVideoOverlay] Attempt 1/4: Unmuted autoplay...');
           video.muted = false;
+          video.autoplay = true;
+          video.playsinline = true;
           setIsMuted(false);
+          
           await video.play();
           console.log('[PromotionVideoOverlay] ✅ Unmuted autoplay succeeded');
           return;
         } catch (err) {
-          console.warn('[PromotionVideoOverlay] Unmuted autoplay blocked, trying muted...');
+          console.warn('[PromotionVideoOverlay] Attempt 1 blocked (normal on iOS):', err);
           
           try {
-            // Fallback: muted autoplay
+            // ────── ATTEMPT 2: Muted Autoplay ──────
+            console.log('[PromotionVideoOverlay] Attempt 2/4: Muted autoplay...');
             video.muted = true;
+            video.autoplay = true;
+            video.playsinline = true;
             setIsMuted(true);
+            
             await video.play();
-            console.log('[PromotionVideoOverlay] ✅ Muted autoplay succeeded');
+            console.log('[PromotionVideoOverlay] ✅ Muted autoplay succeeded (iOS/restrictive browser)');
             return;
           } catch (err2) {
-            console.warn('[PromotionVideoOverlay] Muted autoplay also blocked, showing play button');
-            // Final fallback: show "Tap to Play" button
+            console.warn('[PromotionVideoOverlay] Attempt 2 also blocked:', err2);
+            
+            try {
+              // ────── ATTEMPT 3: Preload with blob fallback ──────
+              console.log('[PromotionVideoOverlay] Attempt 3/4: Preloading video blob...');
+              video.preload = 'auto';
+              video.muted = true;
+              video.autoplay = false;
+              setIsMuted(true);
+              
+              // Preload by requesting the video resource
+              const response = await fetch(video.src || '', { method: 'HEAD' });
+              if (response.ok) {
+                console.log('[PromotionVideoOverlay] ✅ Video preloaded, ready for user interaction');
+              }
+            } catch (err3) {
+              console.warn('[PromotionVideoOverlay] Attempt 3 preload failed:', err3);
+            }
+            
+            // ────── ATTEMPT 4: Show "Tap to Play" ──────
+            console.log('[PromotionVideoOverlay] Attempt 4/4: Showing Tap to Play fallback');
             setShowPlayFallback(true);
           }
         }
       };
 
-      attemptPlay();
+      // Add small delay to ensure DOM is fully ready on mobile
+      const timeoutId = setTimeout(() => {
+        attemptPlay();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
     }, [hasError]);
 
     // Cleanup on unmount

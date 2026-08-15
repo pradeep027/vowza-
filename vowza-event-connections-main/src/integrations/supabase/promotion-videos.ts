@@ -199,6 +199,96 @@ export const deletePromotionVideo = async (videoId: string): Promise<void> => {
 // ============================================================================
 
 /**
+ * ✨ NEW (NO 15-USER LIMIT): Get a random promotion video for an authenticated user.
+ * Ignores user_limit and unique_users_reached entirely.
+ * Returns ONE random active video from ALL active videos.
+ * Ads display to EVERY user on EVERY page load (maximum engagement).
+ */
+export const getRandomPromotionVideo = async (): Promise<PromotionVideo | null> => {
+  console.log('[promotionVideos] 🎲 Fetching random video (NO LIMIT - all users see ads every time)');
+  
+  // Get all active videos (ignore user_limit and unique_users_reached)
+  const { data, error } = await supabase
+    .from('auth_promotion_videos')
+    .select(`
+      id,
+      admin_id,
+      video_url,
+      storage_path,
+      priority_order,
+      display_position,
+      user_limit,
+      unique_users_reached,
+      is_active,
+      created_at,
+      updated_at
+    `)
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('[promotionVideos] ❌ Error fetching videos for random selection:', error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] ⚠️ No active videos available');
+    return null;
+  }
+
+  // Select random video
+  const randomIndex = Math.floor(Math.random() * data.length);
+  const randomVideo = data[randomIndex] as PromotionVideo;
+  
+  console.log(`[promotionVideos] ✅ Selected random video (${randomIndex + 1}/${data.length}):`, randomVideo.id);
+  return randomVideo;
+};
+
+/**
+ * ✨ NEW (NO 15-USER LIMIT): Get a random promotion video for anonymous visitors.
+ * Ignores user_limit and unique_users_reached entirely.
+ * Returns ONE random active video from ALL active videos.
+ * Ads display to EVERY anonymous user on EVERY page load.
+ */
+export const getRandomPromotionVideoForVisitor = async (): Promise<PromotionVideo | null> => {
+  console.log('[promotionVideos] 🎲 Fetching random video for visitor (NO LIMIT - all visitors see ads every time)');
+  
+  // Get all active videos (ignore user_limit and unique_users_reached)
+  const { data, error } = await supabase
+    .from('auth_promotion_videos')
+    .select(`
+      id,
+      admin_id,
+      video_url,
+      storage_path,
+      priority_order,
+      display_position,
+      user_limit,
+      unique_users_reached,
+      is_active,
+      created_at,
+      updated_at
+    `)
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('[promotionVideos] ❌ Error fetching videos for visitor random selection:', error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('[promotionVideos] ⚠️ No active videos available for visitor');
+    return null;
+  }
+
+  // Select random video
+  const randomIndex = Math.floor(Math.random() * data.length);
+  const randomVideo = data[randomIndex] as PromotionVideo;
+  
+  console.log(`[promotionVideos] ✅ Selected random video for visitor (${randomIndex + 1}/${data.length}):`, randomVideo.id);
+  return randomVideo;
+};
+
+/**
  * Get all eligible promotion videos for a user.
  * Returns all active videos that haven't reached their user limit.
  * Use for random selection among eligible videos.
