@@ -202,7 +202,7 @@ const PromotionVideoOverlay = memo(
           {/* Main overlay container */}
           <div className="relative overflow-hidden rounded-2xl bg-black shadow-2xl border border-white/10">
             {/* Video aspect ratio container (16:9) */}
-            <div className="aspect-video relative overflow-hidden bg-black">
+            <div className="aspect-video relative overflow-hidden bg-black flex items-center justify-center">
               {hasError ? (
                 // ⚠️ Video failed to load — show graceful fallback
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black gap-4">
@@ -298,7 +298,13 @@ const PromotionVideoOverlay = memo(
                       height: '100%',
                       objectFit: 'contain',
                       backgroundColor: 'black',
-                      display: 'block', // Force block display
+                      display: 'block !important',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      visibility: 'visible',
+                      opacity: 1,
+                      zIndex: 10,
                     }}
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     aria-label="Promotional video"
