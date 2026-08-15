@@ -730,7 +730,7 @@ function Step1Form({ s1, setS1, sendOTP, verifyOTP, otpLoading }: {
       />
 
       <Field label="House / Shop Number" >
-        <input value={s1.address} onChange={set('address')} placeholder="Flat / Shop / House number"
+        <input value={s1.houseNumber} onChange={set('houseNumber')} placeholder="Flat / Shop / House number"
           className="input-premium text-sm w-full" />
       </Field>
 

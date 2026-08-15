@@ -19,7 +19,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 export interface Step1 {
   fullName: string; phone: string; otpSent: boolean; otpVerified: boolean;
   otp: string; email: string; state: string; district: string; city: string; area: string;
-  address: string; pincode: string; latitude: number | null; longitude: number | null;
+  address: string; houseNumber: string; pincode: string; latitude: number | null; longitude: number | null;
   profession: string; languages: string[];
 }
 export interface Step2 {
@@ -38,7 +38,7 @@ export interface Step4 {
   termsAccepted: boolean;
 }
 
-const EMPTY_S1: Step1 = { fullName:'', phone:'', otpSent:false, otpVerified:false, otp:'', email:'', state:'', district:'', city:'', area:'', address:'', pincode:'', latitude:null, longitude:null, profession:'', languages:[] };
+const EMPTY_S1: Step1 = { fullName:'', phone:'', otpSent:false, otpVerified:false, otp:'', email:'', state:'', district:'', city:'', area:'', address:'', houseNumber:'', pincode:'', latitude:null, longitude:null, profession:'', languages:[] };
 const EMPTY_S2: Step2 = { experience:'', about:'', serviceAreas:[], selfieUrl:null, selfieBlob:null };
 const EMPTY_S3: Step3 = { portfolioFiles:[], instagram:'', website:'' };
 const EMPTY_S4: Step4 = { aadhaarFile:null, aadhaarPreview:'', aadhaarStatus:'idle', aadhaarMessage:'', panFile:null, panPreview:'', panStatus:'idle', panMessage:'', govtIdFile:null, govtIdPreview:'', govtIdStatus:'idle', govtIdMessage:'', termsAccepted:false };
