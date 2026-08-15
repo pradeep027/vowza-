@@ -1,14 +1,14 @@
 /**
  * Vowza Face Liveness Verification Component
- * Motion-based liveness with required challenges: LOOK_UP, LOOK_DOWN, TURN_LEFT, TURN_RIGHT, BLINK
- * No external dependencies - uses canvas face detection patterns
+ * FIXED SEQUENCE: LOOK_UP → TURN_RIGHT → TURN_LEFT
+ * Uses baseline-relative head pose estimation with improved motion detection
+ * No external ML libraries - canvas-based face center tracking
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Camera, CheckCircle2, AlertCircle, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
-import { toast } from 'sonner';
 
-type ChallengeAction = 'LOOK_UP' | 'LOOK_DOWN' | 'TURN_LEFT' | 'TURN_RIGHT' | 'BLINK';
-type VerificationState = 'idle' | 'requesting_camera' | 'detecting' | 'challenge' | 'success' | 'failed';
+type ChallengeAction = 'LOOK_UP' | 'TURN_RIGHT' | 'TURN_LEFT';
+type VerificationState = 'idle' | 'requesting_camera' | 'detecting' | 'look_up_required' | 'look_up_completed' | 'turn_right_required' | 'turn_right_completed' | 'turn_left_required' | 'turn_left_completed' | 'success' | 'failed';
 
 interface Props {
   onVerified: (sessionId: string) => void;
@@ -17,18 +17,12 @@ interface Props {
 
 const CHALLENGE_LABELS: Record<ChallengeAction, string> = {
   LOOK_UP: 'Look UP',
-  LOOK_DOWN: 'Look DOWN',
   TURN_LEFT: 'Turn your head LEFT',
   TURN_RIGHT: 'Turn your head RIGHT',
-  BLINK: 'Blink your eyes',
 };
 
-const ALL_ACTIONS: ChallengeAction[] = ['LOOK_UP', 'LOOK_DOWN', 'TURN_LEFT', 'TURN_RIGHT', 'BLINK'];
-
-function getRandomChallenges(): ChallengeAction[] {
-  const shuffled = [...ALL_ACTIONS].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3);
-}
+// FIXED SEQUENCE - DO NOT RANDOMIZE
+const REQUIRED_SEQUENCE: ChallengeAction[] = ['LOOK_UP', 'TURN_RIGHT', 'TURN_LEFT'];
 
 function generateSessionId(): string {
   return `lv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -42,16 +36,16 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   
   const [state, setState] = useState<VerificationState>('idle');
   const [faceStatus, setFaceStatus] = useState<string>('');
-  const [challenges, setChallenges] = useState<ChallengeAction[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [stepComplete, setStepComplete] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [sessionId] = useState(generateSessionId);
 
-  // Track consecutive frames where challenge condition is met
+  // Baseline for head pose (established during LOOK_UP)
+  const baselineRef = useRef<{x: number, y: number} | null>(null);
   const holdFrames = useRef(0);
-  const HOLD_THRESHOLD = 12; // ~0.5 seconds at 24fps
-  const frameHistoryRef = useRef<Array<{brightness: number, centerX: number, centerY: number, eyesClosed: boolean}>>([]);
+  const HOLD_THRESHOLD = 10;
+  const frameHistoryRef = useRef<Array<{x: number, y: number}>>([]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -61,9 +55,10 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     };
   }, []);
 
-  const analyzeFrame = (canvas: HTMLCanvasElement): {brightness: number, centerX: number, centerY: number, eyesClosed: boolean} => {
+  // Analyze frame to get face center position
+  const analyzeFaceCenter = (canvas: HTMLCanvasElement): {x: number, y: number, valid: boolean} => {
     const ctx = canvas.getContext('2d');
-    if (!ctx || !videoRef.current) return {brightness: 128, centerX: 0.5, centerY: 0.5, eyesClosed: false};
+    if (!ctx || !videoRef.current) return {x: 0.5, y: 0.5, valid: false};
 
     canvas.width = 160;
     canvas.height = 120;
@@ -71,52 +66,36 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     const imageData = ctx.getImageData(0, 0, 160, 120);
     const data = imageData.data;
 
-    // Calculate brightness
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
-    }
-    const brightness = sum / (data.length / 4);
-
-    // Estimate face center (darker region in center)
-    let darkSum = 0, darkCount = 0;
+    // Find darker pixels (face region)
+    let darkSum = {x: 0, y: 0, count: 0};
     for (let i = 0; i < 160; i++) {
       for (let j = 0; j < 120; j++) {
         const idx = (j * 160 + i) * 4;
-        const pixelBrightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-        if (pixelBrightness < 100) { // dark pixels (face)
-          darkSum += i;
-          darkCount++;
+        const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+        if (brightness < 120) {
+          darkSum.x += i;
+          darkSum.y += j;
+          darkSum.count++;
         }
       }
     }
-    const centerX = darkCount > 0 ? (darkSum / darkCount) / 160 : 0.5;
-    const centerY = 0.5; // approximate
 
-    // Detect if eyes closed (very dark around eye region)
-    let eyeRegionBrightness = 0;
-    let eyeCount = 0;
-    for (let i = 40; i < 120; i++) {
-      for (let j = 30; j < 90; j++) {
-        const idx = (j * 160 + i) * 4;
-        eyeRegionBrightness += (data[idx] + data[idx+1] + data[idx+2]) / 3;
-        eyeCount++;
-      }
-    }
-    const avgEyeBrightness = eyeRegionBrightness / eyeCount;
-    const eyesClosed = avgEyeBrightness < 40;
+    // Check if valid face detected (enough dark pixels)
+    const valid = darkSum.count > 800; // ~5% of canvas
+    const x = valid ? darkSum.x / darkSum.count / 160 : 0.5;
+    const y = valid ? darkSum.y / darkSum.count / 120 : 0.5;
 
-    return {brightness, centerX, centerY, eyesClosed};
+    return {x, y, valid};
   };
 
   const startVerification = useCallback(async () => {
     setState('requesting_camera');
     setFaceStatus('Requesting camera access...');
-    setChallenges(getRandomChallenges());
     setCurrentStep(0);
     setStepComplete(false);
     holdFrames.current = 0;
     frameHistoryRef.current = [];
+    baselineRef.current = null;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -153,109 +132,140 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         return;
       }
 
-      const frameData = analyzeFrame(canvasRef.current);
-      frameHistoryRef.current.push(frameData);
+      const faceCenter = analyzeFaceCenter(canvasRef.current);
 
-      // Keep only last 40 frames
-      if (frameHistoryRef.current.length > 40) {
+      // Check if face is valid and centered
+      if (!faceCenter.valid) {
+        setFaceStatus('Position your face inside the circle');
+        holdFrames.current = 0;
+        baselineRef.current = null;
+        frameHistoryRef.current = [];
+        animFrameRef.current = requestAnimationFrame(detect);
+        return;
+      }
+
+      // Face detected - initialize baseline and move to first challenge
+      if (state === 'detecting') {
+        setState('look_up_required');
+        setFaceStatus('');
+      }
+
+      frameHistoryRef.current.push({x: faceCenter.x, y: faceCenter.y});
+      if (frameHistoryRef.current.length > 20) {
         frameHistoryRef.current.shift();
       }
 
-      // Face detected if reasonable brightness
-      if (frameData.brightness < 180 && frameData.brightness > 50) {
-        // Move to challenge state
-        if (state === 'detecting') {
-          setState('challenge');
-          setFaceStatus('');
+      // Handle state-specific logic
+      if (state === 'look_up_required' || state === 'detecting') {
+        // STEP 1: LOOK UP
+        // Establish baseline on first frame
+        if (!baselineRef.current) {
+          baselineRef.current = {x: faceCenter.x, y: faceCenter.y};
+          setFaceStatus('Establish face position...');
+        } else {
+          // Look UP: face moves up (y decreases)
+          const recentFrames = frameHistoryRef.current.slice(-8);
+          if (recentFrames.length >= 8) {
+            const avgY = recentFrames.reduce((sum, f) => sum + f.y, 0) / recentFrames.length;
+            const yDelta = baselineRef.current.y - avgY;
+            
+            // User moved up significantly enough
+            if (yDelta > 0.08) {
+              holdFrames.current++;
+              setFaceStatus('Hold...');
+              
+              if (holdFrames.current >= HOLD_THRESHOLD) {
+                holdFrames.current = 0;
+                setState('look_up_completed');
+                setStepComplete(true);
+                
+                setTimeout(() => {
+                  setStepComplete(false);
+                  // Reset baseline for next challenge
+                  baselineRef.current = {x: faceCenter.x, y: faceCenter.y};
+                  setState('turn_right_required');
+                  setFaceStatus('');
+                }, 800);
+              }
+            } else {
+              if (holdFrames.current > 0 && holdFrames.current < 2) {
+                holdFrames.current = 0;
+              }
+              setFaceStatus('Look UP');
+            }
+          }
         }
-
-        if (state === 'challenge' || state === 'detecting') {
-          const currentAction = challenges[currentStep];
-          if (!currentAction) {
-            animFrameRef.current = requestAnimationFrame(detect);
-            return;
-          }
-
-          const recentFrames = frameHistoryRef.current.slice(-16);
-          if (recentFrames.length < 8) {
-            animFrameRef.current = requestAnimationFrame(detect);
-            return;
-          }
-
-          // Analyze motion pattern
-          const centerXValues = recentFrames.map(f => f.centerX);
-          const minX = Math.min(...centerXValues);
-          const maxX = Math.max(...centerXValues);
-          const xVariation = maxX - minX;
-
-          const brightnessValues = recentFrames.map(f => f.brightness);
-          const minBrightness = Math.min(...brightnessValues);
-          const maxBrightness = Math.max(...brightnessValues);
-          const brightnessVariation = maxBrightness - minBrightness;
-
-          let actionDetected = false;
-
-          switch (currentAction) {
-            case 'LOOK_UP':
-              // Face brightness increases when looking up (more forehead visible)
-              actionDetected = brightnessVariation > 12 && maxBrightness > frameData.brightness + 8;
-              break;
-            case 'LOOK_DOWN':
-              // Face center moves down slightly
-              actionDetected = brightnessVariation > 12 && recentFrames[recentFrames.length - 1].centerY > 0.55;
-              break;
-            case 'TURN_LEFT':
-              // Face center moves left
-              actionDetected = xVariation > 0.12 && minX < 0.35;
-              break;
-            case 'TURN_RIGHT':
-              // Face center moves right
-              actionDetected = xVariation > 0.12 && maxX > 0.65;
-              break;
-            case 'BLINK':
-              // Detect eyes closed
-              actionDetected = frameData.eyesClosed && !recentFrames[Math.max(0, recentFrames.length - 3)].eyesClosed;
-              break;
-          }
-
-          if (actionDetected) {
+      } else if (state === 'turn_right_required' || state === 'turn_right_completed') {
+        // STEP 2: TURN RIGHT
+        // Camera is mirrored (scale-x-[-1]), so physical RIGHT appears as LEFT in canvas
+        // Therefore: Turn RIGHT = face center moves LEFT in canvas (x decreases)
+        const recentFrames = frameHistoryRef.current.slice(-8);
+        if (recentFrames.length >= 8 && baselineRef.current) {
+          const avgX = recentFrames.reduce((sum, f) => sum + f.x, 0) / recentFrames.length;
+          const xDelta = baselineRef.current.x - avgX;
+          
+          // User turned right (x moved left in mirrored view)
+          if (xDelta > 0.1) {
             holdFrames.current++;
             setFaceStatus('Hold...');
+            
+            if (holdFrames.current >= HOLD_THRESHOLD) {
+              holdFrames.current = 0;
+              setState('turn_right_completed');
+              setStepComplete(true);
+              
+              setTimeout(() => {
+                setStepComplete(false);
+                // Reset baseline for final challenge
+                baselineRef.current = {x: faceCenter.x, y: faceCenter.y};
+                setState('turn_left_required');
+                setFaceStatus('');
+              }, 800);
+            }
           } else {
-            if (holdFrames.current > 0 && holdFrames.current < 3) {
+            if (holdFrames.current > 0 && holdFrames.current < 2) {
               holdFrames.current = 0;
             }
-            setFaceStatus(`Perform: ${CHALLENGE_LABELS[currentAction]}`);
-          }
-
-          if (holdFrames.current >= HOLD_THRESHOLD) {
-            setStepComplete(true);
-            holdFrames.current = 0;
-
-            setTimeout(() => {
-              setStepComplete(false);
-              if (currentStep + 1 >= challenges.length) {
-                setState('success');
-                setFaceStatus('');
-                if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-                if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-                onVerified(sessionId);
-              } else {
-                setCurrentStep(s => s + 1);
-              }
-            }, 800);
+            setFaceStatus('Turn your head RIGHT');
           }
         }
-      } else {
-        setFaceStatus('Position your face inside the circle');
-        holdFrames.current = 0;
+      } else if (state === 'turn_left_required') {
+        // STEP 3: TURN LEFT
+        // Camera is mirrored, so physical LEFT appears as RIGHT in canvas
+        // Therefore: Turn LEFT = face center moves RIGHT in canvas (x increases)
+        const recentFrames = frameHistoryRef.current.slice(-8);
+        if (recentFrames.length >= 8 && baselineRef.current) {
+          const avgX = recentFrames.reduce((sum, f) => sum + f.x, 0) / recentFrames.length;
+          const xDelta = avgX - baselineRef.current.x;
+          
+          // User turned left (x moved right in mirrored view)
+          if (xDelta > 0.1) {
+            holdFrames.current++;
+            setFaceStatus('Hold...');
+            
+            if (holdFrames.current >= HOLD_THRESHOLD) {
+              holdFrames.current = 0;
+              setState('success');
+              setFaceStatus('');
+              if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+              if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+              onVerified(sessionId);
+              return;
+            }
+          } else {
+            if (holdFrames.current > 0 && holdFrames.current < 2) {
+              holdFrames.current = 0;
+            }
+            setFaceStatus('Turn your head LEFT');
+          }
+        }
       }
 
       animFrameRef.current = requestAnimationFrame(detect);
     };
 
     detect();
-  }, [state, challenges, currentStep, sessionId, onVerified]);
+  }, [state, sessionId, onVerified]);
 
   const handleRetry = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -263,11 +273,11 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     setAttempts(a => a + 1);
     setState('idle');
     setFaceStatus('');
-    setChallenges(getRandomChallenges());
     setCurrentStep(0);
     setStepComplete(false);
     holdFrames.current = 0;
     frameHistoryRef.current = [];
+    baselineRef.current = null;
   };
 
   // Max 5 attempts
@@ -280,6 +290,31 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       </div>
     );
   }
+
+  // Map state to step number
+  const getStepNumber = () => {
+    switch(state) {
+      case 'look_up_required':
+      case 'look_up_completed':
+        return 0;
+      case 'turn_right_required':
+      case 'turn_right_completed':
+        return 1;
+      case 'turn_left_required':
+        return 2;
+      default:
+        return 0;
+    }
+  };
+
+  const isStepCompleted = (step: number) => {
+    if (step === 0) return state === 'look_up_completed' || state === 'turn_right_required' || state === 'turn_right_completed' || state === 'turn_left_required';
+    if (step === 1) return state === 'turn_right_completed' || state === 'turn_left_required';
+    if (step === 2) return state === 'success';
+    return false;
+  };
+
+  const isStepCurrent = (step: number) => getStepNumber() === step;
 
   return (
     <div className="space-y-6">
@@ -331,40 +366,39 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         </div>
       ) : (
         <div className="relative flex flex-col items-center">
-          {/* Video container with face guide */}
+          {/* Video container */}
           <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full overflow-hidden border-4 border-emerald-400 shadow-lg">
             <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover scale-x-[-1]" playsInline muted />
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-0" width={320} height={320} />
-            {/* Circular guide overlay */}
             <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: 'inset 0 0 0 4px rgba(16,185,129,0.4)' }} />
           </div>
 
           {/* Status/instruction */}
           <div className="mt-5 text-center min-h-[80px]">
-            {state === 'requesting_camera' && (
+            {(state === 'requesting_camera') && (
               <div className="flex items-center gap-2 justify-center text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm">{faceStatus}</span>
               </div>
             )}
 
-            {state === 'detecting' && (
+            {(state === 'detecting') && (
               <p className="text-sm text-muted-foreground">{faceStatus}</p>
             )}
 
-            {state === 'challenge' && (
+            {(state === 'look_up_required' || state === 'look_up_completed' || state === 'turn_right_required' || state === 'turn_right_completed' || state === 'turn_left_required') && (
               <div className="space-y-3">
                 {/* Progress dots */}
                 <div className="flex items-center justify-center gap-2">
-                  {challenges.map((_, i) => (
-                    <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < currentStep ? 'bg-emerald-500' : i === currentStep ? 'bg-[#8B1538]' : 'bg-border'}`} />
+                  {REQUIRED_SEQUENCE.map((_, i) => (
+                    <div key={i} className={`w-3 h-3 rounded-full transition-colors ${isStepCompleted(i) ? 'bg-emerald-500' : isStepCurrent(i) ? 'bg-[#8B1538]' : 'bg-border'}`} />
                   ))}
                 </div>
 
                 {/* Current instruction */}
                 <div className="rounded-xl bg-[#8B1538]/5 border border-[#8B1538]/20 px-5 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                    Step {currentStep + 1} of {challenges.length}
+                    Step {getStepNumber() + 1} of {REQUIRED_SEQUENCE.length}
                   </p>
                   {stepComplete ? (
                     <p className="text-emerald-600 font-bold flex items-center justify-center gap-1.5">
@@ -372,7 +406,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
                     </p>
                   ) : (
                     <p className="text-[#8B1538] font-bold text-lg">
-                      {CHALLENGE_LABELS[challenges[currentStep]]}
+                      {CHALLENGE_LABELS[REQUIRED_SEQUENCE[getStepNumber()]]}
                     </p>
                   )}
                 </div>
