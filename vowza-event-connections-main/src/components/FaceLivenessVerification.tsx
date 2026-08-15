@@ -44,7 +44,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   // Baseline for head pose (established during LOOK_UP)
   const baselineRef = useRef<{x: number, y: number} | null>(null);
   const holdFrames = useRef(0);
-  const HOLD_THRESHOLD = 10;
+  const HOLD_THRESHOLD = 8; // Reduced from 10 for faster detection
   const frameHistoryRef = useRef<Array<{x: number, y: number}>>([]);
 
   // Cleanup on unmount
@@ -56,6 +56,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
   }, []);
 
   // Analyze frame to get face center position
+  // Uses same brightness-based validation as Step2 Identity Selfie
   const analyzeFaceCenter = (canvas: HTMLCanvasElement): {x: number, y: number, valid: boolean} => {
     const ctx = canvas.getContext('2d');
     if (!ctx || !videoRef.current) return {x: 0.5, y: 0.5, valid: false};
@@ -66,13 +67,29 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     const imageData = ctx.getImageData(0, 0, 160, 120);
     const data = imageData.data;
 
-    // Find darker pixels (face region)
+    // Calculate overall frame brightness (like Step2 validation)
+    let totalBrightness = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    const avgBrightness = totalBrightness / (data.length / 4);
+
+    // First check: is frame properly lit? (35-235 range from Step2)
+    const isWellLit = avgBrightness >= 35 && avgBrightness <= 235;
+    if (!isWellLit) {
+      return {x: 0.5, y: 0.5, valid: false}; // Bad lighting - no point analyzing
+    }
+
+    // Find darker pixels relative to frame average (adaptive threshold)
+    // Instead of fixed < 120, use: pixels darker than (average - 30)
+    const faceThreshold = Math.max(80, avgBrightness - 30);
     let darkSum = {x: 0, y: 0, count: 0};
+    
     for (let i = 0; i < 160; i++) {
       for (let j = 0; j < 120; j++) {
         const idx = (j * 160 + i) * 4;
         const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-        if (brightness < 120) {
+        if (brightness < faceThreshold) {
           darkSum.x += i;
           darkSum.y += j;
           darkSum.count++;
@@ -80,8 +97,9 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       }
     }
 
-    // Check if valid face detected (enough dark pixels)
-    const valid = darkSum.count > 800; // ~5% of canvas
+    // Require at least 400 dark pixels (~2% of canvas) instead of 800
+    // This is more lenient but still prevents false positives on blank frames
+    const valid = darkSum.count >= 400;
     const x = valid ? darkSum.x / darkSum.count / 160 : 0.5;
     const y = valid ? darkSum.y / darkSum.count / 120 : 0.5;
 
@@ -169,8 +187,8 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
             const avgY = recentFrames.reduce((sum, f) => sum + f.y, 0) / recentFrames.length;
             const yDelta = baselineRef.current.y - avgY;
             
-            // User moved up significantly enough
-            if (yDelta > 0.08) {
+            // User moved up significantly enough (relaxed from 0.08 to 0.06)
+            if (yDelta > 0.06) {
               holdFrames.current++;
               setFaceStatus('Hold...');
               
@@ -204,8 +222,8 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
           const avgX = recentFrames.reduce((sum, f) => sum + f.x, 0) / recentFrames.length;
           const xDelta = baselineRef.current.x - avgX;
           
-          // User turned right (x moved left in mirrored view)
-          if (xDelta > 0.1) {
+          // User turned right (x moved left in mirrored view) - relaxed from 0.1 to 0.08
+          if (xDelta > 0.08) {
             holdFrames.current++;
             setFaceStatus('Hold...');
             
@@ -238,8 +256,8 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
           const avgX = recentFrames.reduce((sum, f) => sum + f.x, 0) / recentFrames.length;
           const xDelta = avgX - baselineRef.current.x;
           
-          // User turned left (x moved right in mirrored view)
-          if (xDelta > 0.1) {
+          // User turned left (x moved right in mirrored view) - relaxed from 0.1 to 0.08
+          if (xDelta > 0.08) {
             holdFrames.current++;
             setFaceStatus('Hold...');
             
