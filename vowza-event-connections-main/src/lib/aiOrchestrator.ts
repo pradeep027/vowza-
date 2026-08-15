@@ -13,6 +13,7 @@
 import type { ChatMessage, PlannerContext, PlanningStateData, EventBudgetPlan } from './aiPlannerTypes';
 import { fmt } from './aiPlanner';
 import { EventBudgetPlanner } from './eventBudgetPlanner';
+import { extractEventDateFromText } from './eventContextCapturer';
 
 // ── Intent categories ─────────────────────────────────────────────────────────
 export type Intent =
@@ -406,9 +407,6 @@ export function extractPlanState(
 function extractEventDate(text: string): string | undefined {
   // NEW Phase 7B: Use enhanced date extraction from eventContextCapturer
   // This replaces the basic regex-only extraction with comprehensive parsing
-  
-  // Import the enhanced function locally
-  const { extractEventDateFromText, formatEventDate } = require('./eventContextCapturer');
   
   try {
     const dateObj = extractEventDateFromText(text);

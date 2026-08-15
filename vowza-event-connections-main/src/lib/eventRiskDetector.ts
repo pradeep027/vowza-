@@ -148,7 +148,7 @@ export class EventRiskDetector {
     const requiredServices = plan.services.filter(s => s.status === 'required').length;
 
     // Risk 1: Critical services not booked
-    const unbokedCritical = plan.services.filter(
+    const unbookedCritical = plan.services.filter(
       s => s.status === 'required' && s.status !== 'confirmed' && !plan.selectedVendors.find(v => v.serviceId === s.id)
     );
 
