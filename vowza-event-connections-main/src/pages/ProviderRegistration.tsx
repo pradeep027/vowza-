@@ -120,11 +120,24 @@ export default function ProviderRegistration() {
   const streamRef = useRef<MediaStream|null>(null);
   const portfolioRef = useRef<HTMLInputElement>(null);
 
+  // Face detection refs and state for Identity Selfie
+  const faceMeshRef = useRef<any>(null);
+  const animFrameRef = useRef<number>(0);
+  const [faceQualityOk, setFaceQualityOk] = useState(false);
+  const [faceStatus, setFaceStatus] = useState<string>('');
+
   useEffect(() => {
     if (!loading && !user) navigate('/auth');
     // Prefill email from auth (only if not already filled in from a restored session)
     if (user?.email) setS1(p => (p.email ? p : { ...p, email: user.email ?? '' }));
   }, [user, loading, navigate]);
+
+  // Cleanup face detection resources on unmount
+  useEffect(() => {
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, []);
 
   // ── OTP (simulated — wire to real SMS provider in production) ────────────────
   const sendOTP = async () => {
@@ -146,19 +159,121 @@ export default function ProviderRegistration() {
     }
   };
 
-  // ── Camera (front-facing selfie) ──────────────────────────────────────────
+  // ── Face quality validation helper ────────────────────────────────────────
+  const validateFaceQuality = (faces: any[]): { valid: boolean; message: string } => {
+    if (!faces || faces.length === 0) {
+      return { valid: false, message: 'No face detected' };
+    }
+    if (faces.length > 1) {
+      return { valid: false, message: 'Only one person should be visible' };
+    }
+
+    const landmarks = faces[0];
+    if (!landmarks || landmarks.length < 10) {
+      return { valid: false, message: 'Face not clear' };
+    }
+
+    // Check key landmarks are present
+    const noseTip = landmarks[1]; // nose tip
+    const chin = landmarks[152]; // chin
+    const forehead = landmarks[10]; // forehead
+    
+    if (!noseTip || !chin || !forehead) {
+      return { valid: false, message: 'Face not fully visible' };
+    }
+
+    // Check face is reasonably centered (nose should be in center area)
+    if (noseTip.x < 0.25 || noseTip.x > 0.75 || noseTip.y < 0.15 || noseTip.y > 0.85) {
+      return { valid: false, message: 'Center your face in the frame' };
+    }
+
+    // Check face has adequate size (vertical spread between forehead and chin)
+    const verticalSpread = Math.abs(chin.y - forehead.y);
+    if (verticalSpread < 0.15) {
+      return { valid: false, message: 'Move closer to the camera' };
+    }
+
+    // Check face is not too obstructed (landmarks should have decent visibility)
+    const leftEye = landmarks[33];
+    const rightEye = landmarks[263];
+    if (!leftEye || !rightEye) {
+      return { valid: false, message: 'Make sure your face is clearly visible' };
+    }
+
+    // Face is valid
+    return { valid: true, message: 'Face detected ✓ You can capture your selfie' };
+  };
+
+  // ── Initialize and handle face detection ────────────────────────────────────
+  const initializeFaceDetection = async () => {
+    if (!videoRef.current) return;
+
+    try {
+      const { FaceMesh } = await import('@mediapipe/face_mesh');
+      const faceMesh = new FaceMesh({
+        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6,
+      });
+
+      // Handle face detection results
+      faceMesh.onResults((results: any) => {
+        const faces = results.multiFaceLandmarks || [];
+        const validation = validateFaceQuality(faces);
+        setFaceQualityOk(validation.valid);
+        setFaceStatus(validation.message);
+      });
+
+      faceMeshRef.current = faceMesh;
+
+      // Start continuous detection
+      const detect = async () => {
+        if (videoRef.current && faceMeshRef.current && videoRef.current.readyState >= 2) {
+          await faceMeshRef.current.send({ image: videoRef.current });
+        }
+        animFrameRef.current = requestAnimationFrame(detect);
+      };
+      detect();
+    } catch (err) {
+      console.error('Failed to initialize face detection:', err);
+      toast.error('Face detection unavailable. Camera capture will proceed without validation.');
+    }
+  };
+
+  // ── Camera (front-facing selfie with face detection) ────────────────────────
   const openCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       streamRef.current = stream;
       setCameraOpen(true);
-      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); } }, 100);
+      setFaceQualityOk(false);
+      setFaceStatus('Loading face detection...');
+      
+      setTimeout(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          // Initialize face detection after video starts
+          await initializeFaceDetection();
+        }
+      }, 100);
     } catch {
       toast.error('Camera access denied. Please allow camera permission and try again.');
     }
   };
 
   const capturePhoto = () => {
+    // Validate face quality before capture
+    if (!faceQualityOk) {
+      toast.error('Please position your face clearly in the frame');
+      return;
+    }
+
     if (!videoRef.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d')!;
     canvasRef.current.width  = videoRef.current.videoWidth;
@@ -176,7 +291,11 @@ export default function ProviderRegistration() {
   const closeCamera = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (faceMeshRef.current) faceMeshRef.current = null;
     setCameraOpen(false);
+    setFaceQualityOk(false);
+    setFaceStatus('');
   };
 
   // ── Portfolio upload ───────────────────────────────────────────────────────
@@ -495,17 +614,46 @@ export default function ProviderRegistration() {
       {/* Camera modal */}
       {cameraOpen && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full max-w-sm rounded-2xl object-cover" style={{ maxHeight:'70vh' }} />
-          <canvas ref={canvasRef} className="hidden" />
+          <div className="relative">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full max-w-sm rounded-2xl object-cover" style={{ maxHeight:'70vh' }} />
+            <canvas ref={canvasRef} className="hidden" />
+            
+            {/* Face guide overlay */}
+            <div className="absolute inset-0 rounded-2xl pointer-events-none flex items-center justify-center">
+              <div className="w-48 h-56 border-2 border-emerald-400 rounded-2xl opacity-50" />
+            </div>
+          </div>
+
+          {/* Real-time face status feedback */}
+          <div className="mt-4 text-center min-h-[50px]">
+            <p className={`text-sm font-medium transition-colors ${
+              faceQualityOk ? 'text-emerald-400' : 'text-amber-300'
+            }`}>
+              {faceStatus}
+            </p>
+          </div>
+
           <div className="flex gap-4 mt-6">
-            <button onClick={closeCamera} className="px-6 py-3 rounded-xl bg-white/10 text-white text-sm font-semibold">
+            <button onClick={closeCamera} className="px-6 py-3 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors">
               <X className="w-4 h-4" />
             </button>
-            <button onClick={capturePhoto} className="px-8 py-3 rounded-xl bg-white text-gray-900 text-sm font-bold flex items-center gap-2">
+            <button 
+              onClick={capturePhoto} 
+              disabled={!faceQualityOk}
+              className={`px-8 py-3 rounded-xl text-gray-900 text-sm font-bold flex items-center gap-2 transition-all ${
+                faceQualityOk 
+                  ? 'bg-white text-gray-900 hover:bg-gray-100' 
+                  : 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50'
+              }`}
+            >
               <Camera className="w-4 h-4" /> Capture
             </button>
           </div>
-          <p className="text-white/60 text-xs mt-4">Position your face clearly in the frame</p>
+          <p className="text-white/60 text-xs mt-4 max-w-sm text-center">
+            {faceQualityOk 
+              ? 'Your face looks good. Click Capture to take the selfie.' 
+              : 'Position your face clearly in the frame to enable capture'}
+          </p>
         </div>
       )}
     </div>
