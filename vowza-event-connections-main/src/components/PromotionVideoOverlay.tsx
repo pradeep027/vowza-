@@ -235,31 +235,63 @@ const PromotionVideoOverlay = memo(
                     crossOrigin="anonymous"
                     onPlay={handlePlayStart}
                     onError={(e) => {
-                      console.error('[PromotionVideoOverlay] VIDEO ERROR EVENT');
-                      console.error('  Error type:', videoRef.current?.error?.code);
+                      console.error('[PromotionVideoOverlay] ===== VIDEO ERROR EVENT =====');
+                      console.error('  Error code:', videoRef.current?.error?.code);
                       console.error('  Error message:', videoRef.current?.error?.message);
-                      console.error('  URL:', video.video_url);
+                      console.error('  Video src:', video.video_url);
                       console.error('  ReadyState:', videoRef.current?.readyState, '(0=HAVE_NOTHING, 1=HAVE_METADATA, 2=HAVE_CURRENT_DATA, 3=HAVE_FUTURE_DATA, 4=HAVE_ENOUGH_DATA)');
                       console.error('  NetworkState:', videoRef.current?.networkState, '(0=NETWORK_EMPTY, 1=NETWORK_IDLE, 2=NETWORK_LOADING, 3=NETWORK_NO_SOURCE)');
                       console.error('  Current src:', videoRef.current?.currentSrc);
+                      console.error('  Status:', videoRef.current?.status);
+                      
+                      // Additional diagnostics
+                      console.error('  Video element exists:', !!videoRef.current);
+                      console.error('  Video paused:', videoRef.current?.paused);
+                      console.error('  Video ended:', videoRef.current?.ended);
+                      console.error('  Buffered ranges:', videoRef.current?.buffered?.length || 0);
+                      
+                      console.error('[PromotionVideoOverlay] ===== END VIDEO ERROR =====');
                       setHasError(true);
                     }}
                     onCanPlay={() => {
                       console.log('[PromotionVideoOverlay] ✅ onCanPlay fired - video can play');
+                      if (videoRef.current) {
+                        console.log('  - Duration:', videoRef.current.duration);
+                        console.log('  - ReadyState:', videoRef.current.readyState);
+                      }
                     }}
                     onCanPlayThrough={() => {
-                      console.log('[PromotionVideoOverlay] ✅ onCanPlayThrough fired - buffered enough');
+                      console.log('[PromotionVideoOverlay] ✅ onCanPlayThrough fired - fully buffered');
                     }}
                     onLoadedMetadata={() => {
                       console.log('[PromotionVideoOverlay] ✅ onLoadedMetadata fired');
-                      console.log('  Duration:', videoRef.current?.duration);
-                      console.log('  Width:', videoRef.current?.videoWidth, 'Height:', videoRef.current?.videoHeight);
+                      if (videoRef.current) {
+                        console.log('  - Duration:', videoRef.current.duration);
+                        console.log('  - Width:', videoRef.current.videoWidth, 'Height:', videoRef.current.videoHeight);
+                        console.log('  - Current time:', videoRef.current.currentTime);
+                      }
                     }}
                     onLoadStart={() => {
-                      console.log('[PromotionVideoOverlay] onLoadStart fired');
+                      console.log('[PromotionVideoOverlay] onLoadStart fired - starting to load video');
                     }}
                     onDurationChange={() => {
                       console.log('[PromotionVideoOverlay] onDurationChange fired - duration:', videoRef.current?.duration);
+                    }}
+                    onSeeking={() => {
+                      console.log('[PromotionVideoOverlay] onSeeking - user seeking');
+                    }}
+                    onSeeked={() => {
+                      console.log('[PromotionVideoOverlay] onSeeked - seek complete');
+                    }}
+                    onStalled={() => {
+                      console.warn('[PromotionVideoOverlay] ⚠️ onStalled - video loading stalled, may be network issue');
+                    }}
+                    onSuspend={() => {
+                      console.warn('[PromotionVideoOverlay] ⚠️ onSuspend - video loading suspended');
+                    }}
+                    onTimeUpdate={() => {
+                      // Don't log this every frame - too verbose
+                      // console.log('[PromotionVideoOverlay] onTimeUpdate:', videoRef.current?.currentTime);
                     }}
                     style={{
                       width: '100%',
