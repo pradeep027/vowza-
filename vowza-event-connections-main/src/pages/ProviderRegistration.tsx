@@ -668,6 +668,29 @@ export default function ProviderRegistration() {
               ? 'Your face looks good. Click Capture to take the selfie.' 
               : 'Position your face clearly in the frame to enable capture'}
           </p>
+
+          {/* Instructions Box */}
+          <div className="mt-5 mx-auto max-w-xs bg-white/5 border border-white/10 rounded-lg p-3">
+            <p className="text-xs font-bold text-white/90 uppercase tracking-wider mb-2">📋 Tips for Success:</p>
+            <ul className="text-xs text-white/70 space-y-1.5">
+              <li className="flex gap-2 items-start">
+                <span className="text-emerald-400 flex-shrink-0">✓</span>
+                <span>Face must be centered in the frame</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="text-emerald-400 flex-shrink-0">✓</span>
+                <span>Entire face should be clearly visible</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="text-emerald-400 flex-shrink-0">✓</span>
+                <span>Ensure good lighting from the front</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="text-emerald-400 flex-shrink-0">✓</span>
+                <span>Only ONE person should be visible</span>
+              </li>
+            </ul>
+          </div>
         </div>
       )}
     </div>
