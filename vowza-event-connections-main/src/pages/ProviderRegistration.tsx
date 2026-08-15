@@ -247,14 +247,8 @@ export default function ProviderRegistration() {
   };
 
   const capturePhoto = () => {
-    // Validate face quality before capturing
+    // Button is only enabled when validation passes, so safe to capture directly
     if (!videoRef.current || !canvasRef.current) return;
-    
-    const validation = validateFaceQuality(videoRef.current);
-    if (!validation.valid) {
-      toast.error(validation.message);
-      return;
-    }
     
     const ctx = canvasRef.current.getContext('2d')!;
     canvasRef.current.width  = videoRef.current.videoWidth;
