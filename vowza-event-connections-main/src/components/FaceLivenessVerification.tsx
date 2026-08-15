@@ -254,6 +254,11 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       const faceMesh = new FaceMesh({
         locateFile,
       });
+      console.log('[HumanCheck] FaceMesh instance created successfully');
+
+      console.log('[HumanCheck] Initializing FaceMesh...');
+      await faceMesh.initialize();
+      console.log('[HumanCheck] FaceMesh initialized successfully');
 
       console.log('[HumanCheck] Setting FaceMesh options...');
       faceMesh.setOptions({
@@ -262,10 +267,10 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
+      console.log('[HumanCheck] FaceMesh configured successfully');
 
       faceMesh.onResults(onResults);
       faceMeshRef.current = faceMesh;
-      console.log('[HumanCheck] FaceMesh initialized successfully');
 
       setState('detecting');
       setFaceStatus('Position your face inside the circle');
