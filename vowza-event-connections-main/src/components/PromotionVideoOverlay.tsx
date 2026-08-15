@@ -211,16 +211,22 @@ const PromotionVideoOverlay = memo(
                     <p className="text-white text-sm font-semibold">Video Not Available</p>
                     <p className="text-white/60 text-xs mt-2">This promotional video couldn't load.</p>
                     <p className="text-white/50 text-xs mt-1">Check your connection or try again later.</p>
+                    {/* Debug info for development */}
+                    <p className="text-white/30 text-xs mt-3 font-mono break-all max-h-16 overflow-y-auto">
+                      URL: {video.video_url?.substring(0, 50)}...
+                    </p>
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Video element — with multiple fallback strategies for mobile */}
                   <video
+                    key={video.id}  // Force re-render when video changes
                     ref={videoRef}
                     src={video.video_url}
                     muted={isMuted}
                     autoPlay
+                    controls={false}
                     playsInline
                     preload="auto"
                     controlsList="nodownload noplaybackrate nofullscreen"
@@ -229,17 +235,31 @@ const PromotionVideoOverlay = memo(
                     crossOrigin="anonymous"
                     onPlay={handlePlayStart}
                     onError={(e) => {
-                      console.error('[PromotionVideoOverlay] Video error:', videoRef.current?.error?.message, 'Error code:', videoRef.current?.error?.code);
-                      console.warn('[PromotionVideoOverlay] Video URL was:', video.video_url);
-                      console.warn('[PromotionVideoOverlay] Video readyState:', videoRef.current?.readyState);
-                      console.warn('[PromotionVideoOverlay] Video networkState:', videoRef.current?.networkState);
+                      console.error('[PromotionVideoOverlay] VIDEO ERROR EVENT');
+                      console.error('  Error type:', videoRef.current?.error?.code);
+                      console.error('  Error message:', videoRef.current?.error?.message);
+                      console.error('  URL:', video.video_url);
+                      console.error('  ReadyState:', videoRef.current?.readyState, '(0=HAVE_NOTHING, 1=HAVE_METADATA, 2=HAVE_CURRENT_DATA, 3=HAVE_FUTURE_DATA, 4=HAVE_ENOUGH_DATA)');
+                      console.error('  NetworkState:', videoRef.current?.networkState, '(0=NETWORK_EMPTY, 1=NETWORK_IDLE, 2=NETWORK_LOADING, 3=NETWORK_NO_SOURCE)');
+                      console.error('  Current src:', videoRef.current?.currentSrc);
                       setHasError(true);
                     }}
                     onCanPlay={() => {
-                      console.log('[PromotionVideoOverlay] ✅ Video can play (data loaded)');
+                      console.log('[PromotionVideoOverlay] ✅ onCanPlay fired - video can play');
+                    }}
+                    onCanPlayThrough={() => {
+                      console.log('[PromotionVideoOverlay] ✅ onCanPlayThrough fired - buffered enough');
                     }}
                     onLoadedMetadata={() => {
-                      console.log('[PromotionVideoOverlay] ✅ Video metadata loaded - duration:', videoRef.current?.duration);
+                      console.log('[PromotionVideoOverlay] ✅ onLoadedMetadata fired');
+                      console.log('  Duration:', videoRef.current?.duration);
+                      console.log('  Width:', videoRef.current?.videoWidth, 'Height:', videoRef.current?.videoHeight);
+                    }}
+                    onLoadStart={() => {
+                      console.log('[PromotionVideoOverlay] onLoadStart fired');
+                    }}
+                    onDurationChange={() => {
+                      console.log('[PromotionVideoOverlay] onDurationChange fired - duration:', videoRef.current?.duration);
                     }}
                     style={{
                       width: '100%',
@@ -248,7 +268,7 @@ const PromotionVideoOverlay = memo(
                       backgroundColor: 'black',
                       display: 'block', // Force block display
                     }}
-                    className="absolute inset-0 w-full h-full object-contain"
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
                     aria-label="Promotional video"
                   />
 

@@ -342,7 +342,7 @@ export const getAllEligiblePromotionVideos = async (
 };
 
 /**
- * ✨ NEW: Get a RANDOMLY selected eligible promotion video for an authenticated user.
+ * Get a RANDOMLY selected eligible promotion video for an authenticated user.
  * Uses get_random_eligible_promotion_video() RPC which selects from ALL eligible videos.
  * This fixes the issue where Video 1 (priority_order=1) was always selected.
  * 
@@ -392,10 +392,21 @@ export const getRandomEligiblePromotionVideo = async (
     return null;
   }
   
-  // Check if URL looks valid
-  if (!video.video_url.includes('supabase.co') && !video.video_url.startsWith('http')) {
-    console.error('[promotionVideos] ❌ ERROR: video_url looks invalid:', video.video_url);
+  // Ensure URL uses HTTPS (Supabase only serves over HTTPS)
+  let videoUrl = video.video_url;
+  if (videoUrl.startsWith('http://')) {
+    console.warn('[promotionVideos] ⚠️ Converting HTTP to HTTPS:', videoUrl);
+    videoUrl = videoUrl.replace('http://', 'https://');
+    video.video_url = videoUrl;
   }
+  
+  // Validate URL format
+  if (!videoUrl.includes('supabase.co') && !videoUrl.startsWith('https://')) {
+    console.error('[promotionVideos] ❌ ERROR: video_url looks invalid:', videoUrl);
+    return null;
+  }
+  
+  console.log('[promotionVideos] ✅ Video URL validated:', videoUrl.substring(0, 80) + '...');
   
   return video;
 };
@@ -509,8 +520,16 @@ export const getActivePromotionVideoForVisitor = async (
     user_limit: video.user_limit,
   });
 
+  // Ensure HTTPS
+  let videoUrl = video.video_url;
+  if (videoUrl && videoUrl.startsWith('http://')) {
+    console.warn('[promotionVideos] ⚠️ Converting HTTP to HTTPS for visitor');
+    videoUrl = videoUrl.replace('http://', 'https://');
+  }
+
   return {
     ...video,
+    video_url: videoUrl,
     has_user_viewed: false, // Anonymous visitors don't have view history in DB
   } as PromotionVideoWithViewStatus;
 };
