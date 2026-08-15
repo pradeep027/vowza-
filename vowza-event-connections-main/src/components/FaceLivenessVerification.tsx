@@ -93,16 +93,19 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
 
     const landmarks = faces[0];
 
-    // Check face is centered and properly sized
+    // Check face is centered and properly sized (relaxed bounds to allow more positions)
     const noseTip = landmarks[1];
-    if (noseTip.x < 0.2 || noseTip.x > 0.8 || noseTip.y < 0.15 || noseTip.y > 0.85) {
+    const isCentered = noseTip.x > 0.1 && noseTip.x < 0.9 && noseTip.y > 0.05 && noseTip.y < 0.95;
+    
+    if (!isCentered) {
       setFaceStatus('Move your face to the center');
       holdFrames.current = 0;
       return;
     }
 
-    // Face detected, transition to first action
+    // Face detected and centered, transition to first action
     if (state === 'detecting') {
+      console.log('[HumanCheck] Face centered, transitioning to left_required');
       setState('left_required');
       setFaceStatus('');
     }
