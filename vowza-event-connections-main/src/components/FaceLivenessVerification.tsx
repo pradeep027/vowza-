@@ -242,7 +242,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       console.log('[HumanCheck] FaceMesh imported successfully');
 
       const locateFile = (file: string) => {
-        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
         console.log('[HumanCheck] Loading asset:', file, '→', url);
         return url;
       };
