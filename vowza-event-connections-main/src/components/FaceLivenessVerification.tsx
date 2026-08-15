@@ -208,7 +208,6 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
           }
         });
 
-        // Wait for video to be ready
         await new Promise<void>((resolve) => {
           if (videoRef.current && videoRef.current.readyState >= 2) {
             console.log('[HumanCheck] Video ready immediately');
@@ -239,28 +238,39 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     setFaceStatus('Loading face detection model...');
 
     try {
-      console.log('[HumanCheck] Importing FaceMesh...');
-      const FaceMeshModule = await import('@mediapipe/face_mesh');
-      console.log('[HumanCheck] Module imported:', FaceMeshModule);
+      console.log('[HumanCheck] Loading MediaPipe FaceMesh from CDN...');
       
-      // Try default export first, then named export
-      const FaceMesh = FaceMeshModule.default || FaceMeshModule.FaceMesh;
-      console.log('[HumanCheck] FaceMesh constructor:', typeof FaceMesh);
+      // Load FaceMesh script from CDN directly
+      const scriptPromise = new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+        script.onload = () => {
+          console.log('[HumanCheck] Script loaded, waiting for window.FaceMesh...');
+          // Small delay to ensure window.FaceMesh is available
+          setTimeout(() => resolve(), 100);
+        };
+        script.onerror = () => reject(new Error('Failed to load FaceMesh script'));
+        document.head.appendChild(script);
+      });
 
-      if (!FaceMesh || typeof FaceMesh !== 'function') {
-        throw new Error(`FaceMesh is not a constructor. Received: ${typeof FaceMesh}`);
+      await scriptPromise;
+
+      const FaceMesh = (window as any).FaceMesh;
+      console.log('[HumanCheck] FaceMesh from window:', typeof FaceMesh);
+
+      if (!FaceMesh) {
+        throw new Error('FaceMesh not found on window object after script load');
       }
 
       const locateFile = (file: string) => {
-        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
-        return url;
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
       };
 
       console.log('[HumanCheck] Creating FaceMesh instance...');
       const faceMesh = new FaceMesh({
         locateFile,
       });
-      console.log('[HumanCheck] FaceMesh instance created');
+      console.log('[HumanCheck] FaceMesh instance created successfully');
 
       faceMesh.setOptions({
         maxNumFaces: 1,
@@ -268,7 +278,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-      console.log('[HumanCheck] FaceMesh options set');
+      console.log('[HumanCheck] FaceMesh configured');
 
       faceMesh.onResults(onResults);
       faceMeshRef.current = faceMesh;
@@ -286,6 +296,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         }
         animFrameRef.current = requestAnimationFrame(detect);
       };
+      console.log('[HumanCheck] Starting detection loop');
       detect();
     } catch (err: any) {
       console.error('[HumanCheck] Model loading error:', err);
