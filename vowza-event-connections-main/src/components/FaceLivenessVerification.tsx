@@ -158,10 +158,12 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       };
       detect();
     } catch (err) {
+      console.error('MediaPipe load failed:', err);
       setState('failed');
-      setFaceStatus('Failed to load face detection. Please try again.');
+      setFaceStatus('Face detection service unavailable. Please try again.');
+      toast.error('Face detection failed. Please check your connection and try again.');
     }
-  }, []);
+  }, [onResults]);
 
   const onResults = useCallback((results: any) => {
     if (!results.multiFaceLandmarks) return;
@@ -320,10 +322,17 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
           <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
             <AlertCircle className="w-10 h-10 text-red-500" />
           </div>
-          <p className="text-sm text-red-600 text-center">{faceStatus}</p>
-          <button onClick={handleRetry} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-sm font-semibold hover:bg-muted transition-colors">
-            <RefreshCw className="w-4 h-4" /> Try Again
-          </button>
+          <p className="text-sm text-red-600 text-center max-w-sm">{faceStatus}</p>
+          <div className="flex gap-3">
+            <button onClick={handleRetry} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-sm font-semibold hover:bg-muted transition-colors">
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+            {onSkip && (
+              <button onClick={onSkip} className="px-5 py-2.5 rounded-xl bg-muted text-sm font-semibold hover:bg-muted/80 transition-colors">
+                Skip
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="relative flex flex-col items-center">
