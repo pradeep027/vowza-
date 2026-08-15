@@ -211,7 +211,7 @@ export default function ProviderRegistration() {
     try {
       const { FaceMesh } = await import('@mediapipe/face_mesh');
       const faceMesh = new FaceMesh({
-        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`,
       });
 
       faceMesh.setOptions({
