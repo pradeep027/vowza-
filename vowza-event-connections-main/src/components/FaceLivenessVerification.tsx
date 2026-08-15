@@ -73,66 +73,7 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
     };
   }, []);
 
-  const startVerification = useCallback(async () => {
-    setState('requesting_camera');
-    setFaceStatus('Requesting camera access...');
-    setCurrentStep(0);
-    setStepComplete(false);
-    holdFrames.current = 0;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch (err: any) {
-      setState('failed');
-      setFaceStatus('Camera access denied. Please enable camera permissions.');
-      return;
-    }
-
-    setState('loading_model');
-    setFaceStatus('Loading face detection model...');
-
-    try {
-      // Dynamic import to avoid bundling issues
-      const { FaceMesh } = await import('@mediapipe/face_mesh');
-
-      const faceMesh = new FaceMesh({
-        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces: 1, // Only detect ONE face
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
-      faceMesh.onResults(onResults);
-      faceMeshRef.current = faceMesh;
-
-      setState('detecting');
-      setFaceStatus('Position your face inside the circle');
-
-      // Start detection loop
-      const detect = async () => {
-        if (videoRef.current && faceMeshRef.current && videoRef.current.readyState >= 2) {
-          await faceMeshRef.current.send({ image: videoRef.current });
-        }
-        animFrameRef.current = requestAnimationFrame(detect);
-      };
-      detect();
-    } catch (err) {
-      setState('failed');
-      setFaceStatus('Failed to load face detection. Please try again.');
-    }
-  }, []);
-
+  // Define onResults first so it can be used in startVerification
   const onResults = useCallback((results: any) => {
     if (!results.multiFaceLandmarks) return;
 
@@ -229,6 +170,127 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       }, 800);
     }
   }, [state, sessionId, onVerified]);
+
+  const startVerification = useCallback(async () => {
+    console.log('[HumanCheck] Starting verification...');
+    setState('requesting_camera');
+    setFaceStatus('Requesting camera access...');
+    setCurrentStep(0);
+    setStepComplete(false);
+    holdFrames.current = 0;
+
+    try {
+      console.log('[HumanCheck] Requesting camera...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      streamRef.current = stream;
+      console.log('[HumanCheck] Camera stream obtained');
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        console.log('[HumanCheck] Video srcObject set, playing...');
+        await new Promise<void>((resolve, reject) => {
+          const playPromise = videoRef.current?.play();
+          if (playPromise) {
+            playPromise.then(() => {
+              console.log('[HumanCheck] Video playing');
+              resolve();
+            }).catch(err => {
+              console.error('[HumanCheck] Video play error:', err);
+              reject(err);
+            });
+          } else {
+            resolve();
+          }
+        });
+
+        // Wait for video to be ready
+        await new Promise<void>((resolve) => {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            console.log('[HumanCheck] Video ready immediately');
+            resolve();
+          } else {
+            const onCanPlay = () => {
+              console.log('[HumanCheck] Video canplay event');
+              videoRef.current?.removeEventListener('canplay', onCanPlay);
+              resolve();
+            };
+            videoRef.current?.addEventListener('canplay', onCanPlay);
+            setTimeout(() => {
+              console.log('[HumanCheck] Video ready timeout');
+              videoRef.current?.removeEventListener('canplay', onCanPlay);
+              resolve();
+            }, 3000);
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error('[HumanCheck] Camera error:', err);
+      setState('failed');
+      setFaceStatus('Camera access denied. Please enable camera permissions.');
+      return;
+    }
+
+    setState('loading_model');
+    setFaceStatus('Loading face detection model...');
+
+    try {
+      console.log('[HumanCheck] Importing FaceMesh...');
+      // Dynamic import to avoid bundling issues
+      const { FaceMesh } = await import('@mediapipe/face_mesh');
+      console.log('[HumanCheck] FaceMesh imported successfully');
+
+      const locateFile = (file: string) => {
+        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+        console.log('[HumanCheck] Loading asset:', file, '→', url);
+        return url;
+      };
+
+      console.log('[HumanCheck] Creating FaceMesh instance...');
+      const faceMesh = new FaceMesh({
+        locateFile,
+      });
+
+      console.log('[HumanCheck] Setting FaceMesh options...');
+      faceMesh.setOptions({
+        maxNumFaces: 1, // Only detect ONE face
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      faceMesh.onResults(onResults);
+      faceMeshRef.current = faceMesh;
+      console.log('[HumanCheck] FaceMesh initialized successfully');
+
+      setState('detecting');
+      setFaceStatus('Position your face inside the circle');
+
+      // Start detection loop
+      const detect = async () => {
+        if (videoRef.current && faceMeshRef.current && videoRef.current.readyState >= 2) {
+          try {
+            await faceMeshRef.current.send({ image: videoRef.current });
+          } catch (err) {
+            console.error('[HumanCheck] Detection error:', err);
+          }
+        }
+        animFrameRef.current = requestAnimationFrame(detect);
+      };
+      console.log('[HumanCheck] Starting detection loop');
+      detect();
+    } catch (err: any) {
+      console.error('[HumanCheck] Model loading error:', err);
+      console.error('[HumanCheck] Error details:', {
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name,
+      });
+      setState('failed');
+      setFaceStatus('Failed to load face detection. Please try again.');
+    }
+  }, [onResults]);
 
   const handleRetry = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
