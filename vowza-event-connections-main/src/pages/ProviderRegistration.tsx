@@ -241,9 +241,16 @@ export default function ProviderRegistration() {
       detect();
     } catch (err) {
       console.error('Failed to initialize face detection:', err);
-      // Fallback: enable capture without validation
-      setFaceQualityOk(true);
-      setFaceStatus('Face detection unavailable. Manual capture enabled.');
+      // DO NOT fallback - face detection is REQUIRED
+      setFaceQualityOk(false);
+      setFaceStatus('⚠️ Face detection error. Refreshing camera...');
+      
+      // Try to reinitialize after 2 seconds
+      setTimeout(() => {
+        if (videoRef.current) {
+          initializeFaceDetection();
+        }
+      }, 2000);
     }
   };
 
@@ -254,14 +261,7 @@ export default function ProviderRegistration() {
       streamRef.current = stream;
       setCameraOpen(true);
       setFaceQualityOk(false);
-      setFaceStatus('Loading face detection...');
-      
-      // Add timeout to fallback if face detection takes too long
-      const detectionTimeoutId = setTimeout(() => {
-        if (faceQualityOk === false && faceStatus === 'Loading face detection...') {
-          setFaceStatus('Face detection ready. Position your face to enable capture.');
-        }
-      }, 3000);
+      setFaceStatus('🔄 Loading face detection...');
       
       setTimeout(async () => {
         if (videoRef.current) {
@@ -272,7 +272,6 @@ export default function ProviderRegistration() {
             await initializeFaceDetection();
           } catch (err) {
             console.error('Face detection init error:', err);
-            clearTimeout(detectionTimeoutId);
           }
         }
       }, 100);
@@ -282,9 +281,9 @@ export default function ProviderRegistration() {
   };
 
   const capturePhoto = () => {
-    // Validate face quality before capture
+    // ENFORCE: Only capture if face is valid (no fallback)
     if (!faceQualityOk) {
-      toast.error('Please position your face clearly in the frame');
+      toast.error('❌ Please position your face clearly in the frame. Face detection is required.');
       return;
     }
 
@@ -298,7 +297,7 @@ export default function ProviderRegistration() {
       const url = URL.createObjectURL(blob);
       setS2(p => ({ ...p, selfieUrl: url, selfieBlob: blob }));
       closeCamera();
-      toast.success('Selfie captured ✓');
+      toast.success('✅ Selfie captured ✓');
     }, 'image/jpeg', 0.85);
   };
 
