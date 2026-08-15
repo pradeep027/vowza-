@@ -240,13 +240,12 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
 
     try {
       console.log('[HumanCheck] Importing FaceMesh...');
-      // Dynamic import to avoid bundling issues
       const { FaceMesh } = await import('@mediapipe/face_mesh');
       console.log('[HumanCheck] FaceMesh imported successfully');
+      console.log('[HumanCheck] FaceMesh type:', typeof FaceMesh);
 
       const locateFile = (file: string) => {
         const url = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
-        console.log('[HumanCheck] Loading asset:', file, '→', url);
         return url;
       };
 
@@ -254,20 +253,15 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       const faceMesh = new FaceMesh({
         locateFile,
       });
-      console.log('[HumanCheck] FaceMesh instance created successfully');
+      console.log('[HumanCheck] FaceMesh instance created');
 
-      console.log('[HumanCheck] Initializing FaceMesh...');
-      await faceMesh.initialize();
-      console.log('[HumanCheck] FaceMesh initialized successfully');
-
-      console.log('[HumanCheck] Setting FaceMesh options...');
       faceMesh.setOptions({
-        maxNumFaces: 1, // Only detect ONE face
+        maxNumFaces: 1,
         refineLandmarks: true,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-      console.log('[HumanCheck] FaceMesh configured successfully');
+      console.log('[HumanCheck] FaceMesh options set');
 
       faceMesh.onResults(onResults);
       faceMeshRef.current = faceMesh;
@@ -275,7 +269,6 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
       setState('detecting');
       setFaceStatus('Position your face inside the circle');
 
-      // Start detection loop
       const detect = async () => {
         if (videoRef.current && faceMeshRef.current && videoRef.current.readyState >= 2) {
           try {
@@ -286,7 +279,6 @@ export default function FaceLivenessVerification({ onVerified, onSkip }: Props) 
         }
         animFrameRef.current = requestAnimationFrame(detect);
       };
-      console.log('[HumanCheck] Starting detection loop');
       detect();
     } catch (err: any) {
       console.error('[HumanCheck] Model loading error:', err);
