@@ -708,42 +708,55 @@ export async function processMessage(
   context: PlannerContext,
   history?: import('./aiPlannerTypes').ChatMessage[]
 ): Promise<{ response: AIResponse; updatedContext: PlannerContext }> {
-  const { orchestrate, extractContextUpdates } = await import('./aiOrchestrator');
+  const { orchestrate } = await import('./aiOrchestrator');
 
-  // Merge context updates from the current message
-  const updates = extractContextUpdates(message, context);
-  const ctx: PlannerContext = { ...context, ...updates };
+  // ─── PHASE 2A: Orchestrate handles extraction and merging (single merge point) ──
+  const result = orchestrate(message, context, history ?? []);
+  
+  // Use the updated context from orchestrate (already merged and validated)
+  const finalContext = result.updatedContext || context;
+  const ambiguous = (result as any).ambiguousChange ?? false;
 
-  // Orchestrate — decide intent and strategy
-  const result = orchestrate(message, ctx, history ?? []);
-  const l = message.toLowerCase();
+  // ── If ambiguous change, ask for clarification ──────────────────────────
+  if (ambiguous) {
+    const known: string[] = [];
+    if (context.city) known.push(`in **${context.city}**`);
+    if (context.eventType) known.push(`**${context.eventType}**`);
+    return {
+      response: {
+        type: 'question',
+        text: `I want to make sure I understand correctly. You have ${known.join(', ')}. What specific change would you like to make?`
+      },
+      updatedContext: context,  // Keep old context until ambiguity is resolved
+    };
+  }
 
   // ── If we need to ask the next question, do that ─────────────────────────
   if (result.shouldAskNext) {
     const known: string[] = [];
-    if (ctx.eventType)  known.push(`**${ctx.eventType}**`);
-    if (ctx.city)       known.push(`in **${ctx.city}**`);
-    if (ctx.budget)     known.push(`budget **${fmt(ctx.budget)}**`);
-    if (ctx.guestCount) known.push(`**${ctx.guestCount} guests**`);
+    if (finalContext.eventType)  known.push(`**${finalContext.eventType}**`);
+    if (finalContext.city)       known.push(`in **${finalContext.city}**`);
+    if (finalContext.budget)     known.push(`budget **${fmt(finalContext.budget)}**`);
+    if (finalContext.guestCount) known.push(`**${finalContext.guestCount} guests**`);
     const prefix = known.length > 0 ? `Got it — ${known.join(', ')}. ` : '';
     return {
       response: { type: 'question', text: `${prefix}${result.shouldAskNext}` },
-      updatedContext: ctx,
+      updatedContext: finalContext,
     };
   }
 
   // ── Greeting (only on fresh sessions) ───────────────────────────────────
   if (result.intent === 'greeting') {
-    const hasCtx = !!(ctx.eventType || ctx.city || ctx.budget || ctx.guestCount);
+    const hasCtx = !!(finalContext.eventType || finalContext.city || finalContext.budget || finalContext.guestCount);
     if (hasCtx) {
       const known: string[] = [];
-      if (ctx.eventType)  known.push(`${ctx.eventType}`);
-      if (ctx.city)       known.push(`in ${ctx.city}`);
-      if (ctx.budget)     known.push(`budget ${fmt(ctx.budget)}`);
-      if (ctx.guestCount) known.push(`${ctx.guestCount} guests`);
+      if (finalContext.eventType)  known.push(`${finalContext.eventType}`);
+      if (finalContext.city)       known.push(`in ${finalContext.city}`);
+      if (finalContext.budget)     known.push(`budget ${fmt(finalContext.budget)}`);
+      if (finalContext.guestCount) known.push(`${finalContext.guestCount} guests`);
       return {
         response: { type: 'text', text: `Hey! I still have your event details: ${known.join(' · ')}. What would you like to work on next?` },
-        updatedContext: ctx,
+        updatedContext: finalContext,
       };
     }
     return {
@@ -751,14 +764,14 @@ export async function processMessage(
         type: 'text',
         text: `Hello! 👋 I'm your **Vowza AI Planner** — here to help you plan any event from start to finish.\n\nJust tell me what you're planning and I'll help with budgets, vendors, timelines, and more. What's your event?`,
       },
-      updatedContext: ctx,
+      updatedContext: finalContext,
     };
   }
 
   // ── Context update acknowledgement ───────────────────────────────────────
   if (result.intent === 'context_update') {
     const changed: string[] = [];
-    const up = extractContextUpdates(message, context);
+    const up = updates;  // Use the updates we extracted
     if (up.city)       changed.push(`city → **${up.city}**`);
     if (up.budget)     changed.push(`budget → **${fmt(up.budget!)}**`);
     if (up.guestCount) changed.push(`guests → **${up.guestCount}**`);
@@ -766,62 +779,63 @@ export async function processMessage(
     const summary = changed.length
       ? `Got it — updated: ${changed.join(', ')}. `
       : `Noted. `;
-    const canGenerate = ctx.eventType && ctx.city && ctx.budget && ctx.guestCount;
+    const canGenerate = finalContext.eventType && finalContext.city && finalContext.budget && finalContext.guestCount;
     return {
       response: {
         type: 'text',
-        text: `${summary}${canGenerate ? `I'll update the plan for ${ctx.guestCount} guests in **${ctx.city}** with a budget of **${fmt(ctx.budget!)}**. Want me to regenerate the full plan?` : `What else should I know?`}`,
+        text: `${summary}${canGenerate ? `I'll update the plan for ${finalContext.guestCount} guests in **${finalContext.city}** with a budget of **${fmt(finalContext.budget!)}**. Want me to regenerate the full plan?` : `What else should I know?`}`,
       },
-      updatedContext: ctx,
+      updatedContext: finalContext,
     };
   }
 
   // ── VEDA structured responses (only when all context is available) ───────
   switch (result.intent) {
     case 'budget_breakdown':
-      return { response: { type: 'budget_plan', text: withFollowUp(`Here's the budget breakdown for your **${ctx.eventType ?? 'event'}** in **${ctx.city ?? 'your city'}** for **${ctx.guestCount ?? 200} guests** — budget **${fmt(ctx.budget ?? 500000)}**.`, ctx), data: { budgetPlan: generateBudgetPlan(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'budget_plan', text: withFollowUp(`Here's the budget breakdown for your **${finalContext.eventType ?? 'event'}** in **${finalContext.city ?? 'your city'}** for **${finalContext.guestCount ?? 200} guests** — budget **${fmt(finalContext.budget ?? 500000)}**.`, finalContext), data: { budgetPlan: generateBudgetPlan(finalContext) } }, updatedContext: finalContext };
 
     case 'timeline':
-      return { response: { type: 'timeline', text: withFollowUp(`Here's your complete planning timeline for the **${ctx.eventType ?? 'event'}**.`, ctx), data: { timeline: generateTimeline(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'timeline', text: withFollowUp(`Here's your complete planning timeline for the **${finalContext.eventType ?? 'event'}**.`, finalContext), data: { timeline: generateTimeline(finalContext) } }, updatedContext: finalContext };
 
     case 'checklist':
-      return { response: { type: 'checklist', text: withFollowUp(`Here's your full checklist for the **${ctx.eventType ?? 'event'}** — every task prioritised and assigned.`, ctx), data: { checklist: generateChecklist(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'checklist', text: withFollowUp(`Here's your full checklist for the **${finalContext.eventType ?? 'event'}** — every task prioritised and assigned.`, finalContext), data: { checklist: generateChecklist(finalContext) } }, updatedContext: finalContext };
 
     case 'food_plan':
-      return { response: { type: 'food_plan', text: withFollowUp(`Here's the food & catering plan for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}**.`, ctx), data: { foodPlan: generateFoodPlan(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'food_plan', text: withFollowUp(`Here's the food & catering plan for **${finalContext.guestCount ?? 200} guests** in **${finalContext.city ?? 'your city'}**.`, finalContext), data: { foodPlan: generateFoodPlan(finalContext) } }, updatedContext: finalContext };
 
     case 'weather_advice':
-      return { response: { type: 'weather_advice', text: `Here's the weather and season analysis for your **${ctx.eventType ?? 'event'}**${ctx.eventDate ? ` in ${ctx.eventDate}` : ''}.`, data: { weather: getWeatherAdvice(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'weather_advice', text: `Here's the weather and season analysis for your **${finalContext.eventType ?? 'event'}**${finalContext.eventDate ? ` in ${finalContext.eventDate}` : ''}.`, data: { weather: getWeatherAdvice(finalContext) } }, updatedContext: finalContext };
 
     case 'risk_analysis':
-      return { response: { type: 'risk_analysis', text: `Here's the risk analysis for your **${ctx.eventType ?? 'event'}** — with mitigation strategies for each risk.`, data: { risks: analyseRisks(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'risk_analysis', text: `Here's the risk analysis for your **${finalContext.eventType ?? 'event'}** — with mitigation strategies for each risk.`, data: { risks: analyseRisks(finalContext) } }, updatedContext: finalContext };
 
     case 'success_score':
-      return { response: { type: 'success_score', text: `Here's your **Event Success Score** based on everything shared so far.`, data: { score: calculateSuccessScore(ctx) } }, updatedContext: ctx };
+      return { response: { type: 'success_score', text: `Here's your **Event Success Score** based on everything shared so far.`, data: { score: calculateSuccessScore(finalContext) } }, updatedContext: finalContext };
 
     case 'plan_event': {
-      const plan = generateWeddingPlan(ctx);
-      const intro = `Here's your complete **${ctx.durationDays && ctx.durationDays > 1 ? `${ctx.durationDays}-day ` : ''}${ctx.eventType ?? 'event'} plan** for **${ctx.guestCount ?? 200} guests** in **${ctx.city ?? 'your city'}** — budget **${fmt(ctx.budget ?? 800000)}**.`;
-      const overview = generateEventOverviewText(ctx);
+      const plan = generateWeddingPlan(finalContext);
+      const intro = `Here's your complete **${finalContext.durationDays && finalContext.durationDays > 1 ? `${finalContext.durationDays}-day ` : ''}${finalContext.eventType ?? 'event'} plan** for **${finalContext.guestCount ?? 200} guests** in **${finalContext.city ?? 'your city'}** — budget **${fmt(finalContext.budget ?? 800000)}**.`;
+      const overview = generateEventOverviewText(finalContext);
       return {
         response: {
           type: 'wedding_plan',
-          text: withFollowUp(`${intro}\n\n${overview}`, ctx),
+          text: withFollowUp(`${intro}\n\n${overview}`, finalContext),
           data: { weddingPlan: plan },
         },
-        updatedContext: ctx,
+        updatedContext: finalContext,
       };
     }
 
     case 'negotiation': {
+      const l = message.toLowerCase();
       const neg = l.match(/(\d[\d,]+).*?to.*?(\d[\d,]+)|from.*?(\d[\d,]+).*?to.*?(\d[\d,]+)/i);
       if (!neg) {
-        return { response: { type: 'question', text: `Sure! Share the vendor type, current price, and your target price — e.g. *"Negotiate with photographer from ₹60K to ₹45K"*` }, updatedContext: ctx };
+        return { response: { type: 'question', text: `Sure! Share the vendor type, current price, and your target price — e.g. *"Negotiate with photographer from ₹60K to ₹45K"*` }, updatedContext: finalContext };
       }
       const cur = parseInt((neg[1] || neg[3] || '0').replace(/,/g, ''));
       const tgt = parseInt((neg[2] || neg[4] || '0').replace(/,/g, ''));
       const vt = /photographer/i.test(l) ? 'Photographer' : /decorator/i.test(l) ? 'Decorator' : /caterer/i.test(l) ? 'Caterer' : /dj/i.test(l) ? 'DJ' : 'Vendor';
-      return { response: { type: 'negotiation', text: `Here's a professional negotiation message for your **${vt}**.`, data: { negotiation: generateNegotiationMessage(vt, cur, tgt) } }, updatedContext: ctx };
+      return { response: { type: 'negotiation', text: `Here's a professional negotiation message for your **${vt}**.`, data: { negotiation: generateNegotiationMessage(vt, cur, tgt) } }, updatedContext: finalContext };
     }
   }
 
@@ -831,7 +845,7 @@ export async function processMessage(
   // The LLM in llm.ts will receive the orchestration result + RAG context.
   return {
     response: { type: 'text', text: '' }, // placeholder — LLM will fill this
-    updatedContext: ctx,
+    updatedContext: finalContext,
   };
 }
 

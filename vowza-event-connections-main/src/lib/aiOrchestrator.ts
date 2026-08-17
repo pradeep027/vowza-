@@ -14,6 +14,7 @@ import type { ChatMessage, PlannerContext, PlanningStateData, EventBudgetPlan } 
 import { fmt } from './aiPlanner';
 import { EventBudgetPlanner } from './eventBudgetPlanner';
 import { extractEventDateFromText } from './eventContextCapturer';
+import { extractMinimumRating } from './plannerRecommendation';
 
 // ── Intent categories ─────────────────────────────────────────────────────────
 export type Intent =
@@ -49,6 +50,8 @@ export interface OrchestrationResult {
   shouldAskNext:    string | null;  // next question if info is missing
   adminPackageContext?: string;     // NEW Phase 7E: admin packages context
   liveAvailabilityContext?: string; // NEW Phase 7F: real-time availability
+  updatedContext:   PlannerContext; // PHASE 2A: merged and validated context
+  ambiguousChange:  boolean;        // PHASE 2A: whether change was ambiguous
 }
 
 export type ResponseStrategy =
@@ -91,6 +94,40 @@ export function nextSoftFollowUp(ctx: PlannerContext): string | null {
   return null;
 }
 
+// ── PHASE 2A: Record an asked question in the context ────────────────────────
+export function recordAskedQuestion(
+  context: PlannerContext,
+  question: string
+): PlannerContext {
+  const asked = context.askedQuestions ?? [];
+  if (!asked.includes(question)) {
+    asked.push(question);
+  }
+  return { ...context, askedQuestions: asked };
+}
+
+// ── PHASE 2A: Mark a field as explicitly confirmed by the user ────────────────
+export function markFieldConfirmed(
+  context: PlannerContext,
+  fieldName: string
+): PlannerContext {
+  const confirmed = context.confirmedFields ?? [];
+  if (!confirmed.includes(fieldName)) {
+    confirmed.push(fieldName);
+  }
+  return { ...context, confirmedFields: confirmed };
+}
+
+// ── PHASE 2A: Check if a question has been asked before ──────────────────────
+export function hasAskedQuestion(context: PlannerContext, question: string): boolean {
+  return (context.askedQuestions ?? []).includes(question);
+}
+
+// ── PHASE 2A: Check if a field has been explicitly confirmed ──────────────────
+export function isFieldConfirmed(context: PlannerContext, fieldName: string): boolean {
+  return (context.confirmedFields ?? []).includes(fieldName);
+}
+
 // ── Vendor keyword → profession_type map ──────────────────────────────────────
 const VENDOR_KEYWORDS: [RegExp, string][] = [
   [/photograph/i,       'photographer'],
@@ -127,6 +164,22 @@ function extractCity(text: string): string | null {
   for (const c of CITY_LIST) if (l.includes(c)) return c.charAt(0).toUpperCase() + c.slice(1);
   const m = text.match(/\bin\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
   return m?.[1] ?? null;
+}
+
+// ── Locality/Area extractor ───────────────────────────────────────────────────
+function extractLocality(text: string): string | null {
+  // Extract areas/localities mentioned with "in" or "near"
+  // "in Beramguda", "in Banjara Hills", "near Whitefield"
+  const patterns = [
+    /\b(?:in|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/i,  // "in Beramguda"
+    /,\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/i,  // ", Beramguda"
+  ];
+  
+  for (const pattern of patterns) {
+    const m = text.match(pattern);
+    if (m) return m[1];
+  }
+  return null;
 }
 
 // ── Budget extractor ──────────────────────────────────────────────────────────
@@ -436,6 +489,52 @@ function extractEventDate(text: string): string | undefined {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+// ── PHASE 2A: Detect ambiguous changes ─────────────────────────────────────
+// If user says "somewhere else" without specifying a city, flag as ambiguous
+function isAmbiguousChange(message: string, ctx: PlannerContext): boolean {
+  const l = message.toLowerCase();
+  
+  // "Maybe somewhere else" / "Maybe in a different city" but NO city mentioned
+  if ((/somewhere else|different.*city|another.*city|change.*city/i.test(l)) && !extractCity(message)) {
+    return true;
+  }
+  
+  // "Not sure about..." patterns without specifics
+  if (/not.*sure.*about|maybe.*change|possibly.*change/i.test(l) && !extractBudget(message) && !extractCity(message)) {
+    return true;
+  }
+  
+  return false;
+}
+
+// ── PHASE 2A: Merge context intelligently ──────────────────────────────────
+// Preserve all existing fields; only update fields mentioned in the message
+export function mergeContextIntelligently(
+  previousContext: PlannerContext,
+  extractedUpdates: Partial<PlannerContext>,
+  message: string
+): { merged: PlannerContext; ambiguous: boolean } {
+  // Start with all previous values
+  let merged = { ...previousContext };
+  
+  // Check for ambiguous changes first
+  const ambiguous = isAmbiguousChange(message, previousContext);
+  
+  // Only merge non-ambiguous updates
+  if (!ambiguous) {
+    // Merge each extracted field
+    for (const [key, value] of Object.entries(extractedUpdates)) {
+      if (value !== undefined && value !== null) {
+        (merged as any)[key] = value;
+        // Mark the field as confirmed (explicitly provided by user)
+        merged = markFieldConfirmed(merged, key);
+      }
+    }
+  }
+  
+  return { merged, ambiguous };
+}
+
 // ── Extract context updates from message ─────────────────────────────────────
 export function extractContextUpdates(
   message: string,
@@ -455,6 +554,10 @@ export function extractContextUpdates(
   // City
   const city = extractCity(message);
   if (city) updates.city = city;
+
+  // Locality/Area
+  const locality = extractLocality(message);
+  if (locality && !updates.city) updates.city = locality;  // Use as fallback area hint
 
   // Event type
   const eventMap: [RegExp, string][] = [
@@ -525,10 +628,16 @@ export function orchestrate(
   history: ChatMessage[]
 ): OrchestrationResult {
   const normalizedMessage = message.replace(/\bvideo\s+graphers?\b/gi, 'videographer');
-  // 1. Merge any new context from the message
+  
+  // ─── PHASE 2A: Extract and merge context intelligently ───────────────────
   const updates = extractContextUpdates(normalizedMessage, ctx);
-  const merged: PlannerContext = { ...ctx, ...updates };
-
+  const { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
+  
+  // ─── PHASE 2A: If ambiguous, include this in the result ──────────────────
+  if (ambiguous) {
+    console.log('[Vowza AI Phase 2A] Ambiguous context change detected:', { message, updates });
+  }
+  
   // 2. Classify intent
   const intent = classifyIntent(normalizedMessage, merged, history);
 
@@ -538,7 +647,7 @@ export function orchestrate(
   // 4. Extract search parameters
   const city = merged.city ?? extractCity(normalizedMessage);
   const priceMax = extractBudget(normalizedMessage) ?? merged.budget ?? null;
-  const minRating = /highly.rated|top.rated|best|verified/i.test(normalizedMessage) ? 4.0 : 0;
+  const minRating = extractMinimumRating(normalizedMessage) ?? 0;
 
   // 5. Decide if retrieval is needed
   // STRICT RULE: only search the Vowza database when the user explicitly
@@ -559,7 +668,14 @@ export function orchestrate(
 
   // 7. Determine response strategy
   let responseStrategy: ResponseStrategy;
-  const nextQuestion = determineNextQuestion(intent, merged);
+  let nextQuestion = determineNextQuestion(intent, merged);
+  
+  // PHASE 2A: Record the question if we're about to ask it
+  if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan'].includes(intent)) {
+    if (!hasAskedQuestion(merged, nextQuestion)) {
+      merged = recordAskedQuestion(merged, nextQuestion);
+    }
+  }
 
   if (intent === 'greeting') {
     responseStrategy = 'stream_general';
@@ -588,6 +704,8 @@ export function orchestrate(
     responseStrategy,
     contextSummary: buildContextSummary(merged),
     shouldAskNext: responseStrategy === 'ask_question' ? nextQuestion : null,
+    updatedContext: merged,               // ─ NEW: Phase 2A ─
+    ambiguousChange: ambiguous,           // ─ NEW: Phase 2A ─
   };
 }
 

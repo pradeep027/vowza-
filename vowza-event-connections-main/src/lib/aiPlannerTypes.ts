@@ -37,6 +37,9 @@ export interface PlannerContext {
   serviceStyle?:        "buffet" | "table_service";
   timeOfDay?:           "morning" | "afternoon" | "evening" | "night";
   styleVibe?:           "traditional" | "modern";
+  // ── PHASE 2A: Question and confirmation tracking ──────────────────────────
+  askedQuestions?:      string[];  // Questions already asked in this conversation (e.g., ["What city?", "Guest count?"])
+  confirmedFields?:     string[];  // Fields explicitly provided by user (e.g., ["city", "guestCount", "budget"])
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────

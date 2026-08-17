@@ -345,25 +345,35 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const useEdge = import.meta.env.VITE_USE_AI_PROXY !== 'false';
 
-  // ─── PHASE 4: Extract context from message ────────────────────────────────────
-  const extractedContext = extractContextFromMessage(message, context);
-  const contextWithExtraction = { ...context, ...extractedContext };
+  // ─── Get orchestration result which includes updated context ─────────────
+  // Extraction happens inside orchestrate() via extractContextUpdates()
+  const orch = orchestrate(message, context, history);
   
-  console.log('[Vowza AI Phase 4] Extracted context:', {
-    extracted: extractedContext,
-    total: contextWithExtraction,
-  });
+  // ─── PHASE 2A: Check for ambiguous changes ────────────────────────────
+  if (orch.ambiguousChange) {
+    console.log('[Vowza AI Phase 2A] Ambiguous context change detected');
+    const clarificationMsg = `I want to make sure I understand correctly. `;
+    await streamDeterministic(clarificationMsg + `You currently have ${context.eventType ? `a ${context.eventType}` : 'an event'} ${context.city ? `in ${context.city}` : ''}. What specific change would you like to make?`, onChunk);
+    return {
+      fullText: clarificationMsg,
+      aiResponse: { type: 'question', text: `I want to make sure I understand correctly. Please clarify what you'd like to change.` },
+      updatedContext: context,  // Keep old context until clarified
+    };
+  }
+  
+  // Use the updated context from orchestration
+  const contextToUse = orch.updatedContext || context;
 
-  // ─── PHASE 4: Check if context is sufficient for planning ───────────────────
-  // If not, ask for the next essential field and return early
-  const readinessCheck = await checkContextReadinessAndRespond(contextWithExtraction, onChunk);
-  if (!readinessCheck.shouldContinue && readinessCheck.response) {
-    return readinessCheck.response;
+  // Only enforce event-planning readiness for planning, not vendor discovery
+  if (orch.intent !== 'find_vendors') {
+    const readinessCheck = await checkContextReadinessAndRespond(contextToUse, onChunk);
+    if (!readinessCheck.shouldContinue && readinessCheck.response) {
+      return readinessCheck.response;
+    }
   }
 
-  // 1. Orchestrate this turn
-  const orch = orchestrate(message, contextWithExtraction, history);
-  const { response: vedaResponse, updatedContext } = await processMessage(message, contextWithExtraction, history);
+  // 1. Process the message with updated context
+  const { response: vedaResponse, updatedContext } = await processMessage(message, contextToUse, history);
 
   // ─── PHASE 2A: Check planning readiness and generate plan if sufficient ─────
   const readiness = calculatePlanningReadiness(updatedContext);
@@ -528,6 +538,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
       const ragResult = await retrieveVendors(message, updatedContext, 5, {
         professions: orch.professions || [],
         city: orch.city ?? undefined,
+        area: orch.area ?? undefined,
         priceMax: orch.priceMax ?? undefined,
         minRating: orch.minRating || 0,
       });
@@ -570,6 +581,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     const ragResult = await retrieveVendors(message, updatedContext, 12, {
       professions: orch.professions || [],
       city: orch.city ?? undefined,
+      area: orch.area ?? undefined,
       priceMax: orch.priceMax ?? undefined,
       minRating: orch.minRating || 0,
     });
@@ -648,6 +660,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
         {
           professions: [],
           city: generatedPlan.city,
+          area: updatedContext.locality,
           priceMax: Math.max(...generatedPlan.allocations.map(a => a.allocatedAmount)),
         }
       );

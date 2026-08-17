@@ -1,69 +1,23 @@
--- Harden marketplace RPCs used by the AI Planner.
--- This migration is intentionally additive and is not applied by this local fix.
--- A provider is eligible only when both the workflow status and the explicit
--- verification flag are approved, preventing unverified profiles from reaching
--- the planner even if a caller bypasses client-side validation.
+-- Migration: Harden search_vendors_sql RPC with area filtering and verification enforcement
+-- Date: 2026-09-17
+-- Purpose: 
+--   1. Add p_area parameter for locality/area-based vendor search
+--   2. Implement two-tier ranking (exact area > service areas)
+--   3. Enforce verification_status, is_verified, is_published consistently
+--   4. Return actual is_verified value (not hardcoded TRUE)
+--   5. Normalize service_areas matching (case-insensitive, trimmed)
 
-CREATE OR REPLACE FUNCTION public.match_vendors(
-  query_embedding vector(1536),
-  match_count INT DEFAULT 10,
-  similarity_threshold FLOAT DEFAULT 0.5,
-  filter_profession TEXT DEFAULT NULL,
-  filter_city TEXT DEFAULT NULL,
-  filter_price_max NUMERIC DEFAULT NULL
-)
-RETURNS TABLE (
-  provider_id UUID,
-  profession TEXT,
-  content TEXT,
-  similarity FLOAT,
-  price_min NUMERIC,
-  price_max NUMERIC,
-  average_rating FLOAT,
-  is_verified BOOLEAN,
-  city TEXT
-)
-LANGUAGE plpgsql
-STABLE
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    ve.provider_id,
-    pp.profession::TEXT,
-    ve.content,
-    (1 - (ve.embedding <=> query_embedding))::FLOAT,
-    pp.price_min::NUMERIC,
-    pp.price_max::NUMERIC,
-    COALESCE(pp.average_rating, 0)::FLOAT,
-    TRUE,
-    pr.city::TEXT
-  FROM public.vendor_embeddings ve
-  JOIN public.provider_profiles pp ON pp.id = ve.provider_id
-  LEFT JOIN public.profiles pr ON pr.id = pp.user_id
-  WHERE ve.embedding IS NOT NULL
-    AND pp.verification_status IN ('approved', 'verified')
-    AND COALESCE(pp.is_verified, FALSE) = TRUE
-    AND COALESCE(pp.is_published, FALSE) = TRUE
-    AND (filter_profession IS NULL OR pp.profession::TEXT = filter_profession)
-    AND (filter_city IS NULL OR LOWER(pr.city) LIKE LOWER('%' || filter_city || '%'))
-    AND (filter_price_max IS NULL OR pp.price_min IS NULL OR pp.price_min <= filter_price_max)
-    AND 1 - (ve.embedding <=> query_embedding) >= similarity_threshold
-  ORDER BY ve.embedding <=> query_embedding
-  LIMIT match_count;
-END;
-$$;
+-- STEP 1: Drop old function by explicit signature (PostgreSQL safety)
+-- Old signature: search_vendors_sql(TEXT, TEXT, NUMERIC, FLOAT, INTEGER)
+DROP FUNCTION IF EXISTS public.search_vendors_sql(TEXT, TEXT, NUMERIC, FLOAT, INTEGER);
 
--- PostgreSQL cannot alter a function's OUT/RETURNS TABLE row type in place.
--- Replace only this Planner RPC so the published-profile hardening can deploy
--- over the legacy signature without applying unrelated migrations.
-DROP FUNCTION IF EXISTS public.search_vendors_sql(TEXT, TEXT, NUMERIC, DOUBLE PRECISION, INTEGER);
-
+-- STEP 2: Create new function with p_area parameter and service-area normalization
 CREATE OR REPLACE FUNCTION public.search_vendors_sql(
   p_profession TEXT DEFAULT NULL,
   p_city TEXT DEFAULT NULL,
   p_price_max NUMERIC DEFAULT NULL,
   p_min_rating FLOAT DEFAULT 0,
+  p_area TEXT DEFAULT NULL,              -- NEW PARAMETER
   p_limit INT DEFAULT 10
 )
 RETURNS TABLE (
@@ -76,16 +30,16 @@ RETURNS TABLE (
   average_rating FLOAT,
   total_reviews INT,
   total_bookings INT,
-  is_verified BOOLEAN,
+  is_verified BOOLEAN,                   -- ACTUAL database value, NOT TRUE
   is_available BOOLEAN,
   experience_years INT,
   cover_image_url TEXT,
   city TEXT,
+  area TEXT,                             -- NEW OUTPUT
   full_name TEXT,
   avatar_url TEXT
 )
-LANGUAGE plpgsql
-STABLE
+LANGUAGE plpgsql STABLE
 AS $$
 BEGIN
   RETURN QUERY
@@ -99,11 +53,12 @@ BEGIN
     COALESCE(pp.average_rating, 0)::FLOAT,
     COALESCE(pp.total_reviews, 0)::INT,
     COALESCE(pp.total_bookings, 0)::INT,
-    TRUE,
+    COALESCE(pp.is_verified, FALSE)::BOOLEAN,  -- ACTUAL value, NOT TRUE
     COALESCE(pp.is_available, TRUE)::BOOLEAN,
     pp.experience_years::INT,
     pp.cover_image_url::TEXT,
     pr.city::TEXT,
+    pr.area::TEXT,                        -- NEW OUTPUT
     pr.full_name::TEXT,
     pr.avatar_url::TEXT
   FROM public.provider_profiles pp
@@ -113,12 +68,31 @@ BEGIN
     AND COALESCE(pp.is_published, FALSE) = TRUE
     AND (p_profession IS NULL OR pp.profession::TEXT = p_profession)
     AND (p_city IS NULL OR LOWER(COALESCE(pr.city, '')) LIKE LOWER('%' || p_city || '%'))
+    -- NEW: Area filtering with service-areas normalization
+    AND (p_area IS NULL OR 
+      LOWER(TRIM(COALESCE(pr.area, ''))) LIKE '%' || LOWER(TRIM(p_area)) || '%'
+      OR
+      EXISTS (
+        SELECT 1 FROM UNNEST(COALESCE(pp.service_areas, '{}')) AS sa
+        WHERE LOWER(TRIM(sa)) = LOWER(TRIM(p_area))
+      )
+    )
     AND (p_price_max IS NULL OR pp.price_min IS NULL OR pp.price_min <= p_price_max)
     AND COALESCE(pp.average_rating, 0) >= p_min_rating
-  ORDER BY COALESCE(pp.average_rating, 0) DESC, COALESCE(pp.total_bookings, 0) DESC
+  ORDER BY 
+    -- TWO-TIER LOCATION RANKING (no city fallback when area specified)
+    CASE 
+      WHEN LOWER(TRIM(COALESCE(pr.area, ''))) LIKE '%' || LOWER(TRIM(p_area)) || '%' THEN 0
+      WHEN EXISTS (
+        SELECT 1 FROM UNNEST(COALESCE(pp.service_areas, '{}')) AS sa
+        WHERE LOWER(TRIM(sa)) = LOWER(TRIM(p_area))
+      ) THEN 1
+    END,
+    COALESCE(pp.average_rating, 0) DESC,
+    COALESCE(pp.total_bookings, 0) DESC
   LIMIT p_limit;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.match_vendors TO authenticated, anon;
+-- STEP 3: Ensure permissions are set (idempotent)
 GRANT EXECUTE ON FUNCTION public.search_vendors_sql TO authenticated, anon;

@@ -14,6 +14,7 @@ import {
   extractPlannerSearchCriteria,
   rankMarketplaceVendors,
   type MarketplaceAvailabilityStatus,
+  extractMinimumRating,
 } from './plannerRecommendation';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ export interface RetrievedVendor {
   full_name?:     string;
   bio?:           string;
   city?:          string;
+  area?:          string;
   price_min?:     number;
   price_max?:     number;
   average_rating: number;
@@ -62,6 +64,16 @@ export interface RetrievedMenuItem {
 export interface RetrievedFaq {
   question: string;
   answer:   string;
+}
+
+// ── Vendor Search Context (Phase 1 only) ────────────────────────────────────
+export interface VendorSearchContext {
+  profession?: string;           // 'photographer', 'dj', 'caterer', etc.
+  city?: string;                 // From profiles.city (supported in Phase 1)
+  area?: string;                 // From profiles.area or extracted locality (supported in Phase 1)
+  minimumRating?: number;        // 4.0, 4.5, 5.0, etc.
+  serviceBudget?: number;        // Vendor service price budget (optional)
+  locationIntent?: "city" | "area" | "service_area";  // How user specified location
 }
 
 export interface RAGResult {
@@ -229,7 +241,7 @@ export function extractVendorIntent(message: string, ctx: PlannerContext): {
   if (!priceMax && ctx.budget) priceMax = ctx.budget;
 
   // Minimum rating threshold
-  const minRating = /highly.rated|top.rated|best|5.star|4.star/i.test(l) ? 4.0 : 0;
+  const minRating = extractMinimumRating(normalizeVendorSearchMessage(message)) ?? 0;
 
   return { professions, city, priceMax, minRating, guestCount: ctx.guestCount };
 }
@@ -246,6 +258,7 @@ function fmtPrice(n?: number): string {
 async function sqlSearch(
   profession?: string,
   city?: string,
+  area?: string,
   priceMax?: number,
   minRating = 0,
   limit = 8
@@ -254,6 +267,7 @@ async function sqlSearch(
   const { data, error } = await supabase.rpc('search_vendors_sql' as any, {
     p_profession: profession ?? null,
     p_city:       city ?? null,
+    p_area:       area ?? null,
     p_price_max:  priceMax ?? null,
     p_min_rating: minRating,
     p_limit:      limit,
@@ -286,15 +300,15 @@ async function sqlSearch(
   
   let q = supabase
     .from('provider_profiles')
-    .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, experience_years, cover_image_url, user_id')
-    .eq('is_published', true)
+    .select('id, profession, stage_name, bio, price_min, price_max, average_rating, total_reviews, total_bookings, is_verified, is_available, experience_years, cover_image_url, user_id, service_areas')
+    .in('verification_status', ['approved', 'verified'])
     .eq('is_verified', true)
+    .eq('is_published', true)
     .order('average_rating', { ascending: false })
     .limit(limit);
 
-  // CRITICAL: Do NOT require verification_status check here—just query published+verified
   if (profession) {
-    q = q.ilike('profession', `%${profession}%`); // case-insensitive partial match
+    q = q.ilike('profession', `%${profession}%`);
   }
   if (priceMax)   q = q.lte('price_min', priceMax);
   if (minRating)  q = q.gte('average_rating', minRating);
@@ -311,13 +325,13 @@ async function sqlSearch(
     return [];
   }
 
-  // Fetch user profiles for city and name
+  // Fetch user profiles for city, area, and name
   const userIds = fallback.map((v: any) => v.user_id).filter(Boolean);
   if (userIds.length === 0) return [];
 
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, city, avatar_url')
+    .select('id, full_name, city, area, avatar_url')
     .in('id', userIds);
 
   if (profileError) {
@@ -327,13 +341,33 @@ async function sqlSearch(
 
   const pm = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 
-  // Filter by city if specified (case-insensitive)
-  return fallback
-    .filter((v: any) => {
-      if (!city) return true;
+  // Filter by area if specified (exact area OR service_areas match)
+  let filtered = fallback;
+  if (area) {
+    filtered = fallback.filter((v: any) => {
+      const profile = pm.get(v.user_id) ?? {};
+      const vendorArea = profile.area ?? '';
+      const inServiceAreas = (v.service_areas ?? []).some((sa: string) =>
+        sa.toLowerCase().trim() === area.toLowerCase().trim()
+      );
+      // Match if: exact area OR service_areas contains area
+      return vendorArea.toLowerCase().includes(area.toLowerCase()) || inServiceAreas;
+    });
+    
+    if (filtered.length === 0) {
+      console.log('[RAG] Fallback: no vendors in specified area', area);
+      return [];  // Fail closed
+    }
+  } else if (city) {
+    // City filter (when area NOT specified)
+    filtered = fallback.filter((v: any) => {
       const vendorCity = pm.get(v.user_id)?.city ?? '';
       return vendorCity.toLowerCase().includes(city.toLowerCase());
-    })
+    });
+  }
+
+  // Convert to RetrievedVendor
+  return filtered
     .map((v: any): RetrievedVendor => {
       const p = pm.get(v.user_id) ?? {};
       return {
@@ -343,6 +377,7 @@ async function sqlSearch(
         full_name:      (p as any).full_name || v.stage_name,
         bio:            v.bio,
         city:           (p as any).city,
+        area:           (p as any).area,
         price_min:      v.price_min,
         price_max:      v.price_max,
         average_rating: v.average_rating ?? 0,
@@ -587,6 +622,7 @@ export async function retrieveVendors(
   });
   const professions = criteria.professions;
   const city = criteria.city;
+  const area = criteria.area;
   const priceMax = criteria.serviceBudget;
   const minRating = criteria.minimumRating ?? 0;
 
@@ -607,12 +643,12 @@ export async function retrieveVendors(
     if (uniqueProfessions.length > 0) {
       const results = await Promise.all(
         uniqueProfessions.slice(0, 5).map((profession) =>
-          sqlSearch(profession, city, priceMax, minRating, Math.ceil(maxVendors / Math.max(uniqueProfessions.length, 1)))
+          sqlSearch(profession, city, area, priceMax, minRating, Math.ceil(maxVendors / Math.max(uniqueProfessions.length, 1)))
         )
       );
       allVendors = results.flat();
     } else {
-      allVendors = await sqlSearch(undefined, city, priceMax, minRating, maxVendors);
+      allVendors = await sqlSearch(undefined, city, area, priceMax, minRating, maxVendors);
     }
 
     const verifiedUnique = canonicalizeRetrievedVendors(await retainPublishedVerifiedVendors(allVendors));
