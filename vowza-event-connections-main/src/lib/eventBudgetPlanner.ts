@@ -10,22 +10,25 @@
 // Output: BudgetAllocation[] with min/max ranges for rebalancing
 
 import type { PlannerContext, EventCategory, LuxuryLevel } from './aiPlannerTypes';
+import { generateEventAwareBudget } from './eventAwareBudgetEngine';
 
 // ─── Budget allocation template per event type ────────────────────────────────
 // Format: [{ category, basePercentage, minRange, maxRange, priority }, ...]
 // minRange/maxRange allow rebalancing without going below/above
 const BUDGET_TEMPLATES: Record<EventCategory, BudgetCategoryTemplate[]> = {
   wedding: [
-    { category: 'Photography', basePercentage: 14, minRange: 10, maxRange: 18, priority: 'high', required: true },
-    { category: 'Videography', basePercentage: 8, minRange: 0, maxRange: 12, priority: 'medium', required: false },
-    { category: 'Catering', basePercentage: 36, minRange: 28, maxRange: 42, priority: 'high', required: true },
-    { category: 'Decoration', basePercentage: 20, minRange: 14, maxRange: 26, priority: 'high', required: true },
-    { category: 'Makeup & Hair', basePercentage: 6, minRange: 4, maxRange: 8, priority: 'medium', required: true },
+    { category: 'Photography', basePercentage: 12, minRange: 10, maxRange: 15, priority: 'high', required: true },
+    { category: 'Videography', basePercentage: 8, minRange: 5, maxRange: 12, priority: 'high', required: false },
+    { category: 'Catering', basePercentage: 32, minRange: 26, maxRange: 38, priority: 'high', required: true },
+    { category: 'Decoration', basePercentage: 16, minRange: 12, maxRange: 21, priority: 'high', required: true },
+    { category: 'Venue Rental', basePercentage: 12, minRange: 8, maxRange: 16, priority: 'high', required: true },
+    { category: 'Makeup & Hair', basePercentage: 6, minRange: 4, maxRange: 9, priority: 'medium', required: true },
     { category: 'Music/DJ/Band', basePercentage: 5, minRange: 3, maxRange: 8, priority: 'medium', required: false },
-    { category: 'Mehendi/Haldi Artists', basePercentage: 4, minRange: 2, maxRange: 6, priority: 'low', required: false },
-    { category: 'Flowers & Decor', basePercentage: 3, minRange: 2, maxRange: 5, priority: 'low', required: false },
-    { category: 'Venue Rental', basePercentage: 2, minRange: 1, maxRange: 4, priority: 'high', required: true },
-    { category: 'Contingency & Misc', basePercentage: 2, minRange: 2, maxRange: 5, priority: 'low', required: false },
+    { category: 'Lighting & Sound', basePercentage: 4, minRange: 2, maxRange: 7, priority: 'medium', required: false },
+    { category: 'Mehendi/Haldi Artists', basePercentage: 2, minRange: 1, maxRange: 4, priority: 'low', required: false },
+    { category: 'Anchor/Host', basePercentage: 1, minRange: 0, maxRange: 2, priority: 'low', required: false },
+    { category: 'Transportation', basePercentage: 1, minRange: 0, maxRange: 2, priority: 'low', required: false },
+    { category: 'Contingency & Misc', basePercentage: 1, minRange: 1, maxRange: 3, priority: 'low', required: false },
   ],
   
   reception: [
@@ -197,14 +200,14 @@ const REASONING: Record<string, string> = {
   'Videography': 'Professional video preserves the entire event narrative',
   'Catering': 'Food quality directly impacts guest satisfaction — allocate proportionally',
   'Decoration': 'Sets the ambiance and theme — significant investment',
+  'Venue Rental': 'Foundation of the event — must be booked early',
   'Makeup & Hair': 'Bride and key family members need professional styling',
   'Music/DJ/Band': 'Entertainment drives the event atmosphere',
-  'Venue': 'Foundation of the event — must be booked early',
-  'Mehendi Artist': 'Specialized service with fixed rates — high demand',
-  'Haldi Artist': 'Traditional ritual requiring experienced artist',
-  'Pandit/Priest': 'Religious ceremonies require qualified clergy',
-  'Flowers': 'Floral arrangements enhance decoration aesthetics',
-  'Cake': 'Cutting ceremony centerpiece — worth special attention',
+  'Lighting & Sound': 'Professional lighting & sound enhance venue ambiance and ritual audibility',
+  'Mehendi/Haldi Artists': 'Traditional ritual requiring experienced artist',
+  'Anchor/Host': 'Professional emcee ensures smooth ceremony flow and guest engagement',
+  'Transportation': 'Guest shuttles and logistics for seamless event coordination',
+  'Contingency & Misc': 'Emergency buffer for unexpected costs',
 };
 
 // ─── Main Budget Planner Class ─────────────────────────────────────────────────
@@ -226,65 +229,54 @@ export class EventBudgetPlanner {
     const finalCity = city ?? 'Hyderabad';
     const finalLuxury = luxuryLevel ?? 'standard';
     
-    // Get template for this event type
-    const template = BUDGET_TEMPLATES[finalEventType] ?? BUDGET_TEMPLATES.wedding;
-    
-    // Get price multipliers
-    const cityMult = CITY_MULTIPLIER[finalCity] ?? 1.0;
-    const luxuryMult = LUXURY_MULTIPLIER[finalLuxury];
-    
-    // Validate budget against per-guest minimums
-    const perGuestRange = PER_GUEST_RANGES[finalEventType] ?? { min: 1000, max: 2000 };
-    const minBudgetNeeded = finalGuestCount * perGuestRange.min * cityMult * luxuryMult;
-    const maxBudgetRecommended = finalGuestCount * perGuestRange.max * cityMult * luxuryMult;
-    
-    const isFeasible = finalBudget >= minBudgetNeeded * 0.9; // 90% tolerance
-    const feasibilityNotes: string[] = [];
-    if (!isFeasible) {
-      feasibilityNotes.push(
-        `Your budget of ₹${(finalBudget/100000).toFixed(1)}L is tight for ${finalGuestCount} guests in ${finalCity}. ` +
-        `Realistic minimum: ₹${(minBudgetNeeded/100000).toFixed(1)}L. ` +
-        `Consider: reducing guest count, increasing budget, or choosing a budget tier.`
-      );
-    }
-    
-    // Calculate allocations
-    const allocations: BudgetAllocation[] = template.map(cat => {
-      const baseAmount = finalBudget * (cat.basePercentage / 100);
-      const minAmount = finalBudget * (cat.minRange / 100);
-      const maxAmount = finalBudget * (cat.maxRange / 100);
-      
-      return {
-        category: cat.category,
-        basePercentage: cat.basePercentage,
-        minAmount,
-        maxAmount,
-        allocatedAmount: baseAmount,
-        actualPercentage: cat.basePercentage,
-        priority: cat.priority,
-        required: cat.required,
-        reasoning: REASONING[cat.category] ?? 'Important component of your event',
-      };
-    });
-    
+    // Use event-aware budget engine for intelligent allocation
+    const engineContext: PlannerContext = {
+      eventType: finalEventType as EventCategory,
+      budget: finalBudget,
+      guestCount: finalGuestCount,
+      city: finalCity,
+      luxuryLevel: finalLuxury,
+      userSelections: context.userSelections,
+      durationDays: context.durationDays,
+      venueType: context.venueType,
+      hasVenue: context.hasVenue,
+    };
+
+    // Generate event-aware budget
+    const engineResult = generateEventAwareBudget(engineContext, finalBudget);
+
+    // Convert engine output to EventBudgetPlan format
+    const allocations: BudgetAllocation[] = engineResult.allocations.map(a => ({
+      category: a.category,
+      basePercentage: a.percentage,
+      minAmount: a.allocatedAmount * 0.85, // 85-115% range for flexibility
+      maxAmount: a.allocatedAmount * 1.15,
+      allocatedAmount: a.allocatedAmount,
+      actualPercentage: a.percentage,
+      priority: this.getPriority(a.category, finalEventType),
+      required: this.isRequired(a.category, finalEventType),
+      reasoning: REASONING[a.category] ?? `Essential component for your ${finalEventType}`,
+    }));
+
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
     const remaining = Math.max(0, finalBudget - totalAllocated);
-    
+
+    // Merge warnings from budget pressure checks
+    const feasibilityNotes = [
+      ...engineResult.warnings,
+      ...this.generateFeasibilityNotes(finalEventType, finalBudget, finalGuestCount, finalCity),
+    ];
+
+    const isFeasible = feasibilityNotes.length === 0;
+
     // Generate recommendations
-    const recommendations: string[] = [];
-    if (finalEventType === 'wedding') {
-      recommendations.push('Photography is the highest priority — invest here');
-      recommendations.push('Catering quality directly impacts guest satisfaction');
-      recommendations.push('Decoration sets the mood — don\'t skimp');
-    }
-    if (finalEventType === 'corporate') {
-      recommendations.push('Venue and catering are the foundation');
-      recommendations.push('AV/Staging is essential for professional appearance');
-    }
-    if (remaining > finalBudget * 0.1) {
-      recommendations.push(`You have ₹${(remaining/100000).toFixed(1)}L flexibility — consider upgrading key areas`);
-    }
-    
+    const recommendations = this.generateRecommendations(
+      finalEventType,
+      finalGuestCount,
+      remaining,
+      engineResult.activatedCategories
+    );
+
     return {
       eventType: finalEventType,
       city: finalCity,
@@ -298,6 +290,122 @@ export class EventBudgetPlanner {
       feasibilityNotes,
       recommendations,
     };
+  }
+
+  /**
+   * Determine priority level for a category based on event type
+   */
+  private static getPriority(category: string, eventType: string): 'critical' | 'high' | 'medium' | 'low' {
+    const cat = category.toLowerCase();
+
+    // High priority by event type
+    if (eventType === 'wedding' && (cat.includes('photography') || cat.includes('catering'))) return 'high';
+    if (eventType === 'corporate' && (cat.includes('venue') || cat.includes('av'))) return 'high';
+    if (eventType === 'housewarming' && cat.includes('ritual')) return 'high';
+    if ((eventType === 'haldi' || eventType === 'mehendi') && cat.includes('artist')) return 'high';
+    if (eventType === 'sangeet' && (cat.includes('entertainment') || cat.includes('dj'))) return 'high';
+
+    // Default hierarchy
+    if (cat.includes('photography') || cat.includes('catering') || cat.includes('venue')) return 'high';
+    if (cat.includes('videography') || cat.includes('decoration')) return 'medium';
+    
+    return 'low';
+  }
+
+  /**
+   * Determine if category is required for event
+   */
+  private static isRequired(category: string, eventType: string): boolean {
+    const cat = category.toLowerCase();
+
+    // Always required
+    if (cat.includes('catering') || cat.includes('decoration')) return true;
+
+    // Event-specific required
+    if (eventType === 'wedding' && cat.includes('photography')) return true;
+    if (eventType === 'corporate' && (cat.includes('venue') || cat.includes('catering'))) return true;
+    if (eventType === 'housewarming' && cat.includes('ritual')) return true;
+
+    return false;
+  }
+
+  /**
+   * Generate feasibility notes (legacy method for backward compat)
+   */
+  private static generateFeasibilityNotes(
+    eventType: string,
+    budget: number,
+    guestCount: number,
+    city: string
+  ): string[] {
+    const notes: string[] = [];
+
+    // Validate budget against per-guest minimums (legacy)
+    const perGuestRange = PER_GUEST_RANGES[eventType as EventCategory] ?? { min: 1000, max: 2000 };
+    const cityMult = CITY_MULTIPLIER[city] ?? 1.0;
+    const minBudgetNeeded = guestCount * perGuestRange.min * cityMult * 1.0; // standard luxury
+
+    if (budget < minBudgetNeeded * 0.9) {
+      notes.push(
+        `Your budget of ₹${(budget / 100000).toFixed(1)}L is tight for ${guestCount} guests in ${city}. ` +
+        `Realistic minimum: ₹${(minBudgetNeeded / 100000).toFixed(1)}L. ` +
+        `Consider: reducing guest count, increasing budget, or choosing a budget tier.`
+      );
+    }
+
+    return notes;
+  }
+
+  /**
+   * Generate smart recommendations
+   */
+  private static generateRecommendations(
+    eventType: string,
+    guestCount: number,
+    remaining: number,
+    activatedCategories: number
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Event-type specific
+    if (eventType === 'wedding') {
+      recommendations.push('Photography is the highest priority — invest here for lasting memories');
+      recommendations.push('Catering quality directly impacts guest satisfaction and experience');
+      recommendations.push('Decoration sets the mood and aesthetic — don\'t compromise on this');
+    }
+
+    if (eventType === 'corporate') {
+      recommendations.push('Venue and catering are the foundation of a professional event');
+      recommendations.push('AV/Staging is essential for polished, professional appearance');
+    }
+
+    if (eventType.includes('haldi') || eventType.includes('mehendi')) {
+      recommendations.push('Photography is crucial — capture the pre-wedding excitement');
+      recommendations.push('Decoration and comfort matter — guests will remember the ambiance');
+    }
+
+    if (eventType === 'housewarming') {
+      recommendations.push('Don\'t overlook rituals and ceremony — they\'re the heart of housewarming');
+      recommendations.push('Catering should be welcoming and abundant');
+    }
+
+    // Flexibility messaging
+    if (remaining > 0) {
+      const flexPercentage = (remaining / (remaining + activatedCategories * 1000)) * 100;
+      if (flexPercentage > 10) {
+        recommendations.push(
+          `You have ₹${(remaining / 100000).toFixed(1)}L flexibility — consider upgrading key areas like photography or entertainment`
+        );
+      }
+    }
+
+    // Guest count specific
+    if (guestCount > 500) {
+      recommendations.push('With 500+ guests, ensure catering vendor can handle scale and logistics');
+      recommendations.push('Large venue with clear flow is critical for guest experience');
+    }
+
+    return recommendations;
   }
 
   /**
