@@ -62,22 +62,44 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
     try {
       setIsUploading(true);
 
-      // Generate unique filename
+      // Step 1: Upload new photo first (before deleting old)
       const timestamp = Date.now();
       const filename = `founder_${timestamp}_${file.name}`;
 
-      // Upload to storage
-      const { data, error } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from("about-us")
         .upload(filename, file, { upsert: false });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
-      // Get public URL
+      // Step 2: Get public URL of new photo
       const {
         data: { publicUrl },
       } = supabase.storage.from("about-us").getPublicUrl(filename);
 
+      // Step 3: Update database with new photo URL
+      if (founder?.id) {
+        const { error: updateError } = await supabase
+          .from("about_team_members")
+          .update({
+            photo_url: publicUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", founder.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Step 4: Only after database update succeeds, delete old photo
+      if (photoUrl) {
+        const oldFilename = photoUrl.split("/").pop();
+        if (oldFilename) {
+          // Best-effort deletion - don't throw if this fails
+          await supabase.storage.from("about-us").remove([oldFilename]);
+        }
+      }
+
+      // Step 5: Update UI only after everything succeeds
       setPhotoUrl(publicUrl);
       setPhotoPreview(publicUrl);
       toast.success("Photo uploaded successfully!");
@@ -91,9 +113,50 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
     }
   };
 
-  const handleRemovePhoto = () => {
-    setPhotoUrl("");
-    setPhotoPreview("");
+  const handleDeletePhoto = async () => {
+    if (!photoUrl) return;
+
+    const confirmDelete = window.confirm("Delete this profile photo?");
+    if (!confirmDelete) return;
+
+    try {
+      setIsUploading(true);
+
+      // Step 1: Delete from storage using complete filename
+      const filename = photoUrl.split("/").pop();
+      if (filename) {
+        const { error: deleteError } = await supabase.storage
+          .from("about-us")
+          .remove([filename]);
+
+        if (deleteError) throw deleteError;
+      }
+
+      // Step 2: Update database to set photo_url = NULL
+      if (founder?.id) {
+        const { error: updateError } = await supabase
+          .from("about_team_members")
+          .update({
+            photo_url: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", founder.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Step 3: Clear UI only after storage and database operations succeed
+      setPhotoUrl("");
+      setPhotoPreview("");
+      toast.success("Photo deleted successfully!");
+    } catch (err) {
+      console.error("[FounderManager] Delete error:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete photo"
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -182,18 +245,20 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
                   className="w-32 h-32 rounded-lg object-cover border border-border/60"
                 />
                 <button
-                  onClick={handleRemovePhoto}
-                  className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                  onClick={handleDeletePhoto}
+                  disabled={isUploading}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors disabled:opacity-50"
+                  title="Delete photo"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             )}
             <div className="flex-1 flex items-center">
-              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-border/60 hover:border-[#8B1538] hover:bg-[#8B1538]/5 transition-all">
+              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-border/60 hover:border-[#8B1538] hover:bg-[#8B1538]/5 transition-all disabled:opacity-50">
                 <Upload className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  {isUploading ? "Uploading..." : "Upload Photo"}
+                  {isUploading ? "Uploading..." : photoPreview ? "Change Photo" : "Upload Photo"}
                 </span>
                 <input
                   type="file"

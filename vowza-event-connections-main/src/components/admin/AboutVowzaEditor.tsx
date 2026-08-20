@@ -29,13 +29,25 @@ export function AboutVowzaEditor({
     try {
       setIsSaving(true);
 
-      const { error } = await supabase.from("about_us").update({
-        title: title.trim(),
-        description: description.trim(),
-        updated_at: new Date().toISOString(),
-      });
+      // Update the single About Us record using its fixed UUID
+      const { error } = await supabase
+        .from("about_us")
+        .update({
+          title: title.trim(),
+          description: description.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", "00000000-0000-0000-0000-000000000001");
 
-      if (error) throw error;
+      if (error) {
+        console.error("[AboutVowzaEditor] Supabase error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
 
       toast.success("About Vowza updated successfully!");
       onSave?.(title, description);

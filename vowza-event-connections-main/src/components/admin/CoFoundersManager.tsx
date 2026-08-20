@@ -70,19 +70,42 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     try {
       setIsUploading(true);
 
+      // Step 1: Upload new photo first
       const timestamp = Date.now();
       const filename = `cofounders_${timestamp}_${file.name}`;
 
-      const { data, error } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from("about-us")
         .upload(filename, file, { upsert: false });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
+      // Step 2: Get public URL of new photo
       const {
         data: { publicUrl },
       } = supabase.storage.from("about-us").getPublicUrl(filename);
 
+      // Step 3: Update database with new photo URL
+      const { error: updateError } = await supabase
+        .from("about_team_members")
+        .update({
+          photo_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", cofounderId);
+
+      if (updateError) throw updateError;
+
+      // Step 4: Only after database update succeeds, delete old photo
+      if (formData.photo_url) {
+        const oldFilename = formData.photo_url.split("/").pop();
+        if (oldFilename) {
+          // Best-effort deletion - don't throw if this fails
+          await supabase.storage.from("about-us").remove([oldFilename]);
+        }
+      }
+
+      // Step 5: Update UI only after everything succeeds
       setFormData({
         ...formData,
         photo_url: publicUrl,
@@ -92,6 +115,55 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
       console.error("[CoFoundersManager] Upload error:", err);
       toast.error(
         err instanceof Error ? err.message : "Failed to upload photo"
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async (photoUrl?: string) => {
+    if (!photoUrl && !formData.photo_url) return;
+
+    const confirmDelete = window.confirm("Delete this profile photo?");
+    if (!confirmDelete) return;
+
+    try {
+      setIsUploading(true);
+
+      const urlToDelete = photoUrl || formData.photo_url;
+      
+      // Step 1: Delete from storage using complete filename
+      if (urlToDelete) {
+        const filename = urlToDelete.split("/").pop();
+        if (filename) {
+          const { error: deleteError } = await supabase.storage
+            .from("about-us")
+            .remove([filename]);
+
+          if (deleteError) throw deleteError;
+        }
+      }
+
+      // Step 2: Update database to set photo_url = NULL
+      if (editingId) {
+        const { error: updateError } = await supabase
+          .from("about_team_members")
+          .update({
+            photo_url: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId);
+
+        if (updateError) throw updateError;
+      }
+
+      // Step 3: Clear UI only after storage and database operations succeed
+      setFormData({ ...formData, photo_url: "" });
+      toast.success("Photo deleted successfully!");
+    } catch (err) {
+      console.error("[CoFoundersManager] Delete error:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete photo"
       );
     } finally {
       setIsUploading(false);
@@ -184,6 +256,25 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     try {
       setIsDeleting(cofounderId);
 
+      // Find the co-founder to get their photo URL
+      const coFounderToDelete = coFounders.find((c) => c.id === cofounderId);
+      
+      // Step 1: Delete photo from storage if it exists
+      if (coFounderToDelete?.photo_url) {
+        const filename = coFounderToDelete.photo_url.split("/").pop();
+        if (filename) {
+          const { error: deleteError } = await supabase.storage
+            .from("about-us")
+            .remove([filename]);
+
+          // Log error but continue with database deletion
+          if (deleteError) {
+            console.error("[CoFoundersManager] Storage delete error:", deleteError);
+          }
+        }
+      }
+
+      // Step 2: Delete the co-founder record
       const { error } = await supabase
         .from("about_team_members")
         .delete()
@@ -307,17 +398,19 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
                           />
                           <button
                             onClick={() =>
-                              setFormData({ ...formData, photo_url: "" })
+                              handleDeletePhoto(formData.photo_url || coFounder.photo_url)
                             }
-                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                            disabled={isUploading}
+                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors disabled:opacity-50"
+                            title="Delete photo"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </div>
                       )}
-                      <label className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-border/60 hover:border-[#8B1538] text-sm">
+                      <label className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-border/60 hover:border-[#8B1538] text-sm disabled:opacity-50">
                         <Upload className="w-3 h-3" />
-                        <span>Upload</span>
+                        <span>{isUploading ? "Uploading..." : (formData.photo_url || coFounder.photo_url) ? "Change Photo" : "Upload"}</span>
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
