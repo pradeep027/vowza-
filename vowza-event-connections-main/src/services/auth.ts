@@ -7,13 +7,13 @@ declare global {
   }
 }
 
-const getProcessEnv = (key: string) => {
+const getProcessEnv = (key: string): string | undefined => {
   if (typeof window !== 'undefined' && window.process?.env) {
     return window.process.env[key]
   }
   // Fallback for Vite environment variables
   const viteKey = `VITE_${key}`
-  return (import.meta.env as any)?.[viteKey] || key
+  return (import.meta.env as any)?.[viteKey] || undefined
 }
 
 export interface JWTPayload {
@@ -45,11 +45,15 @@ class AuthService {
   private supabase
   private readonly ACCESS_TOKEN_EXPIRY = 60 * 15 // 15 minutes
   private readonly REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 7 // 7 days
-  private readonly JWT_SECRET = getProcessEnv('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production'
-  private readonly REFRESH_JWT_SECRET = getProcessEnv('REFRESH_JWT_SECRET') || 'your-super-secret-refresh-key-change-in-production'
+  private readonly JWT_SECRET = getProcessEnv('JWT_SECRET') || (typeof process !== 'undefined' ? process.env?.JWT_SECRET : undefined) || ''
+  private readonly REFRESH_JWT_SECRET = getProcessEnv('REFRESH_JWT_SECRET') || (typeof process !== 'undefined' ? process.env?.REFRESH_JWT_SECRET : undefined) || ''
 
   constructor() {
     this.supabase = supabase
+    // Warn in development if secrets are not configured (never use hardcoded fallbacks)
+    if (!this.JWT_SECRET || !this.REFRESH_JWT_SECRET) {
+      console.warn('[AuthService] ⚠️ JWT_SECRET and/or REFRESH_JWT_SECRET not configured. Token operations will fail. Set VITE_JWT_SECRET and VITE_REFRESH_JWT_SECRET in .env')
+    }
   }
 
   /**

@@ -202,7 +202,9 @@ function formatBudgetPlanResponse(plan: EventBudgetPlan): string {
     ? `\n### Recommendations:\n${plan.recommendations.map(r => `- ${r}`).join('\n')}\n`
     : '';
 
-  return header + basicInfo + totalBudgetLine + allocTable + summary + feasibility + recommendations;
+  const aiGuidanceNote = '\n---\n*💡 This budget breakdown is AI planning guidance based on industry standards and your event details. For vendor-sourced pricing, see the Vowza marketplace recommendations below.*';
+
+  return header + basicInfo + totalBudgetLine + allocTable + summary + feasibility + recommendations + aiGuidanceNote;
 }
 
 // ─── NEW Phase 2C: Format Package Recommendation with Real Packages ─────────────

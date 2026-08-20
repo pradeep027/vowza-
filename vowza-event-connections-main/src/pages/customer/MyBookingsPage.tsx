@@ -17,6 +17,7 @@ import {
   CalendarX
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { escapeHtml } from '@/lib/utils';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
 type PaymentStatus = Database['public']['Enums']['payment_status'];
@@ -123,19 +124,19 @@ export default function MyBookingsPage() {
   const handleDownloadInvoice = (booking: typeof bookings[number]) => {
     const provider = providers.get(booking.provider_id);
     const html = `
-      <html><head><title>Invoice - ${booking.id}</title>
+      <html><head><title>Invoice - ${escapeHtml(booking.id)}</title>
       <style>body{font-family:sans-serif;padding:40px;color:#222}
       h1{color:#8B1538}table{width:100%;border-collapse:collapse;margin-top:20px}
       td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}</style></head>
       <body>
         <h1>Vowza Invoice</h1>
-        <p>Booking ID: ${booking.id}</p>
+        <p>Booking ID: ${escapeHtml(booking.id)}</p>
         <table>
-          <tr><th>Artist</th><td>${provider?.full_name ?? 'Unknown Artist'}</td></tr>
-          <tr><th>Event Date</th><td>${new Date(booking.event_date).toLocaleDateString('en-IN')}</td></tr>
-          <tr><th>Venue</th><td>${booking.venue_address}, ${booking.venue_city}</td></tr>
+          <tr><th>Artist</th><td>${escapeHtml(provider?.full_name ?? 'Unknown Artist')}</td></tr>
+          <tr><th>Event Date</th><td>${escapeHtml(new Date(booking.event_date).toLocaleDateString('en-IN'))}</td></tr>
+          <tr><th>Venue</th><td>${escapeHtml(booking.venue_address)}, ${escapeHtml(booking.venue_city)}</td></tr>
           <tr><th>Amount</th><td>₹${booking.amount.toLocaleString()}</td></tr>
-          <tr><th>Status</th><td>${statusLabels[booking.status]}</td></tr>
+          <tr><th>Status</th><td>${escapeHtml(statusLabels[booking.status])}</td></tr>
         </table>
       </body></html>`;
     const win = window.open('', '_blank');

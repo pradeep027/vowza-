@@ -7,13 +7,13 @@ declare global {
   }
 }
 
-const getProcessEnv = (key: string) => {
+const getProcessEnv = (key: string): string | undefined => {
   if (typeof window !== 'undefined' && window.process?.env) {
     return window.process.env[key]
   }
   // Fallback for Vite environment variables
   const viteKey = `VITE_${key}`
-  return (import.meta.env as any)?.[viteKey] || key
+  return (import.meta.env as any)?.[viteKey] || undefined
 }
 
 export interface OTPRequest {
@@ -77,7 +77,8 @@ class OTPService {
    */
   private async hashOTP(otp: string): Promise<string> {
     const encoder = new TextEncoder()
-    const data = encoder.encode(otp + getProcessEnv('OTP_SALT'))
+    const salt = getProcessEnv('OTP_SALT') || ''
+    const data = encoder.encode(otp + salt)
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
@@ -250,6 +251,10 @@ class OTPService {
       // return response.ok
       
       // For development, always return true
+      // TODO: Integrate real SMS service (Twilio, MSG91, etc.) before production
+      if (typeof window !== 'undefined') {
+        console.warn('[OTPService] ⚠️ SMS not configured — OTP delivery is mocked. Integrate a real SMS provider before production.')
+      }
       return true
     } catch (error) {
       return false

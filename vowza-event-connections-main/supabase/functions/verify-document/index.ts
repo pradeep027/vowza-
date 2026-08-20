@@ -17,17 +17,22 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  Deno.env.get("SUPABASE_URL") || "",
+  "https://vavfeataqwwbpjonknne.supabase.co",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
 
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 interface Input {
   expectedType: 'aadhaar' | 'pan' | 'govt_id';
@@ -120,7 +125,14 @@ function decide(input: Input): Record<string, unknown> {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+  const cors = getCorsHeaders(req);
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
     const input: Input = await req.json();
     const result = decide(input);

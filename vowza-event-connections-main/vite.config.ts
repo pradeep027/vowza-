@@ -9,6 +9,12 @@ export default defineConfig({
     port: 8080,
   },
   plugins: [react()],
+  esbuild: {
+    // Strip console.log and console.debug in production to prevent info leakage
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    // Keep console.error and console.warn in production for error reporting
+    pure: process.env.NODE_ENV === 'production' ? ['console.log', 'console.debug'] : [],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
