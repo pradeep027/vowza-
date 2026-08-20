@@ -182,6 +182,15 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     try {
       setIsSaving(true);
 
+      // Log the operation
+      console.log("[CoFoundersManager] Save co-founder:", {
+        editingId,
+        name: formData.name?.trim(),
+        role: formData.role?.trim(),
+        bioLength: formData.bio?.length || 0,
+        hasPhoto: !!formData.photo_url,
+      });
+
       const { error } = await supabase
         .from("about_team_members")
         .update({
@@ -194,24 +203,26 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
         .eq("id", editingId);
 
       if (error) {
-        console.error("[CoFoundersManager] Supabase error:", {
+        console.error("[CoFoundersManager] UPDATE FAILED - Supabase Error:", {
           message: error.message,
           code: error.code,
           details: error.details,
           hint: error.hint,
+          status: (error as any).status,
         });
         throw error;
       }
 
+      console.log("[CoFoundersManager] UPDATE succeeded");
       toast.success("Co-founder updated successfully!");
       setEditingId(null);
       setFormData({});
       onRefresh?.();
     } catch (err) {
       console.error("[CoFoundersManager] Error saving:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save co-founder"
-      );
+      const errorMsg = err instanceof Error ? err.message : "Failed to save co-founder";
+      console.error("[CoFoundersManager] Final error message:", errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -221,6 +232,40 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     try {
       setIsSaving(true);
 
+      // Check if we already have 6 co-founders
+      if (coFounders.length >= 6) {
+        toast.error("Maximum 6 co-founders allowed");
+        setIsSaving(false);
+        return;
+      }
+
+      // Calculate next display order safely
+      // If no co-founders exist, use 0
+      // Otherwise, find the max and add 1
+      let nextDisplayOrder = 0;
+      if (coFounders.length > 0) {
+        const maxOrder = Math.max(...coFounders.map((c) => c.display_order));
+        nextDisplayOrder = maxOrder + 1;
+      }
+
+      console.log("[CoFoundersManager] Add new co-founder:", {
+        currentCoFounderCount: coFounders.length,
+        maxAllowed: 6,
+        calculatedDisplayOrder: nextDisplayOrder,
+      });
+
+      console.log("[CoFoundersManager] Executing INSERT for new co-founder:", {
+        table: "about_team_members",
+        columns: {
+          name: "New Co-Founder",
+          role: "Co-Founder",
+          bio: "",
+          member_type: "co_founder",
+          display_order: nextDisplayOrder,
+          is_active: true,
+        }
+      });
+
       const { data, error } = await supabase
         .from("about_team_members")
         .insert({
@@ -228,21 +273,31 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
           role: "Co-Founder",
           bio: "",
           member_type: "co_founder",
-          display_order: Math.max(...coFounders.map((c) => c.display_order)) + 1 || 0,
+          display_order: nextDisplayOrder,
           is_active: true,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[CoFoundersManager] INSERT FAILED - Supabase Error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          status: (error as any).status,
+        });
+        throw error;
+      }
 
+      console.log("[CoFoundersManager] INSERT succeeded", data);
       toast.success("Co-founder added successfully!");
       onRefresh?.();
     } catch (err) {
       console.error("[CoFoundersManager] Error adding:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to add co-founder"
-      );
+      const errorMsg = err instanceof Error ? err.message : "Failed to add co-founder";
+      console.error("[CoFoundersManager] Final error message:", errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSaving(false);
     }

@@ -167,8 +167,31 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
     try {
       setIsSaving(true);
 
+      // Log the operation for debugging
+      console.log("[FounderManager] Save operation:", {
+        operation: founder?.id ? "UPDATE" : "INSERT",
+        founderId: founder?.id,
+        name,
+        role,
+        bioLength: bio.length,
+        hasPhoto: !!photoUrl,
+      });
+
       if (founder?.id) {
         // Update existing founder
+        // NOTE: Do NOT include display_order in UPDATE - preserve existing value
+        console.log("[FounderManager] Executing UPDATE:", {
+          table: "about_team_members",
+          filterId: founder.id,
+          columns: {
+            name,
+            role,
+            bio,
+            photo_url: photoUrl || null,
+            updated_at: new Date().toISOString(),
+          }
+        });
+
         const { error } = await supabase
           .from("about_team_members")
           .update({
@@ -181,16 +204,33 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
           .eq("id", founder.id);
 
         if (error) {
-          console.error("[FounderManager] Supabase error:", {
+          console.error("[FounderManager] UPDATE FAILED - Supabase Error:", {
             message: error.message,
             code: error.code,
             details: error.details,
             hint: error.hint,
+            status: (error as any).status,
           });
           throw error;
         }
+
+        console.log("[FounderManager] UPDATE succeeded");
       } else {
         // Create new founder
+        // NOTE: Founder always gets display_order = 0
+        console.log("[FounderManager] Executing INSERT:", {
+          table: "about_team_members",
+          columns: {
+            name,
+            role,
+            bio,
+            photo_url: photoUrl || null,
+            member_type: "founder",
+            display_order: 0,
+            is_active: true,
+          }
+        });
+
         const { data, error } = await supabase
           .from("about_team_members")
           .insert({
@@ -206,14 +246,17 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
           .single();
 
         if (error) {
-          console.error("[FounderManager] Supabase error:", {
+          console.error("[FounderManager] INSERT FAILED - Supabase Error:", {
             message: error.message,
             code: error.code,
             details: error.details,
             hint: error.hint,
+            status: (error as any).status,
           });
           throw error;
         }
+
+        console.log("[FounderManager] INSERT succeeded", data);
         if (data) {
           onSave?.(data);
         }
@@ -222,9 +265,9 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
       toast.success("Founder saved successfully!");
     } catch (err) {
       console.error("[FounderManager] Error saving:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save founder"
-      );
+      const errorMsg = err instanceof Error ? err.message : "Failed to save founder";
+      console.error("[FounderManager] Final error message:", errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSaving(false);
     }
