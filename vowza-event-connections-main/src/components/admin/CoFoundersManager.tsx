@@ -22,8 +22,6 @@ interface CoFounder {
   role: string;
   bio: string;
   photo_url?: string;
-  email?: string;
-  linkedin_url?: string;
   display_order: number;
   is_active: boolean;
 }
@@ -191,13 +189,19 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
           role: formData.role?.trim(),
           bio: formData.bio?.trim() || "",
           photo_url: formData.photo_url || null,
-          email: formData.email?.trim() || null,
-          linkedin_url: formData.linkedin_url?.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[CoFoundersManager] Supabase error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
 
       toast.success("Co-founder updated successfully!");
       setEditingId(null);

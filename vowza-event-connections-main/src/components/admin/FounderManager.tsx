@@ -11,8 +11,6 @@ interface Founder {
   role: string;
   bio: string;
   photo_url?: string;
-  email?: string;
-  linkedin_url?: string;
 }
 
 interface FounderManagerProps {
@@ -25,8 +23,6 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
   const [role, setRole] = useState(founder?.role || "Founder & CEO");
   const [bio, setBio] = useState(founder?.bio || "");
   const [photoUrl, setPhotoUrl] = useState(founder?.photo_url || "");
-  const [email, setEmail] = useState(founder?.email || "");
-  const [linkedinUrl, setLinkedinUrl] = useState(founder?.linkedin_url || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(founder?.photo_url || "");
@@ -37,8 +33,6 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
       setRole(founder.role);
       setBio(founder.bio);
       setPhotoUrl(founder.photo_url || "");
-      setEmail(founder.email || "");
-      setLinkedinUrl(founder.linkedin_url || "");
       setPhotoPreview(founder.photo_url || "");
     }
   }, [founder]);
@@ -182,13 +176,19 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             role: role.trim(),
             bio: bio.trim(),
             photo_url: photoUrl || null,
-            email: email.trim() || null,
-            linkedin_url: linkedinUrl.trim() || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", founder.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error("[FounderManager] Supabase error:", {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          });
+          throw error;
+        }
       } else {
         // Create new founder
         const { data, error } = await supabase
@@ -198,8 +198,6 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             role: role.trim(),
             bio: bio.trim(),
             photo_url: photoUrl || null,
-            email: email.trim() || null,
-            linkedin_url: linkedinUrl.trim() || null,
             member_type: "founder",
             display_order: 0,
             is_active: true,
@@ -207,7 +205,15 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("[FounderManager] Supabase error:", {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          });
+          throw error;
+        }
         if (data) {
           onSave?.(data);
         }
@@ -314,34 +320,6 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             placeholder="Founder bio..."
             rows={4}
             className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538] resize-none"
-          />
-        </div>
-
-        {/* Email */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Email (Optional)
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="founder@vowza.com"
-            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
-          />
-        </div>
-
-        {/* LinkedIn */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-foreground mb-2">
-            LinkedIn URL (Optional)
-          </label>
-          <input
-            type="url"
-            value={linkedinUrl}
-            onChange={(e) => setLinkedinUrl(e.target.value)}
-            placeholder="https://linkedin.com/in/..."
-            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
           />
         </div>
 
