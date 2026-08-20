@@ -227,37 +227,45 @@ class OTPService {
   }
 
   /**
-   * Send OTP via SMS (integration point)
+   * Send OTP via SMS through Supabase Edge Function
+   * 
+   * To enable real SMS delivery:
+   * 1. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env
+   * 2. Deploy the send-otp edge function: npx supabase functions deploy send-otp
+   * 3. Set SMS provider secrets: supabase secrets set TWILIO_SID=xxx TWILIO_AUTH_TOKEN=xxx TWILIO_PHONE=+1xxx
    */
   private async sendOTPSMS(phone: string, otp: string, purpose: string): Promise<boolean> {
-    try {
-      // Integration with SMS service like Twilio, AWS SNS, etc.
-      // For now, we'll log the OTP (in production, remove this)
-      
-      // Example Twilio integration (commented out for now):
-      // const response = await fetch('https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Authorization': `Basic ${btoa('YOUR_ACCOUNT_SID:YOUR_AUTH_TOKEN')}`,
-      //     'Content-Type': 'application/x-www-form-urlencoded',
-      //   },
-      //   body: new URLSearchParams({
-      //     'To': phone,
-      //     'From': 'YOUR_TWILIO_NUMBER',
-      //     'Body': `Your Vowza verification code is: ${otp}. Valid for ${this.OTP_EXPIRY_SECONDS / 60} minutes.`
-      //   })
-      // })
-      
-      // return response.ok
-      
-      // For development, always return true
-      // TODO: Integrate real SMS service (Twilio, MSG91, etc.) before production
-      if (typeof window !== 'undefined') {
-        console.warn('[OTPService] ⚠️ SMS not configured — OTP delivery is mocked. Integrate a real SMS provider before production.')
-      }
+    const supabaseUrl = getProcessEnv('SUPABASE_URL') || (import.meta.env as any)?.VITE_SUPABASE_URL;
+    const anonKey = getProcessEnv('SUPABASE_ANON_KEY') || (import.meta.env as any)?.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    // If no Supabase config, use mock mode (development)
+    if (!supabaseUrl || !anonKey) {
+      console.warn('[OTPService] ⚠️ SMS not configured — OTP delivery is mocked. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env')
       return true
+    }
+
+    try {
+      const { data: { session } } = await this.supabase.auth.getSession();
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify({ phone, otp, purpose }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text().catch(() => 'SMS send failed');
+        console.error('[OTPService] SMS edge function error:', err);
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      return false
+      console.error('[OTPService] SMS send failed:', error);
+      return false;
     }
   }
 
