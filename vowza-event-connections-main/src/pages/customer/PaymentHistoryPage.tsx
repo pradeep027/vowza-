@@ -4,6 +4,7 @@ import { usePayments } from '@/hooks/usePayments';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Download, Receipt } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { escapeHtml } from '@/lib/utils';
 
 type PaymentStatus = Database['public']['Enums']['payment_status'];
 
@@ -19,19 +20,19 @@ export default function PaymentHistoryPage() {
 
   const handleDownload = (p: (typeof payments)[number]) => {
     const html = `
-      <html><head><title>Receipt - ${p.id}</title>
+      <html><head><title>Receipt - ${escapeHtml(p.id)}</title>
       <style>body{font-family:sans-serif;padding:40px;color:#222}
       h1{color:#8B1538}table{width:100%;border-collapse:collapse;margin-top:20px}
       td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}</style></head>
       <body>
         <h1>Vowza Payment Receipt</h1>
         <table>
-          <tr><th>Artist</th><td>${p.provider_name}</td></tr>
+          <tr><th>Artist</th><td>${escapeHtml(p.provider_name)}</td></tr>
           <tr><th>Amount</th><td>₹${p.amount.toLocaleString()}</td></tr>
-          <tr><th>Payment Method</th><td>${p.payment_method ?? '—'}</td></tr>
-          <tr><th>Status</th><td>${p.status}</td></tr>
-          <tr><th>Transaction ID</th><td>${p.transaction_id ?? '—'}</td></tr>
-          <tr><th>Date</th><td>${new Date(p.created_at).toLocaleDateString('en-IN')}</td></tr>
+          <tr><th>Payment Method</th><td>${escapeHtml(p.payment_method ?? '—')}</td></tr>
+          <tr><th>Status</th><td>${escapeHtml(p.status)}</td></tr>
+          <tr><th>Transaction ID</th><td>${escapeHtml(p.transaction_id ?? '—')}</td></tr>
+          <tr><th>Date</th><td>${escapeHtml(new Date(p.created_at).toLocaleDateString('en-IN'))}</td></tr>
         </table>
       </body></html>`;
     const win = window.open('', '_blank');
