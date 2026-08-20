@@ -11,6 +11,8 @@ interface AboutContent {
   id: string;
   title: string;
   description: string;
+  mission: string;
+  vision: string;
   updated_at: string;
 }
 
@@ -61,6 +63,8 @@ export default function AdminAboutUs() {
             title: "Where Talent Meets Celebration",
             description:
               "Vowza is the premier platform connecting event organizers with top-tier professionals. Our mission is to make event planning seamless, affordable, and stress-free.",
+            mission: "Our mission is to make event planning simple and accessible for everyone.",
+            vision: "To become the most trusted event services platform in India.",
           })
           .select()
           .single();
@@ -142,6 +146,8 @@ export default function AdminAboutUs() {
       <AboutVowzaEditor
         initialTitle={aboutContent?.title}
         initialDescription={aboutContent?.description}
+        initialMission={aboutContent?.mission}
+        initialVision={aboutContent?.vision}
         onSave={() => {
           toast.success("About Vowza updated");
           fetchData();

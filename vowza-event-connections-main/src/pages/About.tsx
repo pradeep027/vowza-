@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AboutHero } from "@/components/about/AboutHero";
-import { AboutVowza } from "@/components/about/AboutVowza";
+import { AboutContent } from "@/components/about/AboutContent";
 import { FounderSection } from "@/components/about/FounderSection";
 import { CoFoundersGrid } from "@/components/about/CoFoundersGrid";
 import Footer from "@/components/Footer";
@@ -11,6 +11,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 interface AboutContent {
   title: string;
   description: string;
+  mission: string;
+  vision: string;
 }
 
 interface TeamMember {
@@ -55,6 +57,8 @@ export default function About() {
           setAboutContent({
             title: aboutData.title || "About Vowza",
             description: aboutData.description || "",
+            mission: aboutData.mission || "",
+            vision: aboutData.vision || "",
           });
         }
 
@@ -100,25 +104,35 @@ export default function About() {
             subtitle="Where Talent Meets Celebration"
           />
 
-          {/* About Vowza Content */}
-          <AboutVowza
-            title="Our Story"
-            description={aboutContent?.description}
-            isLoading={isLoading}
-          />
-
           {/* Divider */}
           <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-          {/* Founder Section */}
-          {(founder || isLoading) && (
-            <FounderSection founder={founder || undefined} isLoading={isLoading} />
-          )}
+          {/* Two-Column Intro Section: Founder LEFT + About Content RIGHT */}
+          <section className="w-full py-12 md:py-16">
+            <div className="max-w-6xl mx-auto px-4 md:px-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
+                {/* LEFT: Founder Profile */}
+                <div>
+                  {(founder || isLoading) && (
+                    <FounderSection founder={founder || undefined} isLoading={isLoading} />
+                  )}
+                </div>
+
+                {/* RIGHT: About Vowza Content (Story, Mission, Vision) */}
+                <div>
+                  <AboutContent
+                    story={aboutContent?.description}
+                    mission={aboutContent?.mission}
+                    vision={aboutContent?.vision}
+                    isLoading={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Divider */}
-          {(founder || isLoading) && (
-            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-          )}
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
           {/* Co-Founders Grid */}
           {(coFounders.length > 0 || isLoading) && (
