@@ -1,0 +1,306 @@
+// ─── Admin: Founder Manager ───────────────────────────────────────────────────
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Loader2, Save, Upload, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Founder {
+  id: string;
+  name: string;
+  role: string;
+  bio: string;
+  photo_url?: string;
+  email?: string;
+  linkedin_url?: string;
+}
+
+interface FounderManagerProps {
+  founder?: Founder | null;
+  onSave?: (founder: Founder) => void;
+}
+
+export function FounderManager({ founder, onSave }: FounderManagerProps) {
+  const [name, setName] = useState(founder?.name || "");
+  const [role, setRole] = useState(founder?.role || "Founder & CEO");
+  const [bio, setBio] = useState(founder?.bio || "");
+  const [photoUrl, setPhotoUrl] = useState(founder?.photo_url || "");
+  const [email, setEmail] = useState(founder?.email || "");
+  const [linkedinUrl, setLinkedinUrl] = useState(founder?.linkedin_url || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(founder?.photo_url || "");
+
+  useEffect(() => {
+    if (founder) {
+      setName(founder.name);
+      setRole(founder.role);
+      setBio(founder.bio);
+      setPhotoUrl(founder.photo_url || "");
+      setEmail(founder.email || "");
+      setLinkedinUrl(founder.linkedin_url || "");
+      setPhotoPreview(founder.photo_url || "");
+    }
+  }, [founder]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Please upload a JPG, PNG, or WebP image");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const filename = `founder_${timestamp}_${file.name}`;
+
+      // Upload to storage
+      const { data, error } = await supabase.storage
+        .from("about-us")
+        .upload(filename, file, { upsert: false });
+
+      if (error) throw error;
+
+      // Get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("about-us").getPublicUrl(filename);
+
+      setPhotoUrl(publicUrl);
+      setPhotoPreview(publicUrl);
+      toast.success("Photo uploaded successfully!");
+    } catch (err) {
+      console.error("[FounderManager] Upload error:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to upload photo"
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl("");
+    setPhotoPreview("");
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("Founder name is required");
+      return;
+    }
+
+    if (!role.trim()) {
+      toast.error("Founder role is required");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      if (founder?.id) {
+        // Update existing founder
+        const { error } = await supabase
+          .from("about_team_members")
+          .update({
+            name: name.trim(),
+            role: role.trim(),
+            bio: bio.trim(),
+            photo_url: photoUrl || null,
+            email: email.trim() || null,
+            linkedin_url: linkedinUrl.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", founder.id);
+
+        if (error) throw error;
+      } else {
+        // Create new founder
+        const { data, error } = await supabase
+          .from("about_team_members")
+          .insert({
+            name: name.trim(),
+            role: role.trim(),
+            bio: bio.trim(),
+            photo_url: photoUrl || null,
+            email: email.trim() || null,
+            linkedin_url: linkedinUrl.trim() || null,
+            member_type: "founder",
+            display_order: 0,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          onSave?.(data);
+        }
+      }
+
+      toast.success("Founder saved successfully!");
+    } catch (err) {
+      console.error("[FounderManager] Error saving:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save founder"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-6">
+      <div>
+        <h3 className="text-xl font-semibold text-foreground mb-4">
+          Founder Profile
+        </h3>
+
+        {/* Photo Upload */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-foreground mb-3">
+            Founder Photo
+          </label>
+          <div className="flex gap-4">
+            {photoPreview && (
+              <div className="relative">
+                <img
+                  src={photoPreview}
+                  alt="Founder preview"
+                  className="w-32 h-32 rounded-lg object-cover border border-border/60"
+                />
+                <button
+                  onClick={handleRemovePhoto}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <div className="flex-1 flex items-center">
+              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-border/60 hover:border-[#8B1538] hover:bg-[#8B1538]/5 transition-all">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {isUploading ? "Uploading..." : "Upload Photo"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoUpload}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            JPG, PNG, or WebP. Max 5MB.
+          </p>
+        </div>
+
+        {/* Name */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Founder name"
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
+          />
+        </div>
+
+        {/* Role */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Role
+          </label>
+          <input
+            type="text"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="e.g., Founder & CEO"
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
+          />
+        </div>
+
+        {/* Bio */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Bio
+          </label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Founder bio..."
+            rows={4}
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538] resize-none"
+          />
+        </div>
+
+        {/* Email */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Email (Optional)
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="founder@vowza.com"
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
+          />
+        </div>
+
+        {/* LinkedIn */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            LinkedIn URL (Optional)
+          </label>
+          <input
+            type="url"
+            value={linkedinUrl}
+            onChange={(e) => setLinkedinUrl(e.target.value)}
+            placeholder="https://linkedin.com/in/..."
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
+          />
+        </div>
+
+        {/* Save Button */}
+        <div className="flex gap-3">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || isUploading}
+            className="bg-[#8B1538] hover:bg-[#6B0E28] text-white font-medium"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Founder
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

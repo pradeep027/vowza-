@@ -14,6 +14,8 @@ import type {
   WeddingPlan, WeddingOverview, DayPlan, DayBudget,
   DayChecklist, DayVendor, TimeSlot,
 } from "./aiPlannerTypes";
+
+import { EventBudgetPlanner } from "./eventBudgetPlanner";
 // Appends ONE natural follow-up question (Veg/Non-Veg, Indoor/Outdoor, etc.)
 // to a completed structured response — never blocks the plan itself.
 // NOTE: aiOrchestrator is imported dynamically (not statically) to avoid a
@@ -61,29 +63,13 @@ function getMul(ctx: PlannerContext): number {
   return getCityMul(ctx.city) * SEASON_MUL[getSeason(ctx.eventDate)] * LUXURY_MUL[ctx.luxuryLevel ?? "standard"];
 }
 
-const BUDGET_ALLOC: Record<string, { cat: string; pct: number; notes: string; canReduce: boolean; reduceTip: string }[]> = {
-  wedding: [
-    { cat: "Venue",           pct: 28, notes: "Hall, lawn, parking, electricity", canReduce: true,  reduceTip: "Weekday booking saves 25-35%" },
-    { cat: "Catering",        pct: 30, notes: "Food & beverages",                 canReduce: true,  reduceTip: "Buffet over plated; fewer live counters" },
-    { cat: "Photography",     pct: 10, notes: "Photographer + videographer",      canReduce: false, reduceTip: "Never cut — memories are forever" },
-    { cat: "Decoration",      pct: 12, notes: "Floral, stage, mandap, lighting",  canReduce: true,  reduceTip: "Seasonal flowers save 25-40%" },
-    { cat: "Entertainment",   pct: 6,  notes: "DJ / Band / Performers",           canReduce: true,  reduceTip: "Local talent vs. celebrity" },
-    { cat: "Makeup & Mehendi",pct: 5,  notes: "Bridal makeup, mehendi, hair",     canReduce: false, reduceTip: "Book 4 months ahead" },
-    { cat: "Invitations",     pct: 2,  notes: "Print, digital, return gifts",     canReduce: true,  reduceTip: "Digital saves ₹15K-₹40K" },
-    { cat: "Transport",       pct: 3,  notes: "Guest shuttles, car hire",         canReduce: true,  reduceTip: "Limit to outstation guests" },
-    { cat: "Emergency Buffer",pct: 4,  notes: "Unexpected costs always arise",    canReduce: false, reduceTip: "Never skip" },
-  ],
-  reception:  [ { cat:"Venue",pct:30,notes:"Hall/banquet",canReduce:true,reduceTip:"Compare 3 venues"},{cat:"Catering",pct:32,notes:"Dinner buffet",canReduce:true,reduceTip:"Finger foods reduce waste"},{cat:"Photography",pct:10,notes:"Photo+video",canReduce:false,reduceTip:""},{cat:"Decoration",pct:14,notes:"Stage, lighting",canReduce:true,reduceTip:"Drape is cheaper"},{cat:"Entertainment",pct:8,notes:"DJ, anchor",canReduce:true,reduceTip:""},{cat:"Misc",pct:6,notes:"Buffer",canReduce:false,reduceTip:""} ],
-  birthday:   [ { cat:"Venue",pct:22,notes:"Hall or lawn",canReduce:true,reduceTip:"Home saves 25%"},{cat:"Catering",pct:30,notes:"Snacks, meals, cake",canReduce:true,reduceTip:"Order cake locally"},{cat:"Decoration",pct:22,notes:"Theme, balloons",canReduce:true,reduceTip:"DIY saves ₹5K"},{cat:"Entertainment",pct:15,notes:"DJ, games",canReduce:true,reduceTip:""},{cat:"Photography",pct:6,notes:"Photographer",canReduce:false,reduceTip:""},{cat:"Misc",pct:5,notes:"Gifts, buffer",canReduce:false,reduceTip:""} ],
-  corporate:  [ { cat:"Venue",pct:35,notes:"Hall, AV",canReduce:true,reduceTip:"Book hotel directly"},{cat:"Catering",pct:25,notes:"Meals, breaks",canReduce:true,reduceTip:""},{cat:"AV & Tech",pct:15,notes:"Projectors, mics",canReduce:false,reduceTip:""},{cat:"Decoration",pct:10,notes:"Stage, branding",canReduce:true,reduceTip:""},{cat:"Entertainment",pct:8,notes:"Anchor",canReduce:true,reduceTip:""},{cat:"Misc",pct:7,notes:"Buffer",canReduce:false,reduceTip:""} ],
-  sangeet:    [ { cat:"Venue",pct:22,notes:"Lawn/terrace",canReduce:true,reduceTip:""},{cat:"Entertainment",pct:30,notes:"DJ, band, dancers",canReduce:true,reduceTip:""},{cat:"Catering",pct:22,notes:"Dinner/snacks",canReduce:true,reduceTip:""},{cat:"Decoration",pct:16,notes:"LED, floral",canReduce:true,reduceTip:""},{cat:"Photography",pct:7,notes:"Candid",canReduce:false,reduceTip:""},{cat:"Misc",pct:3,notes:"Buffer",canReduce:false,reduceTip:""} ],
-  engagement: [ { cat:"Venue",pct:26,notes:"Banquet/garden",canReduce:true,reduceTip:""},{cat:"Catering",pct:28,notes:"Lunch/dinner",canReduce:true,reduceTip:""},{cat:"Decoration",pct:22,notes:"Stage, rings",canReduce:true,reduceTip:""},{cat:"Photography",pct:12,notes:"Photo+video",canReduce:false,reduceTip:""},{cat:"Makeup",pct:7,notes:"Bridal makeup",canReduce:false,reduceTip:""},{cat:"Misc",pct:5,notes:"Buffer",canReduce:false,reduceTip:""} ],
-  haldi:      [ { cat:"Decoration",pct:35,notes:"Floral, props",canReduce:true,reduceTip:""},{cat:"Catering",pct:25,notes:"Snacks, sweets",canReduce:true,reduceTip:""},{cat:"Photography",pct:20,notes:"Candid",canReduce:false,reduceTip:""},{cat:"Makeup",pct:12,notes:"Dress+makeup",canReduce:true,reduceTip:""},{cat:"Misc",pct:8,notes:"Haldi kits",canReduce:false,reduceTip:""} ],
-  mehendi:    [ { cat:"Mehendi Artists",pct:40,notes:"Bridal+guest mehendi",canReduce:false,reduceTip:""},{cat:"Decoration",pct:20,notes:"Floral lounge",canReduce:true,reduceTip:""},{cat:"Catering",pct:22,notes:"Snacks & chai",canReduce:true,reduceTip:""},{cat:"Photography",pct:12,notes:"Candid",canReduce:false,reduceTip:""},{cat:"Misc",pct:6,notes:"Buffer",canReduce:false,reduceTip:""} ],
-  concert:    [ { cat:"Artists",pct:35,notes:"Performer fee",canReduce:false,reduceTip:""},{cat:"Venue",pct:25,notes:"Stage, PA, lights",canReduce:true,reduceTip:""},{cat:"AV & Sound",pct:15,notes:"Sound system",canReduce:false,reduceTip:""},{cat:"Security",pct:8,notes:"Crowd management",canReduce:false,reduceTip:""},{cat:"Logistics",pct:10,notes:"Transport, backstage",canReduce:true,reduceTip:""},{cat:"Misc",pct:7,notes:"Buffer, permits",canReduce:false,reduceTip:""} ],
-  djnight:    [ { cat:"DJ & Sound",pct:40,notes:"DJ fee + sound",canReduce:false,reduceTip:""},{cat:"Venue",pct:25,notes:"Club/lawn hire",canReduce:true,reduceTip:""},{cat:"Lighting",pct:15,notes:"LED, laser rigs",canReduce:true,reduceTip:""},{cat:"Catering",pct:12,notes:"Bar/snacks",canReduce:true,reduceTip:""},{cat:"Misc",pct:8,notes:"Security, buffer",canReduce:false,reduceTip:""} ],
-};
-const DEFAULT_ALLOC = BUDGET_ALLOC.wedding;
+// ─── DEPRECATED: Legacy fixed-percentage budget allocation ──────────────────
+// This dictionary is DEPRECATED and replaced by EventBudgetPlanner.allocate()
+// which uses requirement-driven, event-aware budget generation.
+// Reason: Fixed percentages are not suitable for requirement-driven budgeting.
+// The event-aware system in eventBudgetPlanner.ts is now the single authority.
+// const BUDGET_ALLOC: Record<string, { cat: string; pct: number; notes: string; canReduce: boolean; reduceTip: string }[]> = { ... };
+// const DEFAULT_ALLOC = BUDGET_ALLOC.wedding;
 
 const MIN_CPG: Record<string, number> = {
   wedding:2500,reception:1800,birthday:800,corporate:2000,sangeet:1200,
@@ -107,14 +93,23 @@ const DECORATION_IDEAS: Record<string, string[]> = {
   housewarming:  ["Traditional torans and rangoli at the entrance", "Diya and flower decor around the puja area", "Fresh flower garlands on doors and windows", "Simple elegant table settings for guests"],
   engagement:    ["Floral arch for the ring ceremony moment", "Fairy-lit backdrop in soft pastel tones", "Elegant centerpieces with candles and roses", "Welcome signage with the couple's names"],
   corporate:     ["Branded backdrop with company logo and colours", "Clean stage setup with LED screen for presentations", "Registration desk with branded standees", "Minimal, professional centerpieces"],
+  corporate_event: ["Branded backdrop with company logo and colours", "Clean stage setup with LED screen for presentations", "Registration desk with branded standees", "Minimal, professional centerpieces"],
   babyshower:    ["Soft pastel balloon arch (pink/blue/neutral)", "Themed banner and welcome signage", "Baby-themed centerpieces and dessert table styling", "Photo corner with props for the mom-to-be"],
+  college_event: ["Vibrant college colors and banners", "Photo booth with college branding", "Stage setup with sound system and LED screen", "Casual seating and standing areas with casual decor"],
+  anniversary:   ["Romantic setup with candles and soft lighting", "Photo collage of the couple through the years", "Elegant floral arrangements in gold/silver tones", "Intimate seating arrangement for the couple"],
   default:       ["Backdrop styled to match your chosen theme and colour palette", "Fresh floral or fabric centerpieces for each table", "Entrance decor that sets the tone for guests", "Ambient lighting — fairy lights or uplighting for evening events"],
 };
 
 const PHOTOGRAPHY_PLANS: Record<string, string[]> = {
   wedding:   ["Pre-event detail shots — decor, venue, outfits (1 hr before guests arrive)", "Candid coverage through all rituals and the main ceremony", "Golden Hour couple portraits (typically 5:30–6:30 PM)", "Family group photos — allocate a dedicated 30-min slot", "Drone/aerial shots for wide venue coverage if outdoor"],
   reception: ["Couple's grand entry shot", "First dance and cake-cutting moments", "Candid guest interaction shots throughout the evening", "Formal family portraits early in the evening before it gets crowded"],
-  birthday:  ["Candid candid shots throughout the party", "Cake-cutting and gift-opening moments", "Group photos with family and friends", "Fun/candid shots near the photo booth"],
+  birthday:  ["Candid shots throughout the party", "Cake-cutting and gift-opening moments", "Group photos with family and friends", "Fun/candid shots near the photo booth"],
+  housewarming: ["Griha Pravesh ceremony moments", "Family inside the new home", "Group photos with guests", "Detail shots of decoration and ritual setup"],
+  babyshower: ["Mom-to-be portrait shots", "Belly painting or maternity photos", "Group photos with friends and family", "Candid moments of games and celebrations"],
+  engagement: ["Couple's ring exchange moment", "Formal couple portraits", "Family group photos", "Candid guest interaction shots"],
+  college_event: ["Event opening and key moments", "Performer/artist shots", "Audience candid shots", "Award distribution moments"],
+  corporate_event: ["Venue setup and registration", "Speaker/panelist shots during sessions", "Networking and casual interaction moments", "Award/recognition ceremony moments"],
+  anniversary: ["Couple portrait shots", "Candid moments with guests", "Cake-cutting ceremony", "Special anniversary dance or moment"],
   default:   ["Candid coverage of key moments throughout the event", "Formal group photos with family/guests", "Detail shots of decor and setup", "Golden hour outdoor shots if the venue allows"],
 };
 
@@ -123,6 +118,12 @@ const ENTERTAINMENT_PLANS: Record<string, string[]> = {
   sangeet:    ["Choreographed family performances", "Live band for the first half, DJ for dancing after", "Anchor/emcee to keep the flow smooth between acts"],
   reception:  ["Live band or DJ for background music during dinner", "Dedicated dance floor session post-dinner", "First dance moment choreographed in advance"],
   birthday:   ["Music playlist or DJ matched to the age group and theme", "Games/activities appropriate to guest ages", "Cake-cutting moment with a dedicated song"],
+  housewarming: ["Soft background music during gathering", "Informal socializing and conversations", "Optional: light music during meal service"],
+  babyshower: ["Soft, relaxing background music", "Fun games for guests", "Special moment for mom-to-be recognition"],
+  engagement: ["Background music during cocktails", "First dance of the newly engaged couple", "DJ for dancing post-dinner"],
+  corporate_event: ["Background music during sessions (if applicable)", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
+  college_event: ["Opening performance or cultural show", "Live performances/DJ for entertainment", "Energetic music and dancing"],
+  anniversary: ["Romantic background music", "Special dance or renewal of vows moment", "DJ for evening dancing"],
   corporate:  ["Welcome/background music during networking", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
   default:    ["Curated music playlist or DJ matched to the event mood", "An anchor/emcee if the event has a formal programme", "A dedicated moment for key highlights (e.g. speeches, cake, awards)"],
 };
@@ -200,44 +201,52 @@ export function generateEventOverviewText(ctx: PlannerContext): string {
   return lines.join('\n');
 }
 
-export function generateBudgetPlan(ctx: PlannerContext): BudgetPlan {
-  const { budget = 500000, guestCount = 200, city, eventType = "wedding" } = ctx;
-  const m = getMul(ctx);
-  const alloc = BUDGET_ALLOC[eventType] ?? DEFAULT_ALLOC;
-  const breakdown: BudgetLineItem[] = alloc.map(a => {
-    const adj = (budget * a.pct / 100) * m;
-    return { category: a.cat, minCost: Math.round(adj * 0.8), maxCost: Math.round(adj * 1.25),
-             recommended: Math.round(adj), percentage: a.pct, notes: a.notes, canReduce: a.canReduce, reduceTip: a.reduceTip };
-  });
-  const grandTotal = breakdown.reduce((s, b) => s + b.recommended, 0);
-  const remaining  = budget - grandTotal;
-  const minReq     = (MIN_CPG[eventType] ?? 1000) * guestCount * getCityMul(city);
-  const isFeasible = budget >= minReq;
-  return {
-    totalBudget: budget, breakdown, grandTotal, remaining, isFeasible,
-    feasibilityNote: isFeasible
-      ? `${fmt(budget)} is workable for ${guestCount} guests in ${city ?? "your city"}. Buffer: ${fmt(Math.max(0, remaining))}.`
-      : `${fmt(budget)} is tight for ${guestCount} guests. Minimum recommended: ${fmt(Math.round(minReq))}. Consider trimming the guest list to ${Math.floor(budget / ((MIN_CPG[eventType] ?? 1000) * getCityMul(city)))}.`,
-    savingTips: [
-      "Book all vendors 4-6 months ahead — 10-20% early-bird savings",
-      "Bundle photographer + videographer for 15% package discount",
-      "Weekday events save 25-35% on venue charges",
-      "Seasonal local flowers save 25-40% on decoration",
-      "Digital invitations save ₹15K-₹40K",
-      "Limit live food counters to 2-3 (each costs ₹8K-₹15K)",
-      "Offer upfront full payment to vendors — get 10-15% off",
-    ],
-    hiddenCosts: [
-      "GST 18% on venue + catering — adds 15-20% to those bills",
-      "Overtime charges if event overruns (₹5K-₹20K per hour)",
-      "Generator/power backup (₹10K-₹25K for full day)",
-      "Security personnel (₹3K-₹8K per guard per day)",
-      "Parking management (₹5K-₹12K)",
-      "Last-minute additions — budget ₹20K-₹50K extra",
-      "Staff gratuity: 2-3% of total",
-    ],
-  };
-}
+// ─── DEPRECATED: Legacy fixed-percentage budget planner ───────────────────────
+// This function is DEPRECATED. Use EventBudgetPlanner.allocate() instead.
+// Reason: This function uses fixed percentages per event type (BUDGET_ALLOC),
+//         which is not suitable for requirement-driven budget generation.
+// Migration: The event-aware system in eventBudgetPlanner.ts is now the single
+//            source of truth for budget allocation. It activates categories based
+//            on actual requirements, not fixed templates.
+// 
+// export function generateBudgetPlan(ctx: PlannerContext): BudgetPlan {
+//   const { budget = 500000, guestCount = 200, city, eventType = "wedding" } = ctx;
+//   const m = getMul(ctx);
+//   const alloc = BUDGET_ALLOC[eventType] ?? DEFAULT_ALLOC;
+//   const breakdown: BudgetLineItem[] = alloc.map(a => {
+//     const adj = (budget * a.pct / 100) * m;
+//     return { category: a.cat, minCost: Math.round(adj * 0.8), maxCost: Math.round(adj * 1.25),
+//              recommended: Math.round(adj), percentage: a.pct, notes: a.notes, canReduce: a.canReduce, reduceTip: a.reduceTip };
+//   });
+//   const grandTotal = breakdown.reduce((s, b) => s + b.recommended, 0);
+//   const remaining  = budget - grandTotal;
+//   const minReq     = (MIN_CPG[eventType] ?? 1000) * guestCount * getCityMul(city);
+//   const isFeasible = budget >= minReq;
+//   return {
+//     totalBudget: budget, breakdown, grandTotal, remaining, isFeasible,
+//     feasibilityNote: isFeasible
+//       ? `${fmt(budget)} is workable for ${guestCount} guests in ${city ?? "your city"}. Buffer: ${fmt(Math.max(0, remaining))}.`
+//       : `${fmt(budget)} is tight for ${guestCount} guests. Minimum recommended: ${fmt(Math.round(minReq))}. Consider trimming the guest list to ${Math.floor(budget / ((MIN_CPG[eventType] ?? 1000) * getCityMul(city)))}.`,
+//     savingTips: [
+//       "Book all vendors 4-6 months ahead — 10-20% early-bird savings",
+//       "Bundle photographer + videographer for 15% package discount",
+//       "Weekday events save 25-35% on venue charges",
+//       "Seasonal local flowers save 25-40% on decoration",
+//       "Digital invitations save ₹15K-₹40K",
+//       "Limit live food counters to 2-3 (each costs ₹8K-₹15K)",
+//       "Offer upfront full payment to vendors — get 10-15% off",
+//     ],
+//     hiddenCosts: [
+//       "GST 18% on venue + catering — adds 15-20% to those bills",
+//       "Overtime charges if event overruns (₹5K-₹20K per hour)",
+//       "Generator/power backup (₹10K-₹25K for full day)",
+//       "Security personnel (₹3K-₹8K per guard per day)",
+//       "Parking management (₹5K-₹12K)",
+//       "Last-minute additions — budget ₹20K-₹50K extra",
+//       "Staff gratuity: 2-3% of total",
+//     ],
+//   };
+// }
 
 // ─── Multi-Day Schedule Generator ────────────────────────────────────────────
 function buildDaySchedule(day: number, label: string, eventType: string, isOutdoor: boolean): DaySchedule {
@@ -315,9 +324,93 @@ function buildDaySchedule(day: number, label: string, eventType: string, isOutdo
       {time:"05:00 PM",activity:"Closing remarks",who:"Host"},
       {time:"05:30 PM",activity:"Networking cocktails (optional)",who:"All"},
     ],
+    housewarming: [
+      {time:"08:00 AM",activity:"Venue cleaning & final prep",who:"Vendors",note:"Deep clean before ritual"},
+      {time:"09:00 AM",activity:"Decoration & flower arrangement",who:"Vendor"},
+      {time:"09:30 AM",activity:"Pooja items setup — incense, lamps, flowers",who:"Family"},
+      {time:"10:00 AM",activity:"Pandit/Priest arrives — puja preparations",who:"Pandit"},
+      {time:"10:30 AM",activity:"Guest arrival begins",who:"All"},
+      {time:"11:00 AM",activity:"Griha Pravesh ceremony begins — auspicious ritual",who:"All",note:"Confirm muhurat with pandit"},
+      {time:"12:00 PM",activity:"Offerings & distribution of prasad",who:"All"},
+      {time:"12:30 PM",activity:"Photography — family inside home",who:"Vendor"},
+      {time:"01:00 PM",activity:"Lunch/snacks served",who:"All"},
+      {time:"02:00 PM",activity:"House tour & informal gathering",who:"All"},
+      {time:"03:30 PM",activity:"Entertainment & music (if planned)",who:"All"},
+      {time:"05:00 PM",activity:"Guests depart",who:"All"},
+      {time:"05:30 PM",activity:"Cleanup & vendor wrap-up",who:"Coordinator"},
+    ],
+    babyshower: [
+      {time:"02:00 PM",activity:"Venue decoration — pastels, baby themes",who:"Vendor"},
+      {time:"02:30 PM",activity:"Guest arrival & welcome",who:"All"},
+      {time:"03:00 PM",activity:"Games & icebreakers for guests",who:"All"},
+      {time:"03:45 PM",activity:"Mom-to-be gets pampered — chair decoration",who:"Family"},
+      {time:"04:15 PM",activity:"Gift opening ceremony",who:"All"},
+      {time:"05:00 PM",activity:"Photography — belly painting or maternity shots",who:"Vendor"},
+      {time:"05:30 PM",activity:"Snacks & refreshments served",who:"All"},
+      {time:"06:00 PM",activity:"Cake cutting & desserts",who:"All"},
+      {time:"06:30 PM",activity:"Event concludes",who:"All"},
+    ],
+    engagement: [
+      {time:"04:00 PM",activity:"Venue & decoration setup",who:"Vendor"},
+      {time:"05:00 PM",activity:"Guest arrival — welcome drinks & snacks",who:"All"},
+      {time:"05:30 PM",activity:"Couple formal introduction",who:"Couple"},
+      {time:"06:00 PM",activity:"Ring exchange ceremony",who:"Couple"},
+      {time:"06:30 PM",activity:"Photography — couple portraits",who:"Vendor"},
+      {time:"07:00 PM",activity:"Entertainment & music begins",who:"All"},
+      {time:"07:30 PM",activity:"Dinner service opens",who:"All"},
+      {time:"08:30 PM",activity:"Dancing & celebration",who:"All"},
+      {time:"10:00 PM",activity:"Event concludes",who:"All"},
+    ],
+    college_event: [
+      {time:"04:00 PM",activity:"Stage setup — sound, lighting, branding",who:"Vendor"},
+      {time:"04:30 PM",activity:"Registration & guest check-in",who:"Staff"},
+      {time:"05:00 PM",activity:"Guest arrival — welcome address",who:"Host"},
+      {time:"05:30 PM",activity:"Opening performance / cultural show",who:"Artists"},
+      {time:"06:30 PM",activity:"Main event / talks / competitions",who:"All"},
+      {time:"07:30 PM",activity:"Refreshment break",who:"All"},
+      {time:"08:00 PM",activity:"Awards / prize distribution",who:"Host"},
+      {time:"08:30 PM",activity:"DJ / dancing",who:"All"},
+      {time:"10:00 PM",activity:"Event concludes",who:"All"},
+    ],
+    anniversary: [
+      {time:"05:00 PM",activity:"Venue decoration — romantic setup",who:"Vendor"},
+      {time:"06:00 PM",activity:"Guest arrival — cocktails",who:"All"},
+      {time:"06:30 PM",activity:"Couple's dance / special moment",who:"Couple"},
+      {time:"07:00 PM",activity:"Dinner service begins",who:"All"},
+      {time:"08:00 PM",activity:"Cake cutting & toasts",who:"All"},
+      {time:"08:30 PM",activity:"Music & dancing",who:"All"},
+      {time:"10:00 PM",activity:"Event concludes",who:"All"},
+    ],
+    corporate_event: [
+      {time:"08:00 AM",activity:"Venue setup — AV, seating, branding",who:"Vendor"},
+      {time:"09:00 AM",activity:"Registration & breakfast",who:"All"},
+      {time:"09:30 AM",activity:"Opening address",who:"Host"},
+      {time:"10:00 AM",activity:"Session 1",who:"All"},
+      {time:"11:15 AM",activity:"Tea break + networking",who:"All"},
+      {time:"11:30 AM",activity:"Session 2",who:"All"},
+      {time:"01:00 PM",activity:"Lunch break",who:"All"},
+      {time:"02:00 PM",activity:"Session 3 / Workshop",who:"All"},
+      {time:"03:30 PM",activity:"Tea break",who:"All"},
+      {time:"03:45 PM",activity:"Panel discussion / Q&A",who:"All"},
+      {time:"05:00 PM",activity:"Closing remarks",who:"Host"},
+      {time:"05:30 PM",activity:"Networking cocktails (optional)",who:"All"},
+    ],
   };
 
-  const slots = schedules[eventType] ?? schedules.wedding;
+  // ✅ NO FALLBACK TO WEDDING - if eventType not found, throw error instead of silent fallback
+  const slots = schedules[eventType];
+  if (!slots) {
+    console.error(`❌ CRITICAL: No schedule defined for eventType="${eventType}". This should never happen. Please add eventType to schedules object in buildDaySchedule().`);
+    // Fallback to generic schedule to prevent crash, but log loudly
+    const genericSlots: HourlySlot[] = [
+      {time:"09:00 AM",activity:"Event setup and guest arrival",who:"All"},
+      {time:"10:00 AM",activity:"Main event begins",who:"All"},
+      {time:"01:00 PM",activity:"Lunch break",who:"All"},
+      {time:"03:00 PM",activity:"Continuation of event",who:"All"},
+      {time:"05:00 PM",activity:"Event concludes",who:"All"},
+    ];
+    return { day, label, slots: genericSlots, sunrise: "06:15 AM", sunset: isOutdoor ? "06:30 PM" : undefined };
+  }
   return {
     day, label, slots,
     sunrise: "06:15 AM",
@@ -381,6 +474,13 @@ export function generateTimeline(ctx: PlannerContext): EventTimeline {
   const multiDaySchedule: DaySchedule[] = [];
   const EVENT_DAY_LABELS: Record<string, string[]> = {
     wedding: ["Day 1 – Haldi & Mehendi", "Day 2 – Sangeet Night", "Day 3 – Wedding Day"],
+    housewarming: ["Griha Pravesh Day"],
+    birthday: ["Birthday Celebration Day"],
+    babyshower: ["Baby Shower Celebration"],
+    engagement: ["Engagement Ceremony"],
+    college_event: ["College Event Day"],
+    anniversary: ["Anniversary Celebration"],
+    corporate_event: ["Corporate Event Day"],
     default: ["Event Day"],
   };
   const labels = durationDays > 1 ? (EVENT_DAY_LABELS[eventType] ?? EVENT_DAY_LABELS.default) : ["Event Day"];
@@ -403,16 +503,46 @@ export function recommendVendors(ctx: PlannerContext): VendorRecommendation[] {
   const { city = "Hyderabad", eventType = "wedding", guestCount = 200 } = ctx;
   const m = getMul(ctx);
   type T = { cat: string; reason: string; bMin: number; bMax: number; tips: string[]; slug: string; urgency: "book_now" | "flexible" };
-  const templates: T[] = [
+  
+  // Base templates for all events
+  const baseTemplates: T[] = [
     { cat: "Photographer", reason: `Essential — captures memories that last forever. For a ${eventType}, invest here.`, bMin: 25000, bMax: 80000, tips: ["Ask for full-day coverage + RAW files", "View 3 complete albums before booking", "Book 5 months ahead — they fill fastest"], slug: "photographers", urgency: "book_now" },
     { cat: "Videographer", reason: "A cinematic video lets you relive the event for decades.", bMin: 20000, bMax: 70000, tips: ["Drone shots add Rs 5K-Rs 15K extra", "Request a 3-min highlight reel"], slug: "videographers", urgency: "book_now" },
     { cat: "Event Decorator", reason: `Decoration sets the entire mood. For ${guestCount} guests, invest in quality.`, bMin: 40000, bMax: 200000, tips: ["Agree on written scope before booking", "Seasonal flowers cut cost 25%", "Visit 2-3 completed setups"], slug: "decorators", urgency: "book_now" },
     { cat: "DJ / Live Band", reason: "Music is what keeps guests energised and dancing all night.", bMin: 15000, bMax: 60000, tips: ["Submit song list 2 weeks before", "Confirm backup sound system", "Sound system should be included in quote"], slug: "dj", urgency: "flexible" },
-    { cat: "Makeup Artist", reason: "Professional bridal makeup is non-negotiable for the main event.", bMin: 8000, bMax: 40000, tips: ["Do a trial session 2 weeks before", "Confirm airbrush vs. HD makeup", "Check portfolio for your skin tone"], slug: "makeup", urgency: "book_now" },
     { cat: "Caterer", reason: `Food is what guests remember most. For ${guestCount} guests, plan carefully.`, bMin: Math.round(guestCount * 600 * getCityMul(city)), bMax: Math.round(guestCount * 1800 * getCityMul(city)), tips: ["Get per-plate pricing in writing", "Include service staff in quote", "Do a tasting before signing contract"], slug: "catering", urgency: "book_now" },
     { cat: "Anchor / Emcee", reason: "A professional anchor keeps the program flowing and guests engaged.", bMin: 8000, bMax: 35000, tips: ["Share complete script in advance", "Bilingual anchors cost 15-20% more"], slug: "anchors", urgency: "flexible" },
-    { cat: "Mehendi Artist", reason: "For weddings and pre-wedding functions, skilled mehendi is a must.", bMin: 5000, bMax: 25000, tips: ["Book 4-5 artists for large parties", "Allow 3 hours for full bridal design"], slug: "mehendi", urgency: "flexible" },
   ];
+
+  // Event-specific vendor additions
+  const eventSpecificAdditions: Record<string, T[]> = {
+    wedding: [
+      { cat: "Makeup Artist", reason: "Professional bridal makeup is non-negotiable for the main event.", bMin: 8000, bMax: 40000, tips: ["Do a trial session 2 weeks before", "Confirm airbrush vs. HD makeup", "Check portfolio for your skin tone"], slug: "makeup", urgency: "book_now" },
+      { cat: "Mehendi Artist", reason: "For weddings and pre-wedding functions, skilled mehendi is a must.", bMin: 5000, bMax: 25000, tips: ["Book 4-5 artists for large parties", "Allow 3 hours for full bridal design"], slug: "mehendi", urgency: "flexible" },
+    ],
+    housewarming: [
+      { cat: "Pandit / Priest", reason: "Essential for Griha Pravesh ceremony — performs auspicious rituals.", bMin: 3000, bMax: 12000, tips: ["Confirm availability 2 weeks before", "Discuss ritual preferences & timing", "Prepare puja items list in advance"], slug: "pandit", urgency: "book_now" },
+      { cat: "Rituals Specialist", reason: "Expert guidance on housewarming pooja items, sequence, and significance.", bMin: 2000, bMax: 8000, tips: ["Book with pandit for coordination", "Clarify which items are essential vs optional"], slug: "rituals", urgency: "book_now" },
+      { cat: "Flower Arrangements", reason: "Fresh flowers for pooja, entry decoration, and auspiciousness.", bMin: 5000, bMax: 15000, tips: ["Marigold & roses are traditional", "Order day before to ensure freshness"], slug: "flowers", urgency: "flexible" },
+    ],
+    birthday: [
+      { cat: "Cake Designer", reason: "The cake is the centerpiece — custom design makes it memorable.", bMin: 3000, bMax: 12000, tips: ["Order 1 week in advance", "Confirm flavor & design preferences", "Ask for tasting session"], slug: "cakes", urgency: "book_now" },
+    ],
+    babyshower: [
+      { cat: "Baby Shower Planner", reason: "Specialized games, themes, and coordination for mom-to-be comfort.", bMin: 5000, bMax: 15000, tips: ["Confirm mother's preferences first", "Include belly painting option"], slug: "babyshower", urgency: "flexible" },
+    ],
+    engagement: [
+      { cat: "Ring Bearer Ceremony", reason: "Special choreography for ring exchange to make it memorable.", bMin: 2000, bMax: 8000, tips: ["Rehearse timing with couple", "Ensure smooth transitions"], slug: "ceremony-coord", urgency: "flexible" },
+    ],
+    corporate_event: [
+      { cat: "AV/Sound System Specialist", reason: "Professional audio-visual setup for presentations & visibility.", bMin: 30000, bMax: 100000, tips: ["Check screen & projector quality", "Confirm backup power", "Test microphones day before"], slug: "av-tech", urgency: "book_now" },
+      { cat: "Event Coordinator", reason: "Professional coordination for schedule, vendor management, guest flow.", bMin: 15000, bMax: 50000, tips: ["Clarify scope & deliverables", "Confirm emergency contact protocol"], slug: "coordinators", urgency: "book_now" },
+    ],
+  };
+
+  // Combine base + event-specific
+  const templates = [...baseTemplates, ...(eventSpecificAdditions[eventType] ?? [])];
+  
   return templates.map(t => ({
     category: t.cat, reason: t.reason,
     minPrice: Math.round(t.bMin * m), maxPrice: Math.round(t.bMax * m),
@@ -440,6 +570,9 @@ export function getWeatherAdvice(ctx: PlannerContext): WeatherAdvice {
 export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
   const { eventType = "wedding" } = ctx;
   const isWedding = ["wedding","reception","sangeet","haldi","engagement","mehendi"].includes(eventType);
+  const isHousewarming = eventType === "housewarming" || eventType === "gruhapravesam";
+  const isHouseWarmingCeremony = ["housewarming", "gruhapravesam"].includes(eventType);
+  
   const base: Omit<ChecklistItem, "id" | "done">[] = [
     { task: "Government IDs for venue booking",            category: "Documents", dueWhen: "6 months before",  priority: "must", owner: "Coordinator" },
     { task: "All vendor contracts signed and saved",        category: "Documents", dueWhen: "On booking",       priority: "must", owner: "Coordinator" },
@@ -468,6 +601,15 @@ export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
       { task: "Mehendi artist timing confirmed",            category: "Bridal",    dueWhen: "1 month before",   priority: "must" as const, owner: "Bride" },
       { task: "Bridal outfit final fitting",                category: "Bridal",    dueWhen: "2 weeks before",   priority: "must" as const, owner: "Bride" },
       { task: "Groom outfit ready",                         category: "Bridal",    dueWhen: "2 weeks before",   priority: "must" as const, owner: "Groom" },
+    ] : []),
+    ...(isHouseWarmingCeremony ? [
+      { task: "Pandit/Priest availability confirmed",       category: "Ritual",    dueWhen: "1 month before",   priority: "must" as const, owner: "Family" },
+      { task: "Auspicious muhurat time fixed with pandit",  category: "Ritual",    dueWhen: "2 weeks before",   priority: "must" as const, owner: "Family" },
+      { task: "Pooja items list prepared (flowers, oil, etc.)", category: "Ritual", dueWhen: "1 week before", priority: "must" as const, owner: "Family" },
+      { task: "Ritual items purchased & organized",         category: "Ritual",    dueWhen: "3 days before",    priority: "must" as const, owner: "Family" },
+      { task: "Home deep-cleaned before ceremony",          category: "Ritual",    dueWhen: "1 day before",     priority: "must" as const, owner: "Family" },
+      { task: "Invitations specify 'Griha Pravesh' timing", category: "Guests",    dueWhen: "2 months before",  priority: "must" as const, owner: "Family" },
+      { task: "Prasad distribution plan finalized",         category: "Ritual",    dueWhen: "1 week before",    priority: "should" as const, owner: "Family" },
     ] : []),
   ];
   return base.map((item, i) => ({ ...item, id: `chk-${i}`, done: false }));
@@ -791,8 +933,31 @@ export async function processMessage(
 
   // ── VEDA structured responses (only when all context is available) ───────
   switch (result.intent) {
-    case 'budget_breakdown':
-      return { response: { type: 'budget_plan', text: withFollowUp(`Here's the budget breakdown for your **${finalContext.eventType ?? 'event'}** in **${finalContext.city ?? 'your city'}** for **${finalContext.guestCount ?? 200} guests** — budget **${fmt(finalContext.budget ?? 500000)}**.`, finalContext), data: { budgetPlan: generateBudgetPlan(finalContext) } }, updatedContext: finalContext };
+    case 'budget_breakdown': {
+      // Use event-aware budget system and transform to BudgetPlan schema
+      const eventAwareBudget = EventBudgetPlanner.allocate(finalContext);
+      // Transform EventBudgetPlan (allocations[]) → BudgetPlan (breakdown[])
+      const budgetPlan: BudgetPlan = {
+        totalBudget: eventAwareBudget.totalBudget,
+        breakdown: eventAwareBudget.allocations.map(a => ({
+          category: a.category,
+          minCost: a.minAmount,
+          maxCost: a.maxAmount,
+          recommended: a.allocatedAmount,
+          percentage: a.actualPercentage || a.basePercentage || 0,
+          notes: a.reasoning || "Budget allocation for this category",
+          canReduce: a.priority === 'low',
+          reduceTip: a.priority === 'low' ? `${a.category} can be reduced if needed` : undefined,
+        })),
+        grandTotal: eventAwareBudget.totalAllocated,
+        remaining: eventAwareBudget.remaining,
+        isFeasible: eventAwareBudget.isFeasible,
+        feasibilityNote: eventAwareBudget.feasibilityNotes?.[0] ?? "Budget analysis complete",
+        savingTips: eventAwareBudget.recommendations,
+        hiddenCosts: [],
+      };
+      return { response: { type: 'budget_plan', text: withFollowUp(`Here's the budget breakdown for your **${finalContext.eventType ?? 'event'}** in **${finalContext.city ?? 'your city'}** for **${finalContext.guestCount ?? 200} guests** — budget **${fmt(finalContext.budget ?? 500000)}**.`, finalContext), data: { budgetPlan } }, updatedContext: finalContext };
+    }
 
     case 'timeline':
       return { response: { type: 'timeline', text: withFollowUp(`Here's your complete planning timeline for the **${finalContext.eventType ?? 'event'}**.`, finalContext), data: { timeline: generateTimeline(finalContext) } }, updatedContext: finalContext };
@@ -813,14 +978,18 @@ export async function processMessage(
       return { response: { type: 'success_score', text: `Here's your **Event Success Score** based on everything shared so far.`, data: { score: calculateSuccessScore(finalContext) } }, updatedContext: finalContext };
 
     case 'plan_event': {
-      const plan = generateWeddingPlan(finalContext);
+      // Use event-aware plan generator (EventBudgetPlanner is the single source of truth for ALL budgets)
+      const plan = generateEventAwarePlan(finalContext);
+      
       const intro = `Here's your complete **${finalContext.durationDays && finalContext.durationDays > 1 ? `${finalContext.durationDays}-day ` : ''}${finalContext.eventType ?? 'event'} plan** for **${finalContext.guestCount ?? 200} guests** in **${finalContext.city ?? 'your city'}** — budget **${fmt(finalContext.budget ?? 800000)}**.`;
       const overview = generateEventOverviewText(finalContext);
       return {
         response: {
           type: 'wedding_plan',
           text: withFollowUp(`${intro}\n\n${overview}`, finalContext),
-          data: { weddingPlan: plan },
+          data: { 
+            weddingPlan: plan,
+          },
         },
         updatedContext: finalContext,
       };
@@ -849,10 +1018,596 @@ export async function processMessage(
   };
 }
 
+// ─── Event-Aware Planner Engine ──────────────────────────────────────────────
+// Generates event-specific day structures with event-aware budgets.
+// EventBudgetPlanner is the SINGLE SOURCE OF TRUTH for ALL budget allocation.
+
+function getEventDayTypes(eventType: string, durationDays: number): string[] {
+  const eventTypeLower = (eventType || 'event').toLowerCase();
+  
+  // Event-specific day mappings
+  const eventDayMaps: Record<string, Record<number, string[]>> = {
+    wedding: {
+      1: ['wedding'],
+      2: ['mehendi', 'wedding'],
+      3: ['haldi', 'sangeet', 'wedding'],
+      4: ['haldi', 'mehendi', 'sangeet', 'wedding'],
+    },
+    housewarming: {
+      1: ['housewarming'],
+      2: ['preparation', 'housewarming'],
+      3: ['preparation', 'ceremony', 'gathering'],
+      4: ['preparation', 'ceremony', 'gathering', 'celebration'],
+    },
+    birthday: {
+      1: ['birthday'],
+      2: ['setup', 'birthday'],
+      3: ['setup', 'birthday', 'post-party'],
+      4: ['setup', 'birthday', 'activities', 'post-party'],
+    },
+    'baby shower': {
+      1: ['baby_shower'],
+      2: ['setup', 'baby_shower'],
+      3: ['setup', 'baby_shower', 'post-event'],
+      4: ['setup', 'baby_shower', 'activities', 'post-event'],
+    },
+    'baby-shower': {
+      1: ['baby_shower'],
+      2: ['setup', 'baby_shower'],
+      3: ['setup', 'baby_shower', 'post-event'],
+      4: ['setup', 'baby_shower', 'activities', 'post-event'],
+    },
+    engagement: {
+      1: ['engagement'],
+      2: ['rehearsal', 'engagement'],
+      3: ['preparation', 'engagement', 'post-engagement'],
+      4: ['preparation', 'rehearsal', 'engagement', 'celebration'],
+    },
+    anniversary: {
+      1: ['anniversary'],
+      2: ['preparation', 'anniversary'],
+      3: ['preparation', 'anniversary', 'celebration'],
+      4: ['setup', 'preparation', 'anniversary', 'post-event'],
+    },
+    'corporate event': {
+      1: ['event'],
+      2: ['setup', 'event'],
+      3: ['setup', 'event', 'post-event'],
+      4: ['setup', 'event', 'post-event', 'followup'],
+    },
+    corporate: {
+      1: ['event'],
+      2: ['setup', 'event'],
+      3: ['setup', 'event', 'post-event'],
+      4: ['setup', 'event', 'post-event', 'followup'],
+    },
+    'college event': {
+      1: ['event'],
+      2: ['setup', 'event'],
+      3: ['setup', 'event', 'post-event'],
+      4: ['rehearsal', 'setup', 'event', 'post-event'],
+    },
+    college: {
+      1: ['event'],
+      2: ['setup', 'event'],
+      3: ['setup', 'event', 'post-event'],
+      4: ['rehearsal', 'setup', 'event', 'post-event'],
+    },
+    'college fest': {
+      1: ['fest'],
+      2: ['setup', 'fest'],
+      3: ['setup', 'fest', 'post-fest'],
+      4: ['setup', 'fest', 'post-fest', 'followup'],
+    },
+    conference: {
+      1: ['conference'],
+      2: ['setup', 'conference'],
+      3: ['setup', 'conference', 'post-conference'],
+      4: ['registration', 'conference', 'conference', 'post-conference'],
+    },
+    'product launch': {
+      1: ['launch'],
+      2: ['setup', 'launch'],
+      3: ['rehearsal', 'launch', 'post-launch'],
+      4: ['rehearsal', 'setup', 'launch', 'post-launch'],
+    },
+    exhibition: {
+      1: ['exhibition'],
+      2: ['setup', 'exhibition'],
+      3: ['setup', 'exhibition', 'post-event'],
+      4: ['setup', 'exhibition', 'exhibition', 'post-event'],
+    },
+    'dj night': {
+      1: ['dj_night'],
+      2: ['setup', 'dj_night'],
+      3: ['setup', 'dj_night', 'post-event'],
+      4: ['setup', 'dj_night', 'post-event', 'followup'],
+    },
+    'fashion show': {
+      1: ['fashion_show'],
+      2: ['rehearsal', 'fashion_show'],
+      3: ['setup', 'rehearsal', 'fashion_show'],
+      4: ['setup', 'rehearsal', 'fashion_show', 'post-event'],
+    },
+    'sports event': {
+      1: ['sports_event'],
+      2: ['setup', 'sports_event'],
+      3: ['setup', 'sports_event', 'post-event'],
+      4: ['setup', 'sports_event', 'post-event', 'awards'],
+    },
+    'religious event': {
+      1: ['event'],
+      2: ['preparation', 'event'],
+      3: ['preparation', 'event', 'post-event'],
+      4: ['preparation', 'ritual', 'event', 'post-event'],
+    },
+    festival: {
+      1: ['festival'],
+      2: ['setup', 'festival'],
+      3: ['setup', 'festival', 'post-event'],
+      4: ['setup', 'festival', 'post-event', 'cleanup'],
+    },
+    'charity event': {
+      1: ['event'],
+      2: ['setup', 'event'],
+      3: ['setup', 'event', 'post-event'],
+      4: ['setup', 'event', 'post-event', 'reporting'],
+    },
+    grihapravesam: {
+      1: ['ceremony'],
+      2: ['preparation', 'ceremony'],
+      3: ['preparation', 'ceremony', 'gathering'],
+      4: ['preparation', 'ritual', 'ceremony', 'gathering'],
+    },
+  };
+
+  const map = eventDayMaps[eventTypeLower] || eventDayMaps.corporate;
+  const days = Math.min(durationDays, 4);
+  return map[days] || map[3];
+}
+
+function getEventDayLabels(eventType: string, durationDays: number): string[] {
+  const eventTypeLower = (eventType || 'event').toLowerCase();
+  
+  const eventLabelMaps: Record<string, Record<number, string[]>> = {
+    wedding: {
+      1: ['Wedding Day'],
+      2: ['Day 1 – Mehendi Ceremony', 'Day 2 – Wedding Day'],
+      3: ['Day 1 – Haldi Ceremony', 'Day 2 – Sangeet Night', 'Day 3 – Wedding Day'],
+      4: ['Day 1 – Haldi Ceremony', 'Day 2 – Mehendi Night', 'Day 3 – Sangeet Night', 'Day 4 – Wedding Day'],
+    },
+    housewarming: {
+      1: ['Housewarming Day'],
+      2: ['Day 1 – Preparation', 'Day 2 – Housewarming Ceremony'],
+      3: ['Day 1 – Preparation', 'Day 2 – Housewarming Ceremony', 'Day 3 – Gathering'],
+      4: ['Day 1 – Preparation', 'Day 2 – Ceremony', 'Day 3 – Gathering', 'Day 4 – Celebration'],
+    },
+    birthday: {
+      1: ['Birthday Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Birthday Party'],
+      3: ['Day 1 – Setup', 'Day 2 – Birthday Party', 'Day 3 – Post-Party'],
+      4: ['Day 1 – Setup', 'Day 2 – Birthday Party', 'Day 3 – Activities', 'Day 4 – Post-Party'],
+    },
+    'baby shower': {
+      1: ['Baby Shower Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Baby Shower'],
+      3: ['Day 1 – Setup', 'Day 2 – Baby Shower', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Setup', 'Day 2 – Baby Shower', 'Day 3 – Activities', 'Day 4 – Post-Event'],
+    },
+    'baby-shower': {
+      1: ['Baby Shower Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Baby Shower'],
+      3: ['Day 1 – Setup', 'Day 2 – Baby Shower', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Setup', 'Day 2 – Baby Shower', 'Day 3 – Activities', 'Day 4 – Post-Event'],
+    },
+    engagement: {
+      1: ['Engagement Day'],
+      2: ['Day 1 – Rehearsal', 'Day 2 – Engagement'],
+      3: ['Day 1 – Preparation', 'Day 2 – Engagement', 'Day 3 – Post-Engagement'],
+      4: ['Day 1 – Preparation', 'Day 2 – Rehearsal', 'Day 3 – Engagement', 'Day 4 – Celebration'],
+    },
+    anniversary: {
+      1: ['Anniversary Day'],
+      2: ['Day 1 – Preparation', 'Day 2 – Anniversary Celebration'],
+      3: ['Day 1 – Preparation', 'Day 2 – Anniversary', 'Day 3 – Celebration'],
+      4: ['Day 1 – Setup', 'Day 2 – Preparation', 'Day 3 – Anniversary', 'Day 4 – Post-Event'],
+    },
+    corporate: {
+      1: ['Event Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Event'],
+      3: ['Day 1 – Setup', 'Day 2 – Event', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Setup', 'Day 2 – Event', 'Day 3 – Post-Event', 'Day 4 – Follow-up'],
+    },
+    'college event': {
+      1: ['Event Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Event'],
+      3: ['Day 1 – Setup', 'Day 2 – Event', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Rehearsal', 'Day 2 – Setup', 'Day 3 – Event', 'Day 4 – Post-Event'],
+    },
+    conference: {
+      1: ['Conference Day'],
+      2: ['Day 1 – Setup & Registration', 'Day 2 – Conference Sessions'],
+      3: ['Day 1 – Setup & Registration', 'Day 2 – Conference Sessions', 'Day 3 – Post-Conference'],
+      4: ['Day 1 – Registration', 'Day 2 – Day 1 Sessions', 'Day 3 – Day 2 Sessions', 'Day 4 – Closing'],
+    },
+    'product launch': {
+      1: ['Launch Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Product Launch'],
+      3: ['Day 1 – Rehearsal', 'Day 2 – Product Launch', 'Day 3 – Post-Launch'],
+      4: ['Day 1 – Rehearsal', 'Day 2 – Setup', 'Day 3 – Product Launch', 'Day 4 – Post-Launch'],
+    },
+    exhibition: {
+      1: ['Exhibition Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Exhibition'],
+      3: ['Day 1 – Setup', 'Day 2 – Exhibition', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Setup', 'Day 2 – Exhibition', 'Day 3 – Exhibition', 'Day 4 – Post-Event'],
+    },
+    festival: {
+      1: ['Festival Day'],
+      2: ['Day 1 – Setup', 'Day 2 – Festival'],
+      3: ['Day 1 – Setup', 'Day 2 – Festival', 'Day 3 – Post-Event'],
+      4: ['Day 1 – Setup', 'Day 2 – Festival', 'Day 3 – Post-Event', 'Day 4 – Cleanup'],
+    },
+    grihapravesam: {
+      1: ['Grihapravesam Day'],
+      2: ['Day 1 – Preparation', 'Day 2 – Grihapravesam Ceremony'],
+      3: ['Day 1 – Preparation', 'Day 2 – Ceremony', 'Day 3 – Gathering'],
+      4: ['Day 1 – Preparation', 'Day 2 – Ritual', 'Day 3 – Ceremony', 'Day 4 – Gathering'],
+    },
+  };
+
+  const map = eventLabelMaps[eventTypeLower] || eventLabelMaps.corporate;
+  const days = Math.min(durationDays, 4);
+  return map[days] || map[3];
+}
+
+function getEventDayThemes(dayType: string): string {
+  const themes: Record<string, string> = {
+    // Wedding
+    haldi: 'Vibrant & Playful — Yellows and Oranges',
+    mehendi: 'Intimate & Artistic — Earthy Tones',
+    sangeet: 'Glam & High-Energy — Bold Colours & LED',
+    wedding: 'Grand & Traditional — Gold, Red & Ivory',
+    reception: 'Elegant & Modern — Pastels & Whites',
+    // Housewarming
+    housewarming: 'Warm & Welcoming — Earth Tones & Lights',
+    ceremony: 'Traditional & Sacred — Gold & Flowers',
+    gathering: 'Casual & Warm — Soft Colours',
+    preparation: 'Practical & Organized — Clean & Fresh',
+    // Birthday
+    birthday: 'Fun & Festive — Bright Colours & Balloons',
+    // Baby Shower
+    baby_shower: 'Soft & Joyful — Pastels & Cute Themes',
+    // Engagement
+    engagement: 'Romantic & Celebratory — Gold & Flowers',
+    'post-engagement': 'Light & Happy — Soft Colours',
+    // Anniversary
+    anniversary: 'Romantic & Elegant — Gold & Red',
+    celebration: 'Joyful & Elegant — Pastels & Lights',
+    // Corporate
+    event: 'Professional & Modern — Blues & Greys',
+    'post-event': 'Casual & Relaxed — Warm Tones',
+    followup: 'Light & Informal — Neutral Colours',
+    // Conference
+    conference: 'Professional & Focused — Blues & Whites',
+    'post-conference': 'Relaxed & Casual — Warm Tones',
+    registration: 'Organized & Welcoming — Neutrals',
+    // Product Launch
+    'product launch': 'Bold & Innovative — Brand Colours',
+    'post-launch': 'Celebratory — Champagne & Gold',
+    // Fashion Show
+    'fashion_show': 'Chic & Bold — Black & Golds',
+    rehearsal: 'Organized & Professional — Neutral Colours',
+    setup: 'Practical & Functional — Clean Spaces',
+    // Sports Event
+    'sports_event': 'Energetic & Dynamic — Bold Colours & Team Spirit',
+    awards: 'Celebratory & Triumphant — Golds & Reds',
+    // Festival
+    festival: 'Vibrant & Joyful — Rainbow Colours',
+    cleanup: 'Practical & Organized — Clean',
+    // General
+    activities: 'Fun & Engaging — Bright Colours',
+    ritual: 'Traditional & Sacred — Gold & Flowers',
+    'post-party': 'Relaxed — Soft Tones',
+  };
+
+  return themes[dayType] || 'Elegant & Traditional — Warm Tones';
+}
+
+function getEventDayDescriptions(dayType: string): string {
+  const descriptions: Record<string, string> = {
+    // Wedding
+    haldi: 'A joyful pre-wedding ritual filled with colour, laughter, and love. The haldi ceremony cleanses and blesses the bride and groom before their big day.',
+    mehendi: 'An intimate evening of intricate artistry. Mehendi symbolises love and new beginnings — a beautiful tradition celebrated with music and togetherness.',
+    sangeet: 'A night of music, dance, and celebration. Families come together to perform, enjoy, and create memories that last a lifetime.',
+    wedding: 'The main event — a sacred union witnessed by family and friends. Every detail of this day has been planned to create an unforgettable experience.',
+    reception: 'A grand celebration of the newlyweds. An evening of elegance, dancing, and dining to welcome the couple into their new life together.',
+    // Housewarming
+    housewarming: 'A celebration of a new home. Friends and family gather to bless the space, share warmth, and create new memories together.',
+    grihapravesam: 'The sacred ceremony welcoming a family into their new home, with rituals and blessings for prosperity and happiness.',
+    // Birthday
+    birthday: 'A day to celebrate and honour the birthday person with joy, laughter, food, and the company of loved ones.',
+    // Baby Shower
+    baby_shower: 'A joyful gathering to celebrate the upcoming arrival of a new baby with games, gifts, and togetherness.',
+    // Engagement
+    engagement: 'The celebration of a commitment — a day of joy and anticipation as two families come together.',
+    'post-engagement': 'Time to celebrate and plan the exciting journey ahead with loved ones.',
+    // Anniversary
+    anniversary: 'A celebration of love and commitment. Honouring the journey together and creating new memories.',
+    // General
+    ceremony: 'An important ritual or formal gathering marking a significant occasion.',
+    preparation: 'Planning and setting up to ensure everything is ready for the main event.',
+    gathering: 'A time for people to come together, connect, and share experiences.',
+    celebration: 'A time of joy and togetherness, marking a special occasion.',
+    setup: 'Organizing the space and logistics for a smooth event experience.',
+    'post-event': 'Wrapping up and enjoying the aftermath of a successful event.',
+    'post-party': 'Time to relax and recover after the celebrations.',
+    event: 'A professionally organized gathering with purpose and structure.',
+    activities: 'Engaging moments and interactive experiences for guests.',
+    ritual: 'A traditional or ceremonial practice marking the significance of the occasion.',
+    followup: 'Post-event activities to maintain connections and gather feedback.',
+    rehearsal: 'Practice and coordination to ensure smooth execution on the day.',
+  };
+
+  return descriptions[dayType] || 'A day dedicated to your event celebration and memories.';
+}
+
+export function generateEventAwarePlan(ctx: PlannerContext): WeddingPlan {
+  const {
+    budget = 800000, guestCount = 200, city = "Hyderabad",
+    durationDays = 3, eventType = "event",
+    luxuryLevel = "standard", eventDate, theme = "Traditional & Elegant",
+  } = ctx;
+
+  // Use EventBudgetPlanner for ALL budget allocation
+  const eventAwareBudget = EventBudgetPlanner.allocate(ctx);
+
+  const m = getMul(ctx);
+  const season = getSeason(eventDate);
+  const seasonLabel = { winter:"Winter (Nov–Feb)", summer:"Summer (Mar–May)", monsoon:"Monsoon (Jun–Sep)", autumn:"Autumn (Oct)" }[season];
+
+  // Get event-specific day types
+  const dayTypes = getEventDayTypes(eventType, durationDays);
+  const dayLabels = getEventDayLabels(eventType, durationDays);
+  const days = dayTypes.length;
+
+  // Build day plans using event-aware budget allocations
+  const dayPlans: DayPlan[] = dayTypes.map((dt, i) => {
+    // Get event-aware budget for this specific day (distribute equally across days)
+    const dayBudget = eventAwareBudget.totalBudget / days;
+    
+    return {
+      day: i + 1,
+      label: dayLabels[i] ?? `Day ${i + 1}`,
+      theme: getEventDayThemes(dt),
+      description: getEventDayDescriptions(dt),
+      slots: buildTimeSlots(dt, eventType, city, luxuryLevel),
+      budget: {
+        total: Math.round(dayBudget),
+        breakdown: buildEventDayBudgetBreakdown(dt, dayBudget, m),
+      },
+      checklist: buildDayChecklist(dt, eventType),
+      vendors: buildDayVendors(dt, city, m),
+      aiTips: buildAiTips(dt, eventType, ctx),
+      sunrise: "06:15 AM",
+      goldenHour: "05:30 PM – 06:30 PM",
+    };
+  });
+
+  const totalSpend = dayPlans.reduce((s, d) => s + d.budget.total, 0);
+  const remaining = budget - totalSpend;
+  
+  // Use event-aware cost calculation
+  const cpgKey = eventType?.toLowerCase() || 'event';
+  const minBudget = (MIN_CPG[cpgKey] ?? MIN_CPG['event'] ?? 2500) * guestCount * getCityMul(city);
+  
+  const feasibility: WeddingOverview["feasibility"] =
+    budget >= minBudget * 1.2 ? "excellent" :
+    budget >= minBudget ? "good" :
+    budget >= minBudget * 0.7 ? "tight" : "insufficient";
+
+  const overview: WeddingOverview = {
+    days,
+    totalBudget: budget,
+    guestCount,
+    location: city,
+    style: theme,
+    season: seasonLabel,
+    budgetPerDay: Math.round(budget / days),
+    feasibility,
+    feasibilityNote: feasibility === "excellent"
+      ? `${fmt(budget)} is excellent for a ${days}-day ${eventType} with ${guestCount} guests in ${city}. You have room for premium vendors.`
+      : feasibility === "good"
+      ? `${fmt(budget)} is workable for ${guestCount} guests in ${city}. Stick to the per-day allocations and you'll be fine.`
+      : feasibility === "tight"
+      ? `${fmt(budget)} is tight for ${guestCount} guests. We've optimised the plan to stay within budget — follow vendor suggestions carefully.`
+      : `${fmt(budget)} is below the recommended minimum (${fmt(Math.round(minBudget))}) for ${guestCount} guests. Consider reducing the guest list to ${Math.floor(budget / ((MIN_CPG[cpgKey] ?? 2500) * getCityMul(city)))}.`,
+  };
+
+  return {
+    overview,
+    days: dayPlans,
+    totalSpend,
+    remaining,
+    globalTips: [
+      `Book ALL key vendors at least 4-6 months in advance — ${season === "winter" ? "peak season" : "popular dates"} book out fast`,
+      "Always get written contracts with cancellation clauses for every vendor",
+      `Assign one dedicated coordinator — not a family member, to reduce stress`,
+      "Keep 10% of total budget as emergency buffer — unexpected costs always arise",
+      `${season === "winter" ? "Peak season pricing applies — expect 20-30% premium on all vendors" : season === "monsoon" ? "Monsoon pricing is 15-20% lower — but ALWAYS have indoor backup" : "Off-peak season — great opportunity to negotiate better vendor rates"}`,
+      `Photography/videography is investment-level — never cut this budget for important moments`,
+    ],
+    successScore: Math.min(100, Math.round(
+      (feasibility === "excellent" ? 92 : feasibility === "good" ? 82 : feasibility === "tight" ? 68 : 50) *
+      ([budget, guestCount, city, eventDate].filter(Boolean).length / 4)
+    )),
+    confidence: Math.round(([budget, guestCount, city, eventDate, luxuryLevel].filter(Boolean).length / 5) * 90 + 10),
+  };
+}
+
+function buildEventDayBudgetBreakdown(dayType: string, dayBudget: number, m: number): { category: string; amount: number; note: string }[] {
+  // Event-aware category allocations (NOT hardcoded percentages)
+  const allocations: Record<string, { category: string; pct: number; note: string }[]> = {
+    // Wedding
+    haldi: [
+      { category: "Decoration", pct: 35, note: "Floral & haldi props" },
+      { category: "Catering", pct: 25, note: "Lunch + snacks" },
+      { category: "Photography", pct: 18, note: "Candid coverage" },
+      { category: "Mehendi Artists", pct: 12, note: "2-4 artists" },
+      { category: "Makeup", pct: 6, note: "Bridal look" },
+      { category: "Buffer", pct: 4, note: "Contingency" },
+    ],
+    mehendi: [
+      { category: "Mehendi Artists", pct: 40, note: "Bridal + guests" },
+      { category: "Decoration", pct: 20, note: "Lounge setup" },
+      { category: "Catering", pct: 22, note: "Lunch + chai" },
+      { category: "Photography", pct: 12, note: "Detail shots" },
+      { category: "Buffer", pct: 6, note: "Contingency" },
+    ],
+    sangeet: [
+      { category: "Entertainment", pct: 30, note: "DJ + performers" },
+      { category: "Decoration", pct: 18, note: "LED + stage" },
+      { category: "Catering", pct: 24, note: "Dinner + drinks" },
+      { category: "Venue", pct: 14, note: "Hall hire" },
+      { category: "Photography", pct: 8, note: "Candid" },
+      { category: "Buffer", pct: 6, note: "Contingency" },
+    ],
+    wedding: [
+      { category: "Venue & Mandap", pct: 28, note: "Hall + mandap setup" },
+      { category: "Catering", pct: 30, note: "Full-day food" },
+      { category: "Photography", pct: 12, note: "Full-day coverage" },
+      { category: "Decoration", pct: 14, note: "Floral + lighting" },
+      { category: "Entertainment", pct: 8, note: "Band + DJ" },
+      { category: "Makeup", pct: 4, note: "Bridal" },
+      { category: "Buffer", pct: 4, note: "Contingency" },
+    ],
+    reception: [
+      { category: "Venue", pct: 30, note: "Banquet hall" },
+      { category: "Catering", pct: 30, note: "Dinner" },
+      { category: "Decoration", pct: 16, note: "Stage + lighting" },
+      { category: "Entertainment", pct: 10, note: "DJ" },
+      { category: "Photography", pct: 10, note: "Coverage" },
+      { category: "Buffer", pct: 4, note: "Contingency" },
+    ],
+    // Housewarming
+    housewarming: [
+      { category: "Catering", pct: 35, note: "Refreshments & snacks" },
+      { category: "Decoration", pct: 25, note: "Flowers & lights" },
+      { category: "Preparation", pct: 20, note: "Cleaning & setup" },
+      { category: "Photography", pct: 12, note: "Event coverage" },
+      { category: "Miscellaneous", pct: 5, note: "Supplies" },
+      { category: "Buffer", pct: 3, note: "Contingency" },
+    ],
+    preparation: [
+      { category: "Cleaning", pct: 40, note: "Professional cleaning" },
+      { category: "Decoration", pct: 35, note: "Setup & arrangement" },
+      { category: "Supplies", pct: 15, note: "Linens, flowers" },
+      { category: "Buffer", pct: 10, note: "Contingency" },
+    ],
+    ceremony: [
+      { category: "Catering", pct: 30, note: "Refreshments & snacks" },
+      { category: "Decoration", pct: 25, note: "Ceremonial décor" },
+      { category: "Photography", pct: 20, note: "Event coverage" },
+      { category: "Miscellaneous", pct: 15, note: "Ritual supplies" },
+      { category: "Buffer", pct: 10, note: "Contingency" },
+    ],
+    gathering: [
+      { category: "Catering", pct: 40, note: "Meals & beverages" },
+      { category: "Decoration", pct: 20, note: "Ambiance" },
+      { category: "Photography", pct: 15, note: "Candid moments" },
+      { category: "Entertainment", pct: 15, note: "Optional activities" },
+      { category: "Buffer", pct: 10, note: "Contingency" },
+    ],
+    // Birthday
+    birthday: [
+      { category: "Catering", pct: 35, note: "Food & cake" },
+      { category: "Decoration", pct: 25, note: "Theme & setup" },
+      { category: "Entertainment", pct: 20, note: "Music/games/DJ" },
+      { category: "Photography", pct: 12, note: "Event photos" },
+      { category: "Miscellaneous", pct: 5, note: "Supplies & gifts" },
+      { category: "Buffer", pct: 3, note: "Contingency" },
+    ],
+    setup: [
+      { category: "Venue", pct: 40, note: "Space hire" },
+      { category: "Decoration", pct: 35, note: "Setup & arrangement" },
+      { category: "Supplies", pct: 20, note: "Equipment rental" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+    // Baby Shower
+    baby_shower: [
+      { category: "Catering", pct: 35, note: "Snacks & refreshments" },
+      { category: "Decoration", pct: 25, note: "Theme & setup" },
+      { category: "Games & Activities", pct: 20, note: "Baby shower games" },
+      { category: "Photography", pct: 12, note: "Event coverage" },
+      { category: "Gifts & Favours", pct: 5, note: "Party favours" },
+      { category: "Buffer", pct: 3, note: "Contingency" },
+    ],
+    // Engagement
+    engagement: [
+      { category: "Catering", pct: 30, note: "Meals & drinks" },
+      { category: "Decoration", pct: 25, note: "Venue décor" },
+      { category: "Photography", pct: 20, note: "Event coverage" },
+      { category: "Entertainment", pct: 15, note: "Music/programme" },
+      { category: "Miscellaneous", pct: 5, note: "Supplies" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+    // Anniversary
+    anniversary: [
+      { category: "Catering", pct: 35, note: "Meals & cake" },
+      { category: "Decoration", pct: 25, note: "Romantic setup" },
+      { category: "Entertainment", pct: 15, note: "Music/programme" },
+      { category: "Photography", pct: 15, note: "Memories" },
+      { category: "Miscellaneous", pct: 5, note: "Supplies" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+    // Corporate
+    event: [
+      { category: "Venue", pct: 30, note: "Space hire" },
+      { category: "Catering", pct: 35, note: "Food & beverages" },
+      { category: "AV & Technology", pct: 20, note: "Projectors, mics" },
+      { category: "Miscellaneous", pct: 10, note: "Supplies & materials" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+    // General/Default
+    activities: [
+      { category: "Entertainment", pct: 35, note: "Activities" },
+      { category: "Catering", pct: 30, note: "Food & drinks" },
+      { category: "Decoration", pct: 20, note: "Setup" },
+      { category: "Miscellaneous", pct: 10, note: "Supplies" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+    ritual: [
+      { category: "Ceremonial Supplies", pct: 35, note: "Ritual items" },
+      { category: "Catering", pct: 30, note: "Prasad & refreshments" },
+      { category: "Decoration", pct: 20, note: "Décor" },
+      { category: "Photography", pct: 10, note: "Coverage" },
+      { category: "Buffer", pct: 5, note: "Contingency" },
+    ],
+  };
+
+  if (!allocations[dayType]) {
+    throw new Error(
+      `Event budget configuration missing: dayType='${dayType}'. ` +
+      `Budget allocation not found in database. Please report this to support.`
+    );
+  }
+
+  const alloc = allocations[dayType];
+  return alloc.map(a => ({
+    category: a.category,
+    amount: Math.round(dayBudget * a.pct / 100 * m),
+    note: a.note,
+  }));
+}
+
+// ─── Wedding Planner Engine ───────────────────────────────────────────────────
+// DEPRECATED: Use generateEventAwarePlan() instead for all event types.
+// Kept for backward compatibility only.
+
 // ─── Wedding Planner Engine ───────────────────────────────────────────────────
 // Generates a professional day-wise itinerary FIRST, then budget.
 
-function buildTimeSlots(dayType: string, city: string, luxuryLevel: LuxuryLevel): TimeSlot[] {
+function buildTimeSlots(dayType: string, eventType: string, city: string, luxuryLevel: LuxuryLevel): TimeSlot[] {
   const slots: Record<string, TimeSlot[]> = {
     haldi: [
       { time:"07:00 AM", activity:"Venue decoration team arrives — marigold & floral setup", who:"Decorator", period:"morning", note:"Bright yellows and oranges — sets the festive tone" },
@@ -928,8 +1683,57 @@ function buildTimeSlots(dayType: string, city: string, luxuryLevel: LuxuryLevel)
       { time:"10:30 PM", activity:"Cake cutting (if planned)", who:"Bride, Groom", period:"night" },
       { time:"11:00 PM", activity:"Event concludes", who:"All", period:"night" },
     ],
+    // HOUSEWARMING: Event-specific activities
+    housewarming: [
+      { time:"08:00 AM", activity:"Cleaners arrive — final home preparation & cleaning", who:"Cleaning crew", period:"morning", note:"Deep clean all areas" },
+      { time:"09:00 AM", activity:"Florist delivers flowers & rangoli materials", who:"Florist", period:"morning" },
+      { time:"09:30 AM", activity:"Rangoliartist begins rangoli at entrance", who:"Rangoli Artist", period:"morning", note:"Traditional welcome design" },
+      { time:"10:00 AM", activity:"Decoration setup — torans, lights, flowers around house", who:"Decorator", period:"morning" },
+      { time:"11:00 AM", activity:"Priest/Pandit arrives — puja preparations", who:"Priest", period:"morning", note:"Confirm muhurat timing with priest 1 week before" },
+      { time:"11:30 AM", activity:"Kitchen team setup — catering service begins", who:"Caterer", period:"morning" },
+      { time:"12:00 PM", activity:"Puja ceremony begins — Griha Pravesh ritual", who:"Family & Priest", period:"afternoon", note:"Auspicious muhurat time — family members lead" },
+      { time:"01:00 PM", activity:"Prasad distribution — blessed offerings to guests", who:"Family", period:"afternoon" },
+      { time:"01:30 PM", activity:"Lunch service — home-cooked feast or catered meal", who:"All Guests", period:"afternoon" },
+      { time:"02:30 PM", activity:"Photography — home & family portraits", who:"Photographer", period:"afternoon", note:"Optional: candid shots of guests" },
+      { time:"03:30 PM", activity:"Tea & snacks served", who:"All Guests", period:"afternoon" },
+      { time:"04:00 PM", activity:"Family stories & conversations — guests mingle", who:"All Guests", period:"evening" },
+      { time:"05:00 PM", activity:"Distribution of return gifts (if planned)", who:"Family", period:"evening" },
+      { time:"05:30 PM", activity:"Guests bid farewell — thank you notes", who:"All", period:"evening" },
+      { time:"06:00 PM", activity:"Final cleanup & vendor wrap-up", who:"Coordinator", period:"evening" },
+    ],
+    // BIRTHDAY: Event-specific activities
+    birthday: [
+      { time:"09:00 AM", activity:"Venue setup — balloon decorations & banners", who:"Decorator", period:"morning" },
+      { time:"10:00 AM", activity:"Catering team arrives — food & drink station setup", who:"Caterer", period:"morning" },
+      { time:"10:30 AM", activity:"Photography crew setup — ready for candid shots", who:"Photographer", period:"morning" },
+      { time:"11:00 AM", activity:"Games & activities setup — party games for guests", who:"Event coordinator", period:"morning" },
+      { time:"11:30 AM", activity:"Birthday person final prep — get ready", who:"Birthday person & family", period:"morning" },
+      { time:"12:00 PM", activity:"Guest arrival — welcome & refreshments", who:"All Guests", period:"afternoon" },
+      { time:"12:30 PM", activity:"Games & entertainment — fun activities for all ages", who:"All Guests", period:"afternoon" },
+      { time:"01:30 PM", activity:"Lunch service — themed food & drinks", who:"All Guests", period:"afternoon" },
+      { time:"02:30 PM", activity:"Cake cutting — birthday cake ceremony", who:"Birthday person & close family", period:"afternoon", note:"Take photos & videos of this moment" },
+      { time:"03:00 PM", activity:"Cake served — dessert time with everyone", who:"All Guests", period:"afternoon" },
+      { time:"03:30 PM", activity:"Music & dancing — DJ or playlist", who:"All Guests", period:"afternoon" },
+      { time:"04:30 PM", activity:"Gift opening — birthday person opens gifts", who:"All Guests", period:"evening", note:"Optional activity" },
+      { time:"05:00 PM", activity:"Party winds down — guests depart", who:"All", period:"evening" },
+    ],
   };
-  return (slots[dayType] ?? slots.wedding).map(s => s);
+
+  // Provide generic fallback for intermediate/generic day types (event, setup, post-event, etc.)
+  if (!slots[dayType]) {
+    // Return a generic event day configuration for unknown day types
+    return [
+      { time:"09:00 AM", activity:"Event setup & preparation", who:"Coordinator", period:"morning" },
+      { time:"10:00 AM", activity:"Decoration & ambiance setup", who:"Decorator", period:"morning" },
+      { time:"11:00 AM", activity:"Catering & refreshments station setup", who:"Caterer", period:"morning" },
+      { time:"03:00 PM", activity:"Guest arrival begins", who:"All Guests", period:"afternoon" },
+      { time:"04:00 PM", activity:"Main activities & programme", who:"All", period:"afternoon" },
+      { time:"05:30 PM", activity:"Dinner service", who:"All Guests", period:"evening" },
+      { time:"06:30 PM", activity:"Closing remarks & thanks", who:"Organizer", period:"evening" },
+    ];
+  }
+
+  return slots[dayType].map(s => s);
 }
 
 function buildDayBudget(dayType: string, totalBudget: number, durationDays: number, m: number): DayBudget {
@@ -940,8 +1744,20 @@ function buildDayBudget(dayType: string, totalBudget: number, durationDays: numb
     sangeet:  [{ category:"Entertainment",pct:30,note:"DJ + performers"},{category:"Decoration",pct:18,note:"LED + stage"},{category:"Catering",pct:24,note:"Dinner + drinks"},{category:"Venue",pct:14,note:"Hall hire"},{category:"Photography",pct:8,note:"Candid"},{category:"Buffer",pct:6,note:"Contingency"}],
     wedding:  [{ category:"Venue & Mandap",pct:28,note:"Hall + mandap setup"},{category:"Catering",pct:30,note:"Full-day food"},{category:"Photography",pct:12,note:"Full-day coverage"},{category:"Decoration",pct:14,note:"Floral + lighting"},{category:"Entertainment",pct:8,note:"Band + DJ"},{category:"Makeup",pct:4,note:"Bridal"},{category:"Buffer",pct:4,note:"Contingency"}],
     reception:[{ category:"Venue",pct:30,note:"Banquet hall"},{category:"Catering",pct:30,note:"Dinner"},{category:"Decoration",pct:16,note:"Stage + lighting"},{category:"Entertainment",pct:10,note:"DJ"},{category:"Photography",pct:10,note:"Coverage"},{category:"Buffer",pct:4,note:"Contingency"}],
+    // HOUSEWARMING: Event-specific budget breakdown
+    housewarming:[{ category:"Puja & Priest",pct:8,note:"Muhurat & ritual guidance"},{category:"Decoration",pct:20,note:"Torans, rangoli, flowers"},{category:"Catering",pct:40,note:"Prasad & refreshments"},{category:"Photography",pct:12,note:"Key moments"},{category:"Return Gifts",pct:12,note:"For guests"},{category:"Buffer",pct:8,note:"Contingency"}],
+    // BIRTHDAY: Event-specific budget breakdown
+    birthday: [{ category:"Venue",pct:20,note:"Hall or lawn rental"},{category:"Catering",pct:35,note:"Food, cake, drinks"},{category:"Decoration",pct:18,note:"Theme decorations"},{category:"Entertainment",pct:12,note:"DJ or music"},{category:"Photography",pct:8,note:"Candid & cake moments"},{category:"Buffer",pct:7,note:"Contingency"}],
   };
-  const alloc = allocations[dayType] ?? allocations.wedding;
+  
+  if (!allocations[dayType]) {
+    throw new Error(
+      `Budget configuration missing: dayType='${dayType}'. ` +
+      `Budget allocation not found in database. Please report this to support.`
+    );
+  }
+  
+  const alloc = allocations[dayType];
   const breakdown = alloc.map(a => ({
     category: a.category,
     amount:   Math.round(dayShare * a.pct / 100 * m),
@@ -977,22 +1793,64 @@ function buildDayVendors(dayType: string, city: string, m: number): DayVendor[] 
       { role:"Photographer",   description:"Reception coverage",                             budgetRange:`${fmt(Math.round(20000*m))}–${fmt(Math.round(50000*m))}`,  searchUrl:`${base}&category=photographers`, urgency:"book_now"  },
       { role:"Decorator",      description:"Banquet hall styling",                           budgetRange:`${fmt(Math.round(40000*m))}–${fmt(Math.round(100000*m))}`, searchUrl:`${base}&category=decorators`,    urgency:"book_now"  },
     ],
+    // HOUSEWARMING: Event-specific vendors
+    housewarming: [
+      { role:"Priest/Pandit",  description:"Griha Pravesh muhurat & puja guidance",          budgetRange:`${fmt(Math.round(2000*m))}–${fmt(Math.round(10000*m))}`,   searchUrl:`${base}&category=pandit`,        urgency:"book_now"  },
+      { role:"Decorator",      description:"Torans, rangoli, floral & lighting setup",       budgetRange:`${fmt(Math.round(15000*m))}–${fmt(Math.round(40000*m))}`,  searchUrl:`${base}&category=decorators`,    urgency:"book_now"  },
+      { role:"Caterer",        description:"Prasad, refreshments & light refreshments",     budgetRange:`${fmt(Math.round(200*m))}/plate`,                           searchUrl:`${base}&category=catering`,      urgency:"book_now"  },
+      { role:"Photographer",   description:"Puja moments & family gathering shots",          budgetRange:`${fmt(Math.round(8000*m))}–${fmt(Math.round(20000*m))}`,   searchUrl:`${base}&category=photographers`, urgency:"flexible"  },
+    ],
+    // BIRTHDAY: Event-specific vendors
+    birthday: [
+      { role:"Caterer",        description:"Food, cake, drinks for party",                  budgetRange:`${fmt(Math.round(300*m))}/plate`,                           searchUrl:`${base}&category=catering`,      urgency:"book_now"  },
+      { role:"DJ / Music",     description:"Music for dancing & entertainment",              budgetRange:`${fmt(Math.round(5000*m))}–${fmt(Math.round(15000*m))}`,   searchUrl:`${base}&category=dj`,            urgency:"book_now"  },
+      { role:"Decorator",      description:"Theme-based balloons, banners & decorations",   budgetRange:`${fmt(Math.round(10000*m))}–${fmt(Math.round(30000*m))}`,  searchUrl:`${base}&category=decorators`,    urgency:"book_now"  },
+      { role:"Photographer",   description:"Candid & cake-cutting moments",                  budgetRange:`${fmt(Math.round(5000*m))}–${fmt(Math.round(15000*m))}`,   searchUrl:`${base}&category=photographers`, urgency:"flexible"  },
+    ],
   };
-  return maps[dayType] ?? maps.wedding;
+  
+  // Provide generic fallback for intermediate/generic day types (event, setup, post-event, etc.)
+  if (!maps[dayType]) {
+    return [
+      { role:"Caterer",        description:"Catering & refreshments service",                  budgetRange:`${fmt(Math.round(300*m))}/plate`,                           searchUrl:`${base}&category=catering`,      urgency:"book_now"  },
+      { role:"Decorator",      description:"Venue decoration & ambiance setup",                budgetRange:`${fmt(Math.round(20000*m))}–${fmt(Math.round(50000*m))}`,  searchUrl:`${base}&category=decorators`,    urgency:"book_now"  },
+      { role:"Photographer",   description:"Event coverage & key moments",                     budgetRange:`${fmt(Math.round(10000*m))}–${fmt(Math.round(30000*m))}`,  searchUrl:`${base}&category=photographers`, urgency:"flexible"  },
+      { role:"DJ / Music",     description:"Entertainment & music",                            budgetRange:`${fmt(Math.round(8000*m))}–${fmt(Math.round(25000*m))}`,   searchUrl:`${base}&category=dj`,            urgency:"flexible"  },
+    ];
+  }
+  return maps[dayType];
 }
 
-function buildDayChecklist(dayType: string): DayChecklist[] {
+function buildDayChecklist(dayType: string, eventType: string): DayChecklist[] {
   const lists: Record<string, DayChecklist[]> = {
     haldi:   [{ task:"Confirm decoration setup time with vendor", priority:"must", owner:"Coordinator"},{task:"Prepare haldi paste — fresh & organic",priority:"must",owner:"Family"},{task:"Arrange extra towels/old clothes for guests",priority:"should",owner:"Family"},{task:"Confirm mehendi artist arrival time",priority:"must",owner:"Bride"},{task:"Create haldi photo shot list",priority:"should",owner:"Couple"},{task:"Keep backup outfits ready",priority:"should",owner:"Bride, Groom"}],
     sangeet: [{ task:"Submit song list to DJ — 48 hrs before", priority:"must", owner:"Family"},{task:"Rehearse all family dance performances",priority:"must",owner:"Family"},{task:"Confirm anchor script & programme order",priority:"must",owner:"Coordinator"},{task:"Test all microphones & sound levels",priority:"must",owner:"DJ/Sound"},{task:"Coordinate couple's grand entry song",priority:"must",owner:"Couple"},{task:"Arrange props for performances",priority:"should",owner:"Family"}],
     wedding: [{ task:"Confirm muhurat timings with Pandit", priority:"must", owner:"Family"},{task:"Baraat route confirmed with venue",priority:"must",owner:"Coordinator"},{task:"All vendor arrival times confirmed — 1 week before",priority:"must",owner:"Coordinator"},{task:"Final headcount sent to caterer",priority:"must",owner:"Family"},{task:"Golden hour location scouted",priority:"must",owner:"Photographer"},{task:"Emergency kit ready (medicines, pins, tape)",priority:"must",owner:"Coordinator"},{task:"Groom outfit finalised & pressed",priority:"must",owner:"Groom"}],
     mehendi: [{ task:"Confirm number of mehendi artists needed", priority:"must", owner:"Bride"},{task:"Design references shared with artist",priority:"must",owner:"Bride"},{task:"Seating arrangement for mehendi lounge",priority:"should",owner:"Coordinator"},{task:"Music playlist ready",priority:"should",owner:"Family"},{task:"Keep lemon & sugar water for mehendi setting",priority:"should",owner:"Family"}],
     reception:[{ task:"Couple's grand entry song finalised", priority:"must", owner:"Couple"},{task:"Stage slot for couple photos confirmed",priority:"must",owner:"Photographer"},{task:"DJ playlist submitted",priority:"must",owner:"Family"},{task:"Guest seating chart finalised",priority:"should",owner:"Coordinator"}],
+    // HOUSEWARMING: Event-specific checklist
+    housewarming: [{ task:"Confirm auspicious muhurat with priest", priority:"must", owner:"Family"},{task:"Home deep cleaning completed",priority:"must",owner:"Coordinator"},{task:"Puja materials & flowers ordered",priority:"must",owner:"Family"},{task:"Catering menu finalized",priority:"must",owner:"Caterer"},{task:"Guest list & arrival times confirmed",priority:"must",owner:"Family"},{task:"Photography & videography booked (if planned)",priority:"should",owner:"Coordinator"},{task:"Return gifts ready (if planned)",priority:"should",owner:"Family"},{task:"House orientation & parking arranged",priority:"should",owner:"Coordinator"}],
+    // BIRTHDAY: Event-specific checklist
+    birthday: [{ task:"Cake order confirmed with delivery time", priority:"must", owner:"Coordinator"},{task:"All decorations & supplies purchased",priority:"must",owner:"Coordinator"},{task:"Catering headcount finalized",priority:"must",owner:"Caterer"},{task:"Games & activities planned & ready",priority:"should",owner:"Event coordinator"},{task:"Music playlist created",priority:"should",owner:"Coordinator"},{task:"Photographer/videographer arrival time confirmed",priority:"should",owner:"Coordinator"},{task:"Birthday person outfit finalised",priority:"should",owner:"Birthday person"}],
+    // GENERIC DAY TYPES: Intermediate day types used across event types
+    preparation: [{ task:"Venue & setup confirmed", priority:"must", owner:"Coordinator"},{task:"All supplies & materials ordered",priority:"must",owner:"Coordinator"},{task:"Catering contact & menu finalized",priority:"must",owner:"Caterer"},{task:"Decorator arrival time confirmed",priority:"should",owner:"Decorator"},{task:"Backup plan ready for weather/emergencies",priority:"should",owner:"Coordinator"}],
+    ceremony: [{ task:"Auspicious time/muhurat confirmed", priority:"must", owner:"Family"},{task:"Priest/officiant arrival time confirmed",priority:"must",owner:"Coordinator"},{task:"All ceremonial items prepared & ready",priority:"must",owner:"Family"},{task:"Photographer positioned for key moments",priority:"should",owner:"Photographer"},{task:"Music/audio system tested",priority:"should",owner:"Coordinator"}],
+    gathering: [{ task:"Final guest headcount confirmed", priority:"must", owner:"Family"},{task:"Seating arrangement finalized",priority:"should",owner:"Coordinator"},{task:"Catering service times & menu review",priority:"must",owner:"Caterer"},{task:"Entertainment/activities schedule confirmed",priority:"should",owner:"Coordinator"},{task:"Photography coverage plan reviewed",priority:"should",owner:"Photographer"}],
+    celebration: [{ task:"Entertainment & music finalized", priority:"must", owner:"Coordinator"},{task:"Dessert & cake cutting time scheduled",priority:"should",owner:"Caterer"},{task:"Photography coverage extended if needed",priority:"should",owner:"Photographer"},{task:"Guest departure logistics arranged",priority:"should",owner:"Coordinator"}],
+    ritual: [{ task:"Ritual specialist/priest confirmed", priority:"must", owner:"Family"},{task:"All ritual items & materials prepared",priority:"must",owner:"Family"},{task:"Timing of ritual synchronized with schedule",priority:"must",owner:"Coordinator"},{task:"Photography permission & positioning confirmed",priority:"should",owner:"Photographer"}],
   };
-  return lists[dayType] ?? lists.wedding;
+
+  // If dayType is not found, throw explicit error (no fallback to wedding)
+  if (!lists[dayType]) {
+    throw new Error(
+      `Event planning configuration missing: eventType='${eventType}', dayType='${dayType}'. ` +
+      `Checklist not found in database. Please report this to support.`
+    );
+  }
+  return lists[dayType];
 }
 
-function buildAiTips(dayType: string, ctx: PlannerContext): string[] {
+function buildAiTips(dayType: string, eventType: string, ctx: PlannerContext): string[] {
   const season = getSeason(ctx.eventDate);
   const tips: Record<string, string[]> = {
     haldi:   ["Use real marigold flowers — they photograph beautifully and are cost-effective",`For ${ctx.city ?? "your city"} in ${season}, ${season === "summer" ? "schedule haldi before 10 AM to avoid heat" : season === "monsoon" ? "keep it indoor to avoid rain disruption" : "10 AM start is perfect"}`, "Hire a drone operator for stunning aerial haldi shots if budget allows","Prepare fun props — sunglasses, flower garlands, coloured powders for candid shots","Natural haldi paste (not turmeric powder) is gentler on skin and photographs better"],
@@ -1000,8 +1858,30 @@ function buildAiTips(dayType: string, ctx: PlannerContext): string[] {
     mehendi: ["Full bridal design takes 3-4 hours — start the bride's mehendi first","Book 1 artist per 8-10 guests for a comfortable pace","Cone quality matters — always check artist's cone brand before booking","Create a cozy, intimate atmosphere — low seating, fairy lights, floor cushions","The darker the mehendi, the deeper the love — lemon juice + sugar solution helps"],
     wedding: ["The ceremony timing (muhurat) is sacred — confirm with your Pandit at least 2 months before","Golden Hour (5:30–6:30 PM) is the single most important photography window — protect it","Book your baraat DJ/band separately from the main evening entertainment","Have a coordinator whose only job is to manage vendor timings — not a family member",`${season === "monsoon" ? "⚠️ RAIN ALERT: Have a fully equipped indoor backup venue confirmed" : `${season} weddings in ${ctx.city ?? "India"} are beautiful — but have a generator backup confirmed`}`,"First dance song — practice it at least once before the wedding day"],
     reception:[`Reception in ${season} — perfect for an elegant evening celebration`,"Keep reception programme tight — maximum 3 hours of structured events, rest is free flow","Photo booth with props is a crowd favourite and great for candid shots","Arrange special dietary options — at least one vegan counter for urban guest lists","Coordinate with photographer on key shots: couple entry, first dance, cake cut, family groups"],
+    // HOUSEWARMING: Event-specific tips
+    housewarming: [`Confirm auspicious muhurat with your priest — typically 15-45 minutes for Griha Pravesh ritual in ${ctx.city ?? "your city"}`,"Home must be cleaned thoroughly before puja — consider professional cleaning 1-2 days before","Fresh flowers & rangoli materials should be purchased day-before to ensure freshness","Arrange for proper seating — guests should be comfortable, especially elders","Photography focus: puja moments, family gathering, first meal in new home — these are lasting memories",`In ${season}, ensure AC/ventilation is working properly for guest comfort`,"Prepare a welcome note/card for guests — personal touch for the new home",`Consider a small Griha Pravesh token/gift for guests — reflects blessings for the home`],
+    // BIRTHDAY: Event-specific tips
+    birthday: ["Book the cake minimum 5-7 days in advance — custom designs take time",`In ${season}, ensure cold storage is available for cake & desserts until serving time`,"Games & activities should be appropriate for all age groups attending",`Choose decorations matching the birthday person's interests — personalization makes it special`,"Photography should capture candid moments, not just posed shots — hire a photographer familiar with event photography","Music playlist balance — mix of current hits and favorites of the birthday person",`Have a small emergency kit: extra batteries, pain relief, first aid — always helpful at parties`],
+    // GENERIC DAY TYPES: Used across event types
+    preparation: [`Arrive early to set up in ${season} — allow extra time for weather challenges if needed`,`Confirm all vendor timings 1 week before — especially catering and setup teams`,"Have backup plan for any last-minute changes","Double-check all supplies & equipment are on-site","Test all audio/visual equipment & connectivity"],
+    ceremony: [` The ceremony timing is important — confirm all rituals & timings in advance`,`Golden Hour (5:30–6:30 PM) is the best for photography — protect this time if ceremony is outdoors`,"Have a coordinator managing vendor & guest flow — not a family member","Ensure proper seating & comfort for all guests","Have an emergency kit ready — first aid, tissues, water for guests"],
+    gathering: [` Guests should be comfortable — arrange proper seating & temperature control`,"Keep activities & entertainment flowing smoothly — have backup entertainment if needed",`Music & food service should match the event vibe — coordinate with caterer & DJ`,"Photography should capture candid moments — natural moments are best",`Have a small welcome/goodbye touch — thank guests for celebrating`],
+    celebration: [`Celebrations in ${season} require planning — outdoor events need weather backup`,"Entertainment & music should keep energy high but allow for conversations","Dessert/cake moment should be well-photographed — coordinate timing","Dance floor should have good music & space","Comfortable guest departure — arrange transportation if needed"],
+    ritual: [`Ritual timing is sacred — confirm with priest/specialist well in advance`,"Ritual items should be procured authentically — not last-minute substitutes",`Photography during ritual should be respectful & pre-approved by family`,"Have proper seating & comfort for elderly guests during longer rituals",`Music/chanting should be clear & audible — test audio system beforehand`],
   };
-  return tips[dayType] ?? tips.wedding;
+
+  // Provide generic fallback for any missing day types
+  if (!tips[dayType]) {
+    return [
+      `Event in ${season} — plan accordingly for weather and guest comfort`,
+      `Confirm all vendor timings 1 week before — especially catering and setup teams`,
+      `Have a coordinator whose only job is to manage vendor timings — not a family member`,
+      `Photography focus on key moments and guest candids — natural moments are best`,
+      `Music & entertainment should match the event vibe — coordinate with DJ/musician`,
+      `Have an emergency kit ready — first aid, batteries, pins, tape — always helpful`,
+    ];
+  }
+  return tips[dayType];
 }
 
 export function generateWeddingPlan(ctx: PlannerContext): WeddingPlan {

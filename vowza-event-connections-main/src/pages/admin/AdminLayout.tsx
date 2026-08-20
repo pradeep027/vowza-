@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { LogOut, ChevronLeft, Menu, Activity, Home,
   LayoutDashboard, Users, UserCheck, BookOpen, CreditCard,
   Tag, Star, Megaphone, Bell, BarChart3, Ticket, FileText,
-  Globe, HeadphonesIcon, Settings, Shield, ClipboardList, Image, Gift
+  Globe, HeadphonesIcon, Settings, Shield, ClipboardList, Image, Gift, Users as UsersIcon
 } from 'lucide-react';
 
 type NavigationItem = {
@@ -37,6 +37,7 @@ const NAV: NavigationItem[] = [
   { label: 'Support',        icon: HeadphonesIcon,  path: '/admin/support',       section: 'SERVICES' },
   { label: 'AI Planner',     icon: VowzaIcon,       path: '/admin/ai-planner',    section: 'SERVICES' },
   { label: 'CMS',            icon: Globe,           path: '/admin/cms',           section: 'SERVICES' },
+  { label: 'About Us',       icon: Users,           path: '/admin/about-us',      section: 'SERVICES' },
   { label: 'Settings',       icon: Settings,        path: '/admin/settings',      section: 'SYSTEM' },
   { label: 'Auth Promotion', icon: Image,           path: '/admin/auth-promotion',section: 'SYSTEM' },
   { label: 'Admins',         icon: Shield,          path: '/admin/admins',        section: 'SYSTEM', superOnly: true },

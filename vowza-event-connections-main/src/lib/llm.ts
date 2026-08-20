@@ -274,6 +274,21 @@ async function checkContextReadinessAndRespond(
 ): Promise<{ shouldContinue: boolean; response: SendResult | null }> {
   const readiness = calculateContextReadiness(context);
   
+  // ═══════════════════════════════════════════════════════════════════════════
+  // [TRACE 2] Log readiness calculation details
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('[TRACE 2 - Readiness Check]', {
+    contextEventType: context.eventType,
+    contextGuestCount: context.guestCount,
+    contextCity: context.city,
+    contextBudget: context.budget,
+    readinessScore: readiness.readiness,
+    isSufficient: readiness.isSufficient,
+    missingEssentials: readiness.missingEssentials,
+    nextQuestion: readiness.nextQuestion,
+    timestamp: new Date().toISOString(),
+  });
+  
   console.log('[Vowza AI Phase 4] Context readiness check:', {
     readiness: readiness.readiness,
     isSufficient: readiness.isSufficient,
@@ -283,6 +298,17 @@ async function checkContextReadinessAndRespond(
   // If context is insufficient, ask for the next essential field
   if (!readiness.isSufficient && readiness.nextQuestion) {
     const questionText = formatContextQuestion(readiness.nextQuestion, context);
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // [TRACE 3] Log question that will be shown
+    // ═══════════════════════════════════════════════════════════════════════════
+    console.log('[TRACE 3 - Question Being Asked]', {
+      nextQuestion: readiness.nextQuestion,
+      questionText: questionText.substring(0, 100),
+      contextEventType: context.eventType,
+      timestamp: new Date().toISOString(),
+    });
+    
     await streamDeterministic(questionText, onChunk);
     
     return {
@@ -363,6 +389,20 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   
   // Use the updated context from orchestration
   const contextToUse = orch.updatedContext || context;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // [TRACE 1] Log context after orchestration
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('[TRACE 1 - After Orchestration]', {
+    userMessage: message,
+    orchestrateIntent: orch.intent,
+    orchestrateUpdatedContextEventType: orch.updatedContext?.eventType,
+    orchestrateUpdatedContextGuestCount: orch.updatedContext?.guestCount,
+    contextToUseEventType: contextToUse.eventType,
+    contextToUseGuestCount: contextToUse.guestCount,
+    contextToUseCity: contextToUse.city,
+    timestamp: new Date().toISOString(),
+  });
 
   // Only enforce event-planning readiness for planning, not vendor discovery
   if (orch.intent !== 'find_vendors') {

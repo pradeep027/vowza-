@@ -125,6 +125,46 @@ const BUDGET_TEMPLATES: Record<EventCategory, BudgetCategoryTemplate[]> = {
     { category: 'Music (if applicable)', basePercentage: 5, minRange: 2, maxRange: 8, priority: 'low', required: false },
     { category: 'Contingency & Misc', basePercentage: 13, minRange: 8, maxRange: 18, priority: 'low', required: false },
   ],
+  
+  housewarming: [
+    { category: 'Pandit/Priest', basePercentage: 6, minRange: 4, maxRange: 10, priority: 'high', required: true },
+    { category: 'Catering', basePercentage: 40, minRange: 32, maxRange: 50, priority: 'high', required: true },
+    { category: 'Decoration & Flowers', basePercentage: 18, minRange: 12, maxRange: 25, priority: 'high', required: true },
+    { category: 'Pooja Items & Supplies', basePercentage: 8, minRange: 5, maxRange: 12, priority: 'high', required: true },
+    { category: 'Photography/Videography', basePercentage: 10, minRange: 6, maxRange: 15, priority: 'medium', required: false },
+    { category: 'Cleaning & Setup', basePercentage: 6, minRange: 3, maxRange: 10, priority: 'medium', required: true },
+    { category: 'Music/Entertainment (optional)', basePercentage: 4, minRange: 2, maxRange: 8, priority: 'low', required: false },
+    { category: 'Contingency & Misc', basePercentage: 8, minRange: 4, maxRange: 12, priority: 'low', required: false },
+  ],
+  
+  'babyshower': [
+    { category: 'Catering', basePercentage: 35, minRange: 28, maxRange: 45, priority: 'high', required: true },
+    { category: 'Decoration', basePercentage: 20, minRange: 14, maxRange: 28, priority: 'high', required: true },
+    { category: 'Cake/Desserts', basePercentage: 12, minRange: 8, maxRange: 18, priority: 'high', required: true },
+    { category: 'Games/Entertainment', basePercentage: 12, minRange: 8, maxRange: 18, priority: 'medium', required: false },
+    { category: 'Photography', basePercentage: 10, minRange: 6, maxRange: 15, priority: 'medium', required: false },
+    { category: 'Gifts/Favours for Guests', basePercentage: 6, minRange: 3, maxRange: 10, priority: 'low', required: false },
+    { category: 'Contingency & Misc', basePercentage: 5, minRange: 2, maxRange: 8, priority: 'low', required: false },
+  ],
+  
+  'college_event': [
+    { category: 'Venue', basePercentage: 25, minRange: 18, maxRange: 35, priority: 'high', required: true },
+    { category: 'AV/Sound/Lighting', basePercentage: 20, minRange: 14, maxRange: 28, priority: 'high', required: true },
+    { category: 'Catering/Refreshments', basePercentage: 25, minRange: 18, maxRange: 35, priority: 'high', required: true },
+    { category: 'Entertainment/Performers', basePercentage: 15, minRange: 10, maxRange: 22, priority: 'medium', required: false },
+    { category: 'Decoration', basePercentage: 8, minRange: 5, maxRange: 12, priority: 'low', required: false },
+    { category: 'Photography/Videography', basePercentage: 4, minRange: 2, maxRange: 8, priority: 'low', required: false },
+    { category: 'Contingency & Misc', basePercentage: 3, minRange: 2, maxRange: 5, priority: 'low', required: false },
+  ],
+  
+  'college_fest': [
+    { category: 'Venue', basePercentage: 20, minRange: 14, maxRange: 28, priority: 'high', required: true },
+    { category: 'AV/Sound/Lighting', basePercentage: 18, minRange: 12, maxRange: 25, priority: 'high', required: true },
+    { category: 'Catering', basePercentage: 25, minRange: 18, maxRange: 35, priority: 'high', required: true },
+    { category: 'Entertainment/Performers', basePercentage: 20, minRange: 14, maxRange: 28, priority: 'high', required: true },
+    { category: 'Decoration & Branding', basePercentage: 8, minRange: 5, maxRange: 12, priority: 'medium', required: false },
+    { category: 'Contingency & Misc', basePercentage: 9, minRange: 5, maxRange: 12, priority: 'low', required: false },
+  ],
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -222,8 +262,14 @@ export class EventBudgetPlanner {
   static allocate(context: PlannerContext): EventBudgetPlan {
     const { eventType, budget, guestCount, city, luxuryLevel } = context;
     
-    // Defaults for safety
-    const finalEventType = eventType ?? 'wedding';
+    // Validate required event type — no silent fallback to wedding
+    if (!eventType) {
+      throw new Error(
+        'Event type is required for budget planning. ' +
+        'Received undefined eventType. Please specify the event type (wedding, housewarming, birthday, etc.).'
+      );
+    }
+    
     const finalBudget = budget ?? 500000;
     const finalGuestCount = guestCount ?? 200;
     const finalCity = city ?? 'Hyderabad';
@@ -231,7 +277,7 @@ export class EventBudgetPlanner {
     
     // Use event-aware budget engine for intelligent allocation
     const engineContext: PlannerContext = {
-      eventType: finalEventType as EventCategory,
+      eventType: eventType as EventCategory,
       budget: finalBudget,
       guestCount: finalGuestCount,
       city: finalCity,
@@ -253,9 +299,9 @@ export class EventBudgetPlanner {
       maxAmount: a.allocatedAmount * 1.15,
       allocatedAmount: a.allocatedAmount,
       actualPercentage: a.percentage,
-      priority: this.getPriority(a.category, finalEventType),
-      required: this.isRequired(a.category, finalEventType),
-      reasoning: REASONING[a.category] ?? `Essential component for your ${finalEventType}`,
+      priority: this.getPriority(a.category, eventType),
+      required: this.isRequired(a.category, eventType),
+      reasoning: REASONING[a.category] ?? `Essential component for your ${eventType}`,
     }));
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
@@ -264,21 +310,21 @@ export class EventBudgetPlanner {
     // Merge warnings from budget pressure checks
     const feasibilityNotes = [
       ...engineResult.warnings,
-      ...this.generateFeasibilityNotes(finalEventType, finalBudget, finalGuestCount, finalCity),
+      ...this.generateFeasibilityNotes(eventType, finalBudget, finalGuestCount, finalCity),
     ];
 
     const isFeasible = feasibilityNotes.length === 0;
 
     // Generate recommendations
     const recommendations = this.generateRecommendations(
-      finalEventType,
+      eventType,
       finalGuestCount,
       remaining,
       engineResult.activatedCategories
     );
 
     return {
-      eventType: finalEventType,
+      eventType: eventType,
       city: finalCity,
       totalBudget: finalBudget,
       guestCount: finalGuestCount,

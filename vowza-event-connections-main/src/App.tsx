@@ -41,6 +41,7 @@ const TermsOfService       = lazy(() => import("./pages/TermsOfService"));
 const CategoryPage         = lazy(() => import("./pages/CategoryPage"));
 const CateringCartPage     = lazy(() => import("./pages/CateringCartPage"));
 const VendorEditProfile    = lazy(() => import("./pages/VendorEditProfile"));
+const About                = lazy(() => import("./pages/About"));
 
 // ─── Admin (new enterprise layout) ───────────────────────────────────────────
 const AdminLayout          = lazy(() => import("./pages/admin/AdminLayout"));
@@ -65,6 +66,7 @@ const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
 const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
 const AdminAuthPromotionalManager = lazy(() => import("./pages/admin/AdminAuthPromotionalManager"));
+const AdminAboutUs         = lazy(() => import("./pages/admin/AdminAboutUs"));
 
 // ─── Customer (user dashboard) ────────────────────────────────────────────────
 const CustomerLayout       = lazy(() => import("./pages/customer/CustomerLayout"));
@@ -155,6 +157,7 @@ const AppContent = () => {
           <Route path="/contact"    element={<Contact />} />
           <Route path="/privacy"    element={<PrivacyPolicy />} />
           <Route path="/terms"      element={<TermsOfService />} />
+          <Route path="/about"      element={<About />} />
           <Route path="/category/:slug" element={<CategoryPage />} />
           <Route path="/provider/:id" element={<ProviderProfile />} />
           <Route path="/artist/:id"   element={<ProviderProfile />} />
@@ -196,6 +199,7 @@ const AppContent = () => {
             <Route path="audit-logs"   element={<AdminAuditLogs />} />
             <Route path="system-health"element={<AdminSystemHealth />} />
             <Route path="auth-promotion" element={<AdminAuthPromotionalManager />} />
+            <Route path="about-us"   element={<AdminAboutUs />} />
           </Route>
 
           {/* ── Customer — CustomerLayout handles auth + customer-only role check internally ── */}

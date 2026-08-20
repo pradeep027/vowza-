@@ -286,7 +286,7 @@ function classifyIntent(
   // the word "plan". Vowza Planner should proactively generate a full plan
   // instead of asking "what would you like to know?".
   {
-    const mentionsEvent = /wedding|reception|engagement|haldi|mehendi|sangeet|birthday|housewarming|baby.shower|anniversary|corporate|conference|college|cultural|festival/i.test(l);
+    const mentionsEvent = /wedding|reception|engagement|haldi|mehendi|sangeet|birthday|housewarming|house\s*[-]?\s*warming|baby\s*[-]?\s*shower|anniversary|corporate|conference|collegefest|cultural|festival/i.test(l);
     const mentionsDetail = /₹|lakh|crore|\bguests?\b|\bpeople\b|\bpax\b|in\s+[A-Z][a-z]+/i.test(message);
     if (mentionsEvent && mentionsDetail && !/find|show|search|recommend|book|vendor|photographer|decorator|caterer|dj\b/i.test(l)) {
       return 'plan_event';
@@ -564,33 +564,43 @@ export function extractContextUpdates(
     [/\bwedding\b/i,'wedding'], [/\breception\b/i,'reception'],
     [/\bengagement\b/i,'engagement'], [/\bhaldi\b/i,'haldi'],
     [/\bmehendi\b|mehndi/i,'mehendi'], [/\bsangeet\b/i,'sangeet'],
-    [/\bbirthday\b/i,'birthday'], [/\bbaby.shower\b/i,'babyshower'],
-    [/house.warm/i,'housewarming'], [/\banniversary\b/i,'anniversary'],
+    [/\bbirthday\b/i,'birthday'], [/\bbaby\s*[-]?\s*shower\b/i,'babyshower'],
+    [/\bhouse\s*[-]?\s*warming\b/i,'housewarming'], [/\banniversary\b/i,'anniversary'],
     [/\bcorporate\b/i,'corporate'], [/\bconcert\b/i,'concert'],
-    [/\bparty\b/i,'privateparty'], [/\bnaming.ceremony\b/i,'housewarming'],
-    [/\bgruhapravesam\b/i,'housewarming'], [/\bconference\b/i,'conference'],
+    [/\bparty\b/i,'privateparty'], [/\bnam(?:ing|ing)\s*[-]?\s*ceremon[yi]\b/i,'housewarming'],
+    [/\bgrihapravesam\b/i,'housewarming'], [/\bgruhapravesam\b/i,'housewarming'],
+    [/\bgruh\s*[-]?\s*pravesam\b/i,'housewarming'], [/\bconference\b/i,'conference'],
+    [/\bproduct\s*[-]?\s*launch\b/i,'productlaunch'], [/\bexhibition\b/i,'exhibition'],
+    [/\bcollege\s*[-]?\s*(?:event|fest)\b/i,'collegefest'], [/\bdj\s*[-]?\s*night\b/i,'djnight'],
+    [/\bfashion\s*[-]?\s*show\b/i,'fashionshow'], [/\bsports?\s*[-]?\s*event\b/i,'sportsEvent'],
+    [/\btemple\b/i,'temple'], [/\bfestival\b/i,'festival'],
+    [/\bcharity\b/i,'charity'],
   ];
   for (const [re, et] of eventMap) {
-    if (re.test(l)) { updates.eventType = et as PlannerContext['eventType']; break; }
+    if (re.test(l)) { 
+      updates.eventType = et as PlannerContext['eventType'];
+      console.log('[E2E-TEST] Event extracted:', { message, regex: re.source, extractedEventType: et });
+      break;
+    }
   }
 
   // Style
   if (/\bluxury\b/i.test(l))         updates.luxuryLevel = 'luxury';
   else if (/\bpremium\b/i.test(l))   updates.luxuryLevel = 'premium';
-  else if (/budget.friendly|low.budget/i.test(l)) updates.luxuryLevel = 'budget';
+  else if (/\bbudget\s*[-]?\s*friendly\b|low\s*[-]?\s*budget/i.test(l)) updates.luxuryLevel = 'budget';
 
   // Venue type
   if (/\boutdoor\b/i.test(l))        updates.venueType = 'outdoor';
   else if (/\bindoor\b/i.test(l))    updates.venueType = 'indoor';
 
   // Food
-  if (/non.veg/i.test(l))            updates.foodPreference = 'non-veg';
+  if (/non\s*[-]?\s*veg\b/i.test(l))            updates.foodPreference = 'non-veg';
   else if (/\bveg\b/i.test(l))       updates.foodPreference = 'veg';
-  else if (/\bboth\b.*(veg|food)|veg.*non.veg/i.test(l)) updates.foodPreference = 'both';
+  else if (/\bboth\b\s*(?:veg|food)|veg\s*[-]?\s*non\s*[-]?\s*veg/i.test(l)) updates.foodPreference = 'both';
 
   // Service style
   if (/\bbuffet\b/i.test(l))         updates.serviceStyle = 'buffet';
-  else if (/table\s*service/i.test(l)) updates.serviceStyle = 'table_service';
+  else if (/\btable\s*[-]?\s*service\b/i.test(l)) updates.serviceStyle = 'table_service';
 
   // Time of day
   if (/\bmorning\b/i.test(l))        updates.timeOfDay = 'morning';
@@ -631,7 +641,7 @@ export function orchestrate(
   
   // ─── PHASE 2A: Extract and merge context intelligently ───────────────────
   const updates = extractContextUpdates(normalizedMessage, ctx);
-  const { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
+  let { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
   
   // ─── PHASE 2A: If ambiguous, include this in the result ──────────────────
   if (ambiguous) {

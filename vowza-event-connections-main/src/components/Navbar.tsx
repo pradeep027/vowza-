@@ -318,20 +318,37 @@ const Navbar = () => {
               </a>
 
               {user && (
-                <Link
-                  to="/my-bookings"
-                  className={cn(
-                    "group relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
-                    isActive("/my-bookings") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
-                  )}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  My Bookings
-                  <span className={cn(
-                    "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left transition-transform duration-250 ease-out",
-                    isActive("/my-bookings") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-                  )} />
-                </Link>
+                <>
+                  <Link
+                    to="/my-bookings"
+                    className={cn(
+                      "group relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
+                      isActive("/my-bookings") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
+                    )}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    My Bookings
+                    <span className={cn(
+                      "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left transition-transform duration-250 ease-out",
+                      isActive("/my-bookings") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                    )} />
+                  </Link>
+
+                  <Link
+                    to="/about"
+                    className={cn(
+                      "group relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] transition-colors duration-250 ease-out",
+                      isActive("/about") ? "text-maroon" : "text-foreground/85 hover:text-maroon"
+                    )}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    About Us
+                    <span className={cn(
+                      "absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left transition-transform duration-250 ease-out",
+                      isActive("/about") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                    )} />
+                  </Link>
+                </>
               )}
             </div>
 
@@ -539,6 +556,13 @@ const Navbar = () => {
                 </>
               ) : (
                 <div className="flex items-center gap-2">
+                  <Link
+                    to="/about"
+                    className="group relative px-4 py-2 rounded-lg text-[15px] font-semibold tracking-[0.01em] text-foreground/85 hover:text-maroon transition-colors duration-250 ease-out"
+                  >
+                    About Us
+                    <span className="absolute left-4 right-4 -bottom-0.5 h-[2px] rounded-full bg-gradient-maroon origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-250 ease-out" />
+                  </Link>
                   <Link to="/provider/register">
                     <button className="px-5 py-2 rounded-full text-[13px] font-bold bg-gradient-to-r from-[hsl(40,95%,56%)] to-[hsl(36,85%,44%)] text-[#1a1200] shadow-[0_2px_12px_hsl(40,95%,52%,0.35)] hover:shadow-[0_4px_20px_hsl(40,95%,52%,0.5)] hover:scale-[1.03] transition-all duration-200">
                       Join as Artist
@@ -655,6 +679,7 @@ const Navbar = () => {
               {user ? (
                 <>
                   <Link to="/my-bookings"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><BookOpen className="w-4 h-4" /> My Bookings</Link>
+                  <Link to="/about"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Users className="w-4 h-4" /> About Us</Link>
                   <Link to={dashboardLink} className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
                   {rolesLoaded && !isProvider && (
                     <Link to="/provider/register" className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
@@ -668,6 +693,7 @@ const Navbar = () => {
                 </>
               ) : (
                 <div className="pt-2">
+                  <Link to="/about"  className="flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Users className="w-4 h-4" /> About Us</Link>
                   <Link to="/auth">
                     <button className="w-full px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold border border-border text-foreground hover:text-maroon hover:border-maroon/30 hover:bg-secondary transition-colors duration-250 ease-out">
                       Sign in

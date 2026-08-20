@@ -95,6 +95,21 @@ export function calculateContextReadiness(context: PlannerContext): ReadinessRes
   const essentials = getEssentialQuestions();
   const missing = getMissingEssentialFields(context);
   
+  // ═══════════════════════════════════════════════════════════════════════════
+  // [TRACE 2-DETAIL] Log readiness calculation in detail
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('[TRACE 2-DETAIL - getMissingEssentialFields]', {
+    contextEventType: context.eventType,
+    contextGuestCount: context.guestCount,
+    contextCity: context.city,
+    contextBudget: context.budget,
+    essentialsCount: essentials.length,
+    essentialsFields: essentials.map(e => e.field),
+    missingCount: missing.length,
+    missingFields: missing.map(m => m.field),
+    timestamp: new Date().toISOString(),
+  });
+  
   const filled = essentials.length - missing.length;
   const readiness = Math.round((filled / essentials.length) * 100);
   
@@ -102,6 +117,16 @@ export function calculateContextReadiness(context: PlannerContext): ReadinessRes
   const isSufficient = readiness >= 100;
   
   const nextQuestion = missing.length > 0 ? missing[0] : undefined;
+  
+  console.log('[TRACE 2-DETAIL - Calculation Result]', {
+    essentialsCount: essentials.length,
+    filledCount: filled,
+    missingCount: missing.length,
+    readinessScore: readiness,
+    isSufficient,
+    nextQuestionField: nextQuestion?.field,
+    timestamp: new Date().toISOString(),
+  });
   
   return {
     readiness,

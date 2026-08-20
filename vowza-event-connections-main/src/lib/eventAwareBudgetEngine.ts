@@ -185,18 +185,6 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<EventCategory, Record<string, nu
     'Invitations': 3,
   },
 
-  // CORPORATE: Professional events (focus on AV/staging, less on catering than weddings)
-  corporate: {
-    'Venue Rental': 20,
-    'Catering': 25,
-    'AV/Staging/Lighting': 25,
-    'Photography': 12,
-    'Videography': 8,
-    'Anchor/Host': 5,
-    'Music/Entertainment': 3,
-    'Flowers': 2,
-  },
-
   // PRODUCTLAUNCH: Professional product showcase
   productlaunch: {
     'Venue Rental': 20,

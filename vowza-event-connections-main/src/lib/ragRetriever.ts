@@ -308,7 +308,7 @@ async function sqlSearch(
     .limit(limit);
 
   if (profession) {
-    q = q.ilike('profession', `%${profession}%`);
+    q = q.eq('profession', profession);
   }
   if (priceMax)   q = q.lte('price_min', priceMax);
   if (minRating)  q = q.gte('average_rating', minRating);
