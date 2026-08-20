@@ -248,11 +248,11 @@ export class EventBudgetPlanner {
     // Convert engine output to EventBudgetPlan format
     const allocations: BudgetAllocation[] = engineResult.allocations.map(a => ({
       category: a.category,
-      basePercentage: a.percentage,
+      basePercentage: a.actualPercentage,
       minAmount: a.allocatedAmount * 0.85, // 85-115% range for flexibility
       maxAmount: a.allocatedAmount * 1.15,
       allocatedAmount: a.allocatedAmount,
-      actualPercentage: a.percentage,
+      actualPercentage: a.actualPercentage,
       priority: this.getPriority(a.category, finalEventType),
       required: this.isRequired(a.category, finalEventType),
       reasoning: REASONING[a.category] ?? `Essential component for your ${finalEventType}`,
