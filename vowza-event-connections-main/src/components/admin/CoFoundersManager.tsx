@@ -239,43 +239,46 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
         return;
       }
 
-      // Calculate next display order safely
-      // If no co-founders exist, use 0
-      // Otherwise, find the max and add 1
-      let nextDisplayOrder = 0;
-      if (coFounders.length > 0) {
-        const maxOrder = Math.max(...coFounders.map((c) => c.display_order));
-        nextDisplayOrder = maxOrder + 1;
+      // Calculate next display order safely with defensive guards
+      // Collect all valid display_order values from existing co-founders
+      const displayOrders = coFounders
+        .map((c) => Number(c.display_order))
+        .filter((value) => Number.isFinite(value));
+
+      // Determine next order: max of existing + 1, or 0 if none exist
+      let nextDisplayOrder: number;
+      if (displayOrders.length > 0) {
+        nextDisplayOrder = Math.max(...displayOrders) + 1;
+      } else {
+        nextDisplayOrder = 0;
+      }
+
+      // CRITICAL: Validate that nextDisplayOrder is a valid finite number
+      if (!Number.isFinite(nextDisplayOrder)) {
+        throw new Error(`Invalid display_order calculated: ${nextDisplayOrder}`);
       }
 
       console.log("[CoFoundersManager] Add new co-founder:", {
         currentCoFounderCount: coFounders.length,
         maxAllowed: 6,
         calculatedDisplayOrder: nextDisplayOrder,
+        isValidNumber: Number.isFinite(nextDisplayOrder),
       });
 
-      console.log("[CoFoundersManager] Executing INSERT for new co-founder:", {
-        table: "about_team_members",
-        columns: {
-          name: "New Co-Founder",
-          role: "Co-Founder",
-          bio: "",
-          member_type: "co_founder",
-          display_order: nextDisplayOrder,
-          is_active: true,
-        }
-      });
+      const insertPayload = {
+        name: "New Co-Founder",
+        role: "Co-Founder",
+        bio: "",
+        member_type: "co_founder",
+        display_order: nextDisplayOrder as number, // Explicitly cast to number
+        is_active: true,
+      };
+
+      console.log("[CoFoundersManager] FINAL INSERT PAYLOAD:", insertPayload);
 
       const { data, error } = await supabase
         .from("about_team_members")
-        .insert({
-          name: "New Co-Founder",
-          role: "Co-Founder",
-          bio: "",
-          member_type: "co_founder",
-          display_order: nextDisplayOrder,
-          is_active: true,
-        })
+        .insert(insertPayload)
         .select()
         .single();
 

@@ -218,6 +218,12 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
       } else {
         // Create new founder
         // NOTE: Founder always gets display_order = 0
+        const displayOrderValue: number = 0;
+
+        if (!Number.isFinite(displayOrderValue)) {
+          throw new Error(`Invalid display_order calculated: ${displayOrderValue}`);
+        }
+
         console.log("[FounderManager] Executing INSERT:", {
           table: "about_team_members",
           columns: {
@@ -226,22 +232,26 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             bio,
             photo_url: photoUrl || null,
             member_type: "founder",
-            display_order: 0,
+            display_order: displayOrderValue,
             is_active: true,
           }
         });
 
+        const insertPayload = {
+          name: name.trim(),
+          role: role.trim(),
+          bio: bio.trim(),
+          photo_url: photoUrl || null,
+          member_type: "founder",
+          display_order: displayOrderValue as number,
+          is_active: true,
+        };
+
+        console.log("[FounderManager] FINAL INSERT PAYLOAD:", insertPayload);
+
         const { data, error } = await supabase
           .from("about_team_members")
-          .insert({
-            name: name.trim(),
-            role: role.trim(),
-            bio: bio.trim(),
-            photo_url: photoUrl || null,
-            member_type: "founder",
-            display_order: 0,
-            is_active: true,
-          })
+          .insert(insertPayload)
           .select()
           .single();
 
