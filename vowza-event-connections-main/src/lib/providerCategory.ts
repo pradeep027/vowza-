@@ -195,3 +195,34 @@ export function isDancer(provider: unknown): boolean {
       return n === 'dancer' || n === 'kuchipudi_dancer' || n === 'classical_dancer' || n === 'western_dancer' || n === 'hip_hop_dancer' || n === 'contemporary_dancer';
     });
 }
+
+/** Canonical category gate for photographers and videographers (merged category). */
+export function isPhotographyOrVideography(provider: unknown): boolean {
+  if (!provider || typeof provider !== 'object') return false;
+  const row = provider as Record<string, unknown>;
+  const details = (row.vendor_details ?? row.category_details ?? {}) as Record<string, unknown>;
+  
+  // Check for explicit merged category
+  const isMerged = [row.profession, row.category, row.category_name, details.category, details.category_name, details.profession]
+    .some(value => {
+      const n = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+      return n === 'photography_videography' || n === 'photography_and_videography';
+    });
+  
+  return isMerged || isPhotographer(provider) || isVideographer(provider) || isDroneOperator(provider);
+}
+
+/** Check if provider offers only photography services. */
+export function isPhotographyOnly(provider: unknown): boolean {
+  return isPhotographer(provider) && !isVideographer(provider) && !isDroneOperator(provider);
+}
+
+/** Check if provider offers only videography services. */
+export function isVideographyOnly(provider: unknown): boolean {
+  return isVideographer(provider) && !isPhotographer(provider) && !isDroneOperator(provider);
+}
+
+/** Check if provider offers both photography and videography services. */
+export function isPhotographyAndVideography(provider: unknown): boolean {
+  return isPhotographer(provider) && isVideographer(provider);
+}

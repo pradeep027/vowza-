@@ -14,6 +14,7 @@ import WaterPackageManager from './WaterPackageManager';
 import PhotographerPackageManager from './PhotographerPackageManager';
 import CateringPackageManager from './CateringPackageManager';
 import VideographyPackageManager from './VideographyPackageManager';
+import PhotoVideoPackageManager from './PhotoVideoPackageManager';
 import DronePackageManager from './DronePackageManager';
 import DJPackageManager from './DJPackageManager';
 import DecoratorPackageManager from './DecoratorPackageManager';
@@ -26,7 +27,7 @@ import PriestPackageManager from './PriestPackageManager';
 import BandPackageManager from './BandPackageManager';
 import SingerPackageManager from './SingerPackageManager';
 import DancerPackageManager from './DancerPackageManager';
-import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isSinger, isDancer } from '@/lib/providerCategory';
+import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isSinger, isDancer, isPhotographyOrVideography } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
   silver:  { icon: Package, gradient: 'from-gray-400 to-gray-600' },
@@ -60,6 +61,10 @@ export default function VendorPackages() {
   // the original Services & Packages experience below without any changes.
   if (isWaterSupplier(provider)) {
     return <WaterPackageManager provider={provider} />;
+  }
+  // Combined Photography & Videography (must check before individual photographer/videographer)
+  if (isPhotographyOrVideography(provider) && provider?.profession === 'photography_videography') {
+    return <PhotoVideoPackageManager provider={provider} />;
   }
   if (isPhotographer(provider)) {
     return <PhotographerPackageManager provider={provider} />;
