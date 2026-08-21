@@ -12,11 +12,10 @@ import { cn } from '@/lib/utils';
 import {
   CheckCircle, ArrowLeft, ArrowRight, User,
   Briefcase, Image as ImageIcon, Shield, Eye,
-  Camera, X, Upload, RefreshCw, Phone, Mail,
+  X, Upload, RefreshCw, Phone, Mail,
   MapPin, Languages, ChevronDown, Loader2,
   FileText, Instagram, Globe, Star
 } from 'lucide-react';
-import FaceLivenessVerification from '@/components/FaceLivenessVerification';
 import DocumentUploadCard from '@/components/DocumentUploadCard';
 import { validateFullName, validateEmail, validateTownCity, validateArea, validatePincode, validateDescription } from '@/utils/validation';
 import type { VerificationResult } from '@/utils/documentVerification';
@@ -55,8 +54,7 @@ const STEPS = [
   { id: 2, label: 'Professional',   icon: Briefcase },
   { id: 3, label: 'Portfolio',      icon: ImageIcon },
   { id: 4, label: 'Verification',   icon: Shield    },
-  { id: 5, label: 'Human Check',    icon: Camera    },
-  { id: 6, label: 'Review',         icon: Eye       },
+  { id: 5, label: 'Review',         icon: Eye       },
 ];
 
 // ── Reusable field wrapper ─────────────────────────────────────────────────────
@@ -111,33 +109,17 @@ export default function ProviderRegistration() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
-  const [livenessVerified, setLivenessVerified] = useState(false);
-  const [livenessSessionId, setLivenessSessionId] = useState('');
-  const [cameraOpen, setCameraOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream|null>(null);
   const portfolioRef = useRef<HTMLInputElement>(null);
 
-  // Face detection refs and state for Identity Selfie
-  const faceMeshRef = useRef<any>(null);
-  const animFrameRef = useRef<number>(0);
-  const [faceQualityOk, setFaceQualityOk] = useState(false);
-  const [faceStatus, setFaceStatus] = useState<string>('');
-
   useEffect(() => {
     if (!loading && !user) navigate('/auth');
     // Prefill email from auth (only if not already filled in from a restored session)
     if (user?.email) setS1(p => (p.email ? p : { ...p, email: user.email ?? '' }));
   }, [user, loading, navigate]);
-
-  // Cleanup face detection resources on unmount
-  useEffect(() => {
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, []);
 
   // ── OTP (simulated — wire to real SMS provider in production) ────────────────
   const sendOTP = async () => {
@@ -157,120 +139,6 @@ export default function ProviderRegistration() {
     } else {
       toast.error('Incorrect OTP. Please try again.');
     }
-  };
-
-  // ── Validate face quality using brightness-based check ─────────────────────
-  const validateFaceQuality = (videoElement: HTMLVideoElement): { valid: boolean; message: string } => {
-    // Simple brightness-based validation since MediaPipe CDN is unreliable
-    // We check if the video frame has reasonable content (not dark/blank)
-    if (!videoElement || videoElement.readyState < 2) {
-      return { valid: false, message: '⏳ Loading camera...' };
-    }
-    
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 100;
-      canvas.height = 100;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return { valid: true, message: '✓ Ready to capture' };
-      
-      ctx.drawImage(videoElement, 0, 0, 100, 100);
-      const imageData = ctx.getImageData(0, 0, 100, 100);
-      const data = imageData.data;
-      
-      // Calculate average brightness (0-255)
-      let sum = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
-      }
-      const average = sum / (data.length / 4);
-      
-      // Validation logic:
-      // - Too dark (< 35): Camera blocked or no lighting
-      // - Too bright (> 235): Blank/white frame or flash
-      // - Valid range (35-235): Good content, likely a face
-      if (average < 35) {
-        return { valid: false, message: '⚠️ Camera is too dark. Check lighting.' };
-      }
-      if (average > 235) {
-        return { valid: false, message: '⚠️ Camera is too bright. Step back.' };
-      }
-      
-      return { valid: true, message: '✓ Camera ready. Click Capture.' };
-    } catch (err) {
-      console.error('Face validation error:', err);
-      return { valid: true, message: '✓ Ready to capture' };
-    }
-  };
-
-  // ── Initialize continuous face detection ────────────────────────────────────
-  const initializeFaceDetection = () => {
-    if (!videoRef.current) return;
-
-    // Start continuous brightness validation loop
-    const detect = () => {
-      if (videoRef.current) {
-        const validation = validateFaceQuality(videoRef.current);
-        setFaceQualityOk(validation.valid);
-        setFaceStatus(validation.message);
-      }
-      animFrameRef.current = requestAnimationFrame(detect);
-    };
-    
-    detect();
-  };
-
-  // ── Camera (front-facing selfie with face detection) ────────────────────────
-  const openCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      streamRef.current = stream;
-      setCameraOpen(true);
-      setFaceQualityOk(false);
-      setFaceStatus('🔄 Loading face detection...');
-      
-      setTimeout(async () => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          // Initialize face detection after video starts
-          try {
-            await initializeFaceDetection();
-          } catch (err) {
-            console.error('Face detection init error:', err);
-          }
-        }
-      }, 100);
-    } catch {
-      toast.error('Camera access denied. Please allow camera permission and try again.');
-    }
-  };
-
-  const capturePhoto = () => {
-    // Button is only enabled when validation passes, so safe to capture directly
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const ctx = canvasRef.current.getContext('2d')!;
-    canvasRef.current.width  = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    ctx.drawImage(videoRef.current, 0, 0);
-    canvasRef.current.toBlob(blob => {
-      if (!blob) { toast.error('Failed to capture. Try again.'); return; }
-      const url = URL.createObjectURL(blob);
-      setS2(p => ({ ...p, selfieUrl: url, selfieBlob: blob }));
-      closeCamera();
-      toast.success('✅ Selfie captured ✓');
-    }, 'image/jpeg', 0.85);
-  };
-
-  const closeCamera = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (faceMeshRef.current) faceMeshRef.current = null;
-    setCameraOpen(false);
-    setFaceQualityOk(false);
-    setFaceStatus('');
   };
 
   // ── Portfolio upload ───────────────────────────────────────────────────────
@@ -307,11 +175,10 @@ export default function ProviderRegistration() {
       }
       case 3: return s3.portfolioFiles.length >= 2;
       case 4: return !!(s4.aadhaarStatus === 'verified' && (s4.panStatus === 'idle' || s4.panStatus === 'verified') && (s4.govtIdStatus === 'idle' || s4.govtIdStatus === 'verified') && s4.termsAccepted && s4.aadhaarStatus !== 'processing' && s4.panStatus !== 'processing');
-      case 5: return livenessVerified;
-      case 6: return true;
+      case 5: return true;
       default: return false;
     }
-  }, [step, s1, s2, s3, s4, livenessVerified]);
+  }, [step, s1, s2, s3, s4]);
 
   /** Active validation — shows errors and toasts, called on Continue click */
   const validateCurrentStep = useCallback((): boolean => {
@@ -361,11 +228,7 @@ export default function ProviderRegistration() {
         if (!s4.termsAccepted) errors.terms = 'Please accept the terms and conditions';
         break;
       }
-      case 5: {
-        if (!livenessVerified) errors.liveness = 'Please complete face verification';
-        break;
-      }
-      case 6: return true;
+      case 5: return true;
     }
 
     setValidationErrors(errors);
@@ -375,7 +238,7 @@ export default function ProviderRegistration() {
       return false;
     }
     return true;
-  }, [step, s1, s2, s3, s4, livenessVerified]);
+  }, [step, s1, s2, s3, s4]);
 
   const canProceed = isStepValid;
 
@@ -436,10 +299,6 @@ export default function ProviderRegistration() {
         social_links: { instagram: s3.instagram, website: s3.website },
         verification_status: 'pending',
         onboarding_completed: true,
-        liveness_verified: livenessVerified,
-        liveness_verified_at: livenessVerified ? new Date().toISOString() : null,
-        liveness_session_id: livenessSessionId || null,
-        liveness_provider: 'mediapipe_face_mesh',
         vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, pan_url: panUrl, govt_id_url: govtIdUrl, address: s1.address },
       } as any);
       if (error && error.code !== '23505') throw error;
@@ -548,8 +407,7 @@ export default function ProviderRegistration() {
           {step === 2 && <Step2Form s2={s2} setS2={setS2} openCamera={openCamera} retake={() => { setS2(p => ({...p, selfieUrl:null, selfieBlob:null})); openCamera(); }} />}
           {step === 3 && <Step3Form s3={s3} portfolioRef={portfolioRef} handlePortfolio={handlePortfolio} removePortfolio={removePortfolio} setS3={setS3} />}
           {step === 4 && <Step4Form s4={s4} setS4={setS4} />}
-          {step === 5 && <FaceLivenessVerification onVerified={(sid) => { setLivenessVerified(true); setLivenessSessionId(sid); }} />}
-          {step === 6 && <Step5Review s1={s1} s2={s2} s3={s3} s4={s4} goTo={setStep} />}
+          {step === 5 && <Step5Review s1={s1} s2={s2} s3={s3} s4={s4} goTo={setStep} />}
         </div>
 
         {/* Navigation */}
