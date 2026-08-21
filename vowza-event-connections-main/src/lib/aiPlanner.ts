@@ -913,9 +913,14 @@ export async function processMessage(
   // ── Context update acknowledgement ───────────────────────────────────────
   if (result.intent === 'context_update') {
     const changed: string[] = [];
-    const up = updates;  // Use the updates we extracted
+    // Compute diffs between original and updated context
+    const up: Partial<PlannerContext> = {};
+    if (finalContext.city !== context.city && finalContext.city) up.city = finalContext.city;
+    if (finalContext.budget !== context.budget && finalContext.budget) up.budget = finalContext.budget;
+    if (finalContext.guestCount !== context.guestCount && finalContext.guestCount) up.guestCount = finalContext.guestCount;
+    if (finalContext.eventType !== context.eventType && finalContext.eventType) up.eventType = finalContext.eventType;
     if (up.city)       changed.push(`city → **${up.city}**`);
-    if (up.budget)     changed.push(`budget → **${fmt(up.budget!)}**`);
+    if (up.budget)     changed.push(`budget → **${fmt(up.budget)}**`);
     if (up.guestCount) changed.push(`guests → **${up.guestCount}**`);
     if (up.eventType)  changed.push(`event → **${up.eventType}**`);
     const summary = changed.length
