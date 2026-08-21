@@ -857,7 +857,7 @@ export async function processMessage(
   
   // Use the updated context from orchestrate (already merged and validated)
   const finalContext = result.updatedContext || context;
-  const ambiguous = (result as any).ambiguousChange ?? false;
+  const ambiguous = result.ambiguousChange ?? false;
 
   // ── If ambiguous change, ask for clarification ──────────────────────────
   if (ambiguous) {
