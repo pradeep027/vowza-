@@ -236,7 +236,7 @@ function classifyIntent(
   // marketplace request ("Actually, show me photographers instead").
   const switchesMarketplaceRequest = detectProfessions(message).length > 0
     && /find|show|search|recommend|suggest|list|profiles?|vendors?|providers?|available|book|hire|looking for|need/i.test(l);
-  if (/change|update|modify|make it|instead|actually|correction|not \w+|switch to/i.test(l) && !switchesMarketplaceRequest) {
+  if (/change|update|modify|make it|instead|actually|correction|not \w+|switch to|increase|decrease|raise|lower|reduce|bump|up to|down to/i.test(l) && !switchesMarketplaceRequest) {
     return 'context_update';
   }
 
@@ -275,8 +275,28 @@ function classifyIntent(
     }
   }
 
-  // Planning
-  if (/(plan|full plan|complete plan|plan everything|plan my|plan a .+? for|wedding plan|create plan)/i.test(l)
+  // Budget — check BEFORE plan_event so "budget" keywords are not swallowed
+  if (/(budget|cost breakdown|how much|afford|₹|lakh|crore|estimate|quote|price list)/i.test(l)) {
+    return 'budget_breakdown';
+  }
+
+  // Timeline — check BEFORE plan_event so "timeline" is not swallowed by "plan"
+  if (/(timeline|schedule|when to|months before|planning schedule|what to do when)/i.test(l)) {
+    return 'timeline';
+  }
+
+  // Checklist — check BEFORE plan_event
+  if (/(checklist|to.do|what.* need|prepare|things to arrange|list of)/i.test(l)) {
+    return 'checklist';
+  }
+
+  // Food — check BEFORE plan_event so "plan the food" hits food_plan
+  if (/(food|catering|menu|per plate|buffet|veg|non.veg|cuisine)/i.test(l)) {
+    return 'food_plan';
+  }
+
+  // Planning — AFTER specific intents so it only catches generic "plan my wedding" etc.
+  if (/(\bplan\b|full plan|complete plan|plan everything|plan my|plan a .+? for|wedding plan|create plan)/i.test(l)
       && !/(budget|cost breakdown|how much|afford|₹|lakh|crore|estimate|quote|price list)/i.test(l)) {
     return 'plan_event';
   }
@@ -291,26 +311,6 @@ function classifyIntent(
     if (mentionsEvent && mentionsDetail && !/find|show|search|recommend|book|vendor|photographer|decorator|caterer|dj\b/i.test(l)) {
       return 'plan_event';
     }
-  }
-
-  // Budget
-  if (/(budget|cost breakdown|how much|afford|₹|lakh|crore|estimate|quote|price list)/i.test(l)) {
-    return 'budget_breakdown';
-  }
-
-  // Timeline
-  if (/(timeline|schedule|when to|months before|planning schedule|what to do when)/i.test(l)) {
-    return 'timeline';
-  }
-
-  // Checklist
-  if (/(checklist|to.do|what.* need|prepare|things to arrange|list of)/i.test(l)) {
-    return 'checklist';
-  }
-
-  // Food
-  if (/(food|catering|menu|per plate|buffet|veg|non.veg|cuisine)/i.test(l)) {
-    return 'food_plan';
   }
 
   // Weather
@@ -547,8 +547,9 @@ export function extractContextUpdates(
   const budget = extractBudget(message);
   if (budget) updates.budget = budget;
 
-  // Guest count
-  const gm = message.match(/(\d+)\s*(?:guests?|people|pax|persons?|attendees?|heads?)/i);
+  // Guest count — supports both "500 guests" and "guest count to 500"
+  const gm = message.match(/(\d+)\s*(?:guests?|people|pax|persons?|attendees?|heads?)/i)
+    ?? message.match(/(?:guest\s*count|expect(?:ed)?|about|around|with|having|total)\s*(?:of\s*)?(?:to\s*)?(?:about\s*)?(?:around\s*)?(\d+)/i);
   if (gm) updates.guestCount = parseInt(gm[1]);
 
   // City
