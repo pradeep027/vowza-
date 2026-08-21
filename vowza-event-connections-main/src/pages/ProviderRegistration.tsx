@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import {
   CheckCircle, ArrowLeft, ArrowRight, User,
   Briefcase, Image as ImageIcon, Shield, Eye,
-  X, Upload, RefreshCw, Phone, Mail,
+  Camera, X, Upload, RefreshCw, Phone, Mail,
   MapPin, Languages, ChevronDown, Loader2,
   FileText, Instagram, Globe, Star
 } from 'lucide-react';
@@ -109,6 +109,7 @@ export default function ProviderRegistration() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -139,6 +140,45 @@ export default function ProviderRegistration() {
     } else {
       toast.error('Incorrect OTP. Please try again.');
     }
+  };
+
+  // ── Camera (front-facing selfie for Step 2) ────────────────────────────────
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      setTimeout(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      }, 100);
+    } catch {
+      toast.error('Camera access denied. Please allow camera permission and try again.');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const ctx = canvasRef.current.getContext('2d')!;
+    canvasRef.current.width  = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    ctx.drawImage(videoRef.current, 0, 0);
+    canvasRef.current.toBlob(blob => {
+      if (!blob) { toast.error('Failed to capture. Try again.'); return; }
+      const url = URL.createObjectURL(blob);
+      setS2(p => ({ ...p, selfieUrl: url, selfieBlob: blob }));
+      closeCamera();
+      toast.success('✅ Selfie captured ✓');
+    }, 'image/jpeg', 0.85);
+  };
+
+  const closeCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
   };
 
   // ── Portfolio upload ───────────────────────────────────────────────────────
