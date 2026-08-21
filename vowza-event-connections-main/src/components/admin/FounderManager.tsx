@@ -11,6 +11,7 @@ interface Founder {
   role: string;
   bio: string;
   photo_url?: string;
+  linkedin_url?: string;
 }
 
 interface FounderManagerProps {
@@ -22,6 +23,7 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
   const [name, setName] = useState(founder?.name || "");
   const [role, setRole] = useState(founder?.role || "Founder & CEO");
   const [bio, setBio] = useState(founder?.bio || "");
+  const [linkedinUrl, setLinkedinUrl] = useState(founder?.linkedin_url || "");
   const [photoUrl, setPhotoUrl] = useState(founder?.photo_url || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -32,6 +34,7 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
       setName(founder.name);
       setRole(founder.role);
       setBio(founder.bio);
+      setLinkedinUrl(founder.linkedin_url || "");
       setPhotoUrl(founder.photo_url || "");
       setPhotoPreview(founder.photo_url || "");
     }
@@ -199,6 +202,7 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             role: role.trim(),
             bio: bio.trim(),
             photo_url: photoUrl || null,
+            linkedin_url: linkedinUrl?.trim() || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", founder.id);
@@ -244,6 +248,7 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
           photo_url: photoUrl || null,
           member_type: "founder",
           display_order: displayOrderValue as number,
+          linkedin_url: linkedinUrl?.trim() || null,
           is_active: true,
         };
 
@@ -373,6 +378,20 @@ export function FounderManager({ founder, onSave }: FounderManagerProps) {
             placeholder="Founder bio..."
             rows={4}
             className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538] resize-none"
+          />
+        </div>
+
+        {/* LinkedIn URL */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            LinkedIn URL (Optional)
+          </label>
+          <input
+            type="url"
+            value={linkedinUrl}
+            onChange={(e) => setLinkedinUrl(e.target.value)}
+            placeholder="https://www.linkedin.com/in/username"
+            className="w-full px-4 py-2 rounded-lg border border-border/60 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
           />
         </div>
 

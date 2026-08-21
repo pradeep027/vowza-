@@ -22,6 +22,7 @@ interface CoFounder {
   role: string;
   bio: string;
   photo_url?: string;
+  linkedin_url?: string;
   display_order: number;
   is_active: boolean;
 }
@@ -198,6 +199,7 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
           role: formData.role?.trim(),
           bio: formData.bio?.trim() || "",
           photo_url: formData.photo_url || null,
+          linkedin_url: formData.linkedin_url?.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingId);
@@ -232,9 +234,9 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     try {
       setIsSaving(true);
 
-      // Check if we already have 6 co-founders
-      if (coFounders.length >= 6) {
-        toast.error("Maximum 6 co-founders allowed");
+      // Check if we already have 8 co-founders
+      if (coFounders.length >= 8) {
+        toast.error("Maximum 8 co-founders allowed");
         setIsSaving(false);
         return;
       }
@@ -270,7 +272,8 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
         role: "Co-Founder",
         bio: "",
         member_type: "co_founder",
-        display_order: nextDisplayOrder as number, // Explicitly cast to number
+        display_order: nextDisplayOrder as number,
+        linkedin_url: null,
         is_active: true,
       };
 
@@ -413,7 +416,7 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
       <div className="space-y-6 bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-6">
         <div>
           <h3 className="text-xl font-semibold text-foreground mb-4">
-            Co-Founders ({coFounders.length}/6)
+            Co-Founders ({coFounders.length}/8)
           </h3>
           <p className="text-muted-foreground mb-4">
             No co-founders added yet.
@@ -435,7 +438,7 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
     <div className="space-y-6 bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-6">
       <div>
         <h3 className="text-xl font-semibold text-foreground mb-4">
-          Co-Founders ({coFounders.length}/6)
+          Co-Founders ({coFounders.length}/8)
         </h3>
 
         {/* Co-Founders List */}
@@ -528,6 +531,22 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
                       }
                       rows={2}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-border/60 bg-background resize-none"
+                    />
+                  </div>
+
+                  {/* LinkedIn URL */}
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      LinkedIn URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.linkedin_url || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, linkedin_url: e.target.value })
+                      }
+                      placeholder="https://www.linkedin.com/in/username"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-border/60 bg-background"
                     />
                   </div>
 
@@ -638,7 +657,7 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
         </div>
 
         {/* Add New Button */}
-        {coFounders.length < 6 && (
+        {coFounders.length < 8 && (
           <Button
             onClick={handleAddCoFounder}
             disabled={isSaving}
@@ -650,9 +669,9 @@ export function CoFoundersManager({ coFounders, onRefresh }: CoFoundersManagerPr
           </Button>
         )}
 
-        {coFounders.length >= 6 && (
+        {coFounders.length >= 8 && (
           <p className="text-sm text-muted-foreground">
-            Maximum 6 co-founders reached.
+            Maximum 8 co-founders reached.
           </p>
         )}
       </div>

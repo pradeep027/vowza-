@@ -181,7 +181,8 @@ export default function AdminAboutUs() {
         <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
           <li>Changes are published immediately to the public About page</li>
           <li>Photos must be JPG, PNG, or WebP format (max 5MB)</li>
-          <li>Maximum 1 founder and 6 co-founders</li>
+          <li>Maximum 1 founder and 8 co-founders</li>
+          <li>LinkedIn URLs are optional for founder and co-founders</li>
           <li>Use the visibility toggle to show/hide co-founders without deleting</li>
           <li>Reorder team members using the arrow buttons</li>
         </ul>
