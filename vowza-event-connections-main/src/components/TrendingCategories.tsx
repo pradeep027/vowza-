@@ -8,8 +8,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
-  Camera,          // Photographers
-  Video,           // Videographers
+  Camera,          // Photography & Videography (merged)
   Guitar,          // Bands
   Disc3,           // DJs
   Mic,             // Singers
@@ -27,7 +26,7 @@ import {
 } from "lucide-react";
 import { useCategories } from "@/hooks/useArtists";
 
-// ── 19 canonical categories — module scope, never re-created ─────────────────
+// ── 18 canonical categories (merged photography & videography) — module scope ─
 interface CategoryDef {
   id:    string;                        // slug used for DB query
   name:  string;                        // display label
@@ -39,29 +38,15 @@ interface CategoryDef {
   types: string[];
 }
 
-// Custom photographer icon component using the provided PNG
-const PhotographerIcon = ({ className }: { className?: string }) => (
-  <img src="/images/wedding-photography.jpg" alt="" className={`${className} object-cover rounded-lg`} />
-);
-
 const CATEGORIES: CategoryDef[] = [
   {
-    id:    "photographer",
-    name:  "Photographers",
-    icon:  PhotographerIcon as any,
+    id:    "photography-videography",
+    name:  "📸🎥 Photography & Videography",
+    icon:  Camera,
     color: "bg-rose-50 dark:bg-rose-950/40",
     text:  "text-rose-600 dark:text-rose-400",
     ring:  "ring-rose-200 dark:ring-rose-800",
-    types: ["photographer"],
-  },
-  {
-    id:    "videographer",
-    name:  "Videographers",
-    icon:  Video,
-    color: "bg-pink-50 dark:bg-pink-950/40",
-    text:  "text-pink-600 dark:text-pink-400",
-    ring:  "ring-pink-200 dark:ring-pink-800",
-    types: ["videographer","cinematographer"],
+    types: ["photographer", "videographer", "cinematographer", "photography_videography"],
   },
   {
     id:    "drone_operator",
@@ -196,7 +181,7 @@ const CATEGORIES: CategoryDef[] = [
 interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }
 
 const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {
-  const isPhotographer = cat.id === 'photographer';
+  const hasImage = ['photography-videography', 'catering_services', 'drone_operator', 'music_band', 'dj', 'makeup_artist', 'anchor', 'mehendi_artist', 'singer', 'wedding_decorator', 'dancer', 'banquet_hall', 'rentals', 'pandit', 'water_supplier'].includes(cat.id);
 
   return (
   <motion.button
@@ -221,13 +206,9 @@ const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {
     <span className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 ${cat.color} blur-2xl scale-150 pointer-events-none`} />
 
     {/* Icon / Image */}
-    {isPhotographer ? (
+    {cat.id === 'photography-videography' ? (
       <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-        <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photographers" className="w-full h-full object-cover" />
-      </div>
-    ) : cat.id === 'videographer' ? (
-      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-        <img src="/images/VIDEOGRAPHY MAIN.jpg" alt="Videographers" className="w-full h-full object-cover" />
+        <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photography & Videography" className="w-full h-full object-cover" />
       </div>
     ) : cat.id === 'catering_services' ? (
       <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">

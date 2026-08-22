@@ -18,11 +18,12 @@ import AppLogo from "@/components/AppLogo";
 import { useArtists } from "@/hooks/useArtists";
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
-import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isDancer, isSinger } from "@/lib/providerCategory";
+import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isDancer, isSinger, isPhotographyOrVideography } from "@/lib/providerCategory";
 import WaterSupplyMenu from "@/components/WaterSupplyMenu";
 import PhotographerPackages from "@/components/PhotographerPackages";
 import CateringMenu from "@/components/CateringMenu";
 import VideographyMenu from "@/components/VideographyMenu";
+import UnifiedPhotographyVideographyMenu from "@/components/UnifiedPhotographyVideographyMenu";
 import DroneMenu from "@/components/DroneMenu";
 import DJMenu from "@/components/DJMenu";
 import DecoratorMenu from "@/components/DecoratorMenu";
@@ -305,7 +306,20 @@ const ProviderProfile = () => {
                     {provider.is_featured && <span className="badge-featured">⭐ Featured</span>}
                     {provider.instant_booking && <span className="badge-instant"><Zap className="w-3 h-3" />Instant</span>}
                   </div>
-                  <p className="text-muted-foreground font-medium text-sm mb-2">{professionLabels[provider.profession] || provider.profession}{provider.subcategory ? ` · ${provider.subcategory}` : ""}</p>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <p className="text-muted-foreground font-medium text-sm">
+                      {isPhotographyOrVideography(provider) && provider?.profession === 'photography_videography' 
+                        ? '📸🎥 Photography & Videography' 
+                        : professionLabels[provider.profession] || provider.profession}
+                      {provider.subcategory ? ` · ${provider.subcategory}` : ""}
+                    </p>
+                    {isPhotographyOrVideography(provider) && provider?.profession === 'photography_videography' && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="badge-gold">📸 Photography</span>
+                        <span className="badge-gold">🎥 Videography</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     {profile.city && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{profile.city}{profile.area ? `, ${profile.area}` : ""}</span>}
                     <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{(provider.average_rating || 0).toFixed(1)} ({provider.total_reviews || 0} reviews)</span>
@@ -424,7 +438,7 @@ const ProviderProfile = () => {
               )}
 
               {/* ── PACKAGES TAB ── */}
-              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplyMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : isVideographer(provider) ? <VideographyMenu provider={provider} profile={profile} /> : isDroneOperator(provider) ? <DroneMenu provider={provider} profile={profile} /> : isDJ(provider) ? <DJMenu provider={provider} profile={profile} /> : isDecorator(provider) ? <DecoratorMenu provider={provider} profile={profile} /> : isMakeupArtist(provider) ? <MakeupMenu provider={provider} profile={profile} /> : isMehendiArtist(provider) ? <MehendiMenu provider={provider} profile={profile} /> : isAnchor(provider) ? <AnchorMenu provider={provider} profile={profile} /> : isBanquetHall(provider) ? <BanquetHallMenu provider={provider} profile={profile} /> : isRentalService(provider) ? <RentalMenu provider={provider} profile={profile} /> : isPriest(provider) ? <PriestMenu provider={provider} profile={profile} /> : isBand(provider) ? <BandMenu provider={provider} profile={profile} /> : isDancer(provider) ? <DancerMenu provider={provider} profile={profile} /> : isSinger(provider) ? <SingerMenu provider={provider} profile={profile} /> : (
+              {activeTab === "packages" && (isWaterSupplier(provider) ? <WaterSupplyMenu provider={provider} profile={profile} /> : isPhotographyOrVideography(provider) && provider?.profession === 'photography_videography' ? <UnifiedPhotographyVideographyMenu provider={provider} profile={profile} /> : isPhotographer(provider) ? <PhotographerPackages provider={provider} profile={profile} /> : isCaterer(provider) ? <CateringMenu provider={provider} profile={profile} /> : isVideographer(provider) ? <VideographyMenu provider={provider} profile={profile} /> : isDroneOperator(provider) ? <DroneMenu provider={provider} profile={profile} /> : isDJ(provider) ? <DJMenu provider={provider} profile={profile} /> : isDecorator(provider) ? <DecoratorMenu provider={provider} profile={profile} /> : isMakeupArtist(provider) ? <MakeupMenu provider={provider} profile={profile} /> : isMehendiArtist(provider) ? <MehendiMenu provider={provider} profile={profile} /> : isAnchor(provider) ? <AnchorMenu provider={provider} profile={profile} /> : isBanquetHall(provider) ? <BanquetHallMenu provider={provider} profile={profile} /> : isRentalService(provider) ? <RentalMenu provider={provider} profile={profile} /> : isPriest(provider) ? <PriestMenu provider={provider} profile={profile} /> : isBand(provider) ? <BandMenu provider={provider} profile={profile} /> : isDancer(provider) ? <DancerMenu provider={provider} profile={profile} /> : isSinger(provider) ? <SingerMenu provider={provider} profile={profile} /> : (
                 <div className="bg-surface-1 rounded-2xl border border-border/60 p-6">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">Pricing & Packages</h2>
                   {packages.length === 0 ? (

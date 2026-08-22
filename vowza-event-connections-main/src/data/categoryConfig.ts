@@ -3,7 +3,7 @@
 //   subcategories, profile fields, banner colours, icons, slugs
 
 import {
-  Camera, Video, MonitorPlay, Music2, Disc3, Mic,
+  Camera, MonitorPlay, Music2, Disc3, Mic,
   PersonStanding, Users, Paintbrush, Sparkles, Hand,
   Wand2, Building2, Package, Landmark, Droplets,
   Utensils, Lightbulb, Volume2, type LucideIcon,
@@ -49,35 +49,24 @@ const COMMON_FIELDS: FieldDef[] = [
 export const CATEGORIES: CategoryDef[] = [
   // ────────────────────────────────────────────────────────────
   {
-    id: "photographer", name: "Photography", plural: "Photographers",
+    id: "photography-videography", name: "Photography & Videography", plural: "Photography & Videography",
     icon: Camera,
     gradient: "linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%)",
     bannerColor: "bg-blue-900",
-    professionTypes: ["photographer"],
-    subcategories: ["Wedding Photography","Pre-Wedding","Candid","Traditional","Baby Shoot","Corporate","Fashion","Product"],
+    professionTypes: ["photographer", "videographer", "cinematographer", "photography_videography"],
+    subcategories: ["Wedding Photography","Pre-Wedding","Candid","Traditional","Baby Shoot","Corporate","Fashion","Product","Traditional Video","Cinematic Film","Wedding Film","Reel Package","Drone Coverage","Live Streaming"],
     fields: [
       ...COMMON_FIELDS,
+      // Photography fields
       { key: "drone_available",  label: "Drone Available",   type: "boolean",  section: "services" },
       { key: "albums_included",  label: "Albums Included",   type: "boolean",  section: "services" },
-      { key: "delivery_days",    label: "Delivery Time (days)", type: "number", placeholder: "15", section: "services" },
       { key: "team_size",        label: "Team Size",         type: "number",   placeholder: "2",  section: "services" },
-      { key: "hourly_rate",      label: "Hourly Rate (₹)",   type: "number",   placeholder: "2000", section: "pricing" },
-    ],
-  },
-  // ────────────────────────────────────────────────────────────
-  {
-    id: "videographer", name: "Videography", plural: "Videographers",
-    icon: Video,
-    gradient: "linear-gradient(135deg,#200122 0%,#6f0000 100%)",
-    bannerColor: "bg-red-900",
-    professionTypes: ["videographer","cinematographer"],
-    subcategories: ["Traditional Video","Cinematic Film","Wedding Film","Reel Package","Drone Coverage","Live Streaming"],
-    fields: [
-      ...COMMON_FIELDS,
+      // Videography fields
       { key: "cinematic",       label: "Cinematic Style",    type: "boolean", section: "services" },
       { key: "drone_coverage",  label: "Drone Coverage",     type: "boolean", section: "services" },
-      { key: "delivery_days",   label: "Delivery Time (days)", type: "number", placeholder: "30", section: "services" },
+      { key: "delivery_days",   label: "Delivery Time (days)", type: "number", placeholder: "15", section: "services" },
       { key: "formats",         label: "Output Formats",     type: "tags",    placeholder: "4K, Reels, DVD", section: "services" },
+      { key: "hourly_rate",      label: "Hourly Rate (₹)",   type: "number",   placeholder: "2000", section: "pricing" },
     ],
   },
   // ────────────────────────────────────────────────────────────

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 // ── Mega menu data ─────────────────────────────────────────────────────────
 const megaCategories = [
-  { label: "Photographers",    icon: Camera,   slug: "photographer",       featured: true  },
+  { label: "📸🎥 Photography & Videography", icon: Camera, slug: "photography-videography", featured: true },
   { label: "DJs",              icon: Disc3,    slug: "dj",                 featured: false },
   { label: "Live Bands",       icon: Music,    slug: "music_band",         featured: true  },
   { label: "Makeup Artists",   icon: Palette,  slug: "makeup_artist",      featured: false },

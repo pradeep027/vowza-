@@ -70,11 +70,23 @@ function getCategoryMeta(professionType: string): { name: string; icon: string }
 // ─── Normalize category URL param → database profession enum ──────────────────
 // The URL might use plural or common terms (e.g. "photographers") but the
 // database enum stores singular profession_type values (e.g. "photographer").
+// Supports compound searches like "wedding photography" by extracting profession keywords.
 const CATEGORY_NORMALIZATION: Record<string, string | string[]> = {
+  'photography-videography': ['photographer', 'videographer', 'cinematographer', 'drone_operator', 'photography_videography'],
+  'photography_videography': ['photographer', 'videographer', 'cinematographer', 'drone_operator'],
+  'photo and video': ['photographer', 'videographer', 'cinematographer', 'drone_operator', 'photography_videography'],
+  'photography and videography': ['photographer', 'videographer', 'cinematographer', 'drone_operator', 'photography_videography'],
+  'wedding photo video': ['photographer', 'videographer', 'cinematographer', 'drone_operator', 'photography_videography'],
+  'wedding photography': 'photographer',
+  'wedding videography': 'videographer',
+  'wedding photographer': 'photographer',
+  'wedding videographer': 'videographer',
   photographers:     'photographer',
   photographer:      'photographer',
+  photography:       'photographer',
   videographers:     'videographer',
   videographer:      'videographer',
+  videography:       'videographer',
   decorators:        ['wedding_decorator', 'event_decorator', 'stage_decorator'],
   decorator:         ['wedding_decorator', 'event_decorator', 'stage_decorator'],
   wedding_decorator: 'wedding_decorator',

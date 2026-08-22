@@ -29,6 +29,7 @@ import LocationPicker, { type LocationData, emptyLocationData } from '@/componen
 const PROFESSIONS = [
   { value: 'photographer',      label: 'Photographer'       },
   { value: 'videographer',      label: 'Videographer'       },
+  { value: 'photography_videography', label: 'Photography & Videography' },
   { value: 'drone_operator',    label: 'Drone Photographer' },
   { value: 'music_band',        label: 'Band'               },
   { value: 'dj',                label: 'DJ'                 },
@@ -110,6 +111,7 @@ export default function ProviderRegistration() {
   const [submitted, setSubmitted] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -148,10 +150,12 @@ export default function ProviderRegistration() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       streamRef.current = stream;
       setCameraOpen(true);
+      setCameraReady(false);
       setTimeout(async () => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
+          setCameraReady(true);
         }
       }, 100);
     } catch {
@@ -179,6 +183,7 @@ export default function ProviderRegistration() {
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
     setCameraOpen(false);
+    setCameraReady(false);
   };
 
   // ── Portfolio upload ───────────────────────────────────────────────────────
@@ -496,24 +501,15 @@ export default function ProviderRegistration() {
             </div>
           </div>
 
-          {/* Real-time face status feedback */}
-          <div className="mt-4 text-center min-h-[50px]">
-            <p className={`text-sm font-medium transition-colors ${
-              faceQualityOk ? 'text-emerald-400' : 'text-amber-300'
-            }`}>
-              {faceStatus}
-            </p>
-          </div>
-
           <div className="flex gap-4 mt-6">
             <button onClick={closeCamera} className="px-6 py-3 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors">
               <X className="w-4 h-4" />
             </button>
             <button 
               onClick={capturePhoto} 
-              disabled={!faceQualityOk}
+              disabled={!cameraReady}
               className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
-                faceQualityOk 
+                cameraReady
                   ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
                   : 'bg-gray-500 text-gray-300 cursor-not-allowed opacity-60'
               }`}
@@ -544,13 +540,13 @@ export default function ProviderRegistration() {
               </li>
               <li className="flex gap-2.5 items-start">
                 <span className="text-emerald-400 flex-shrink-0 font-bold">5.</span>
-                <span>When status shows green, click Capture</span>
+                <span>When camera is ready, click Capture</span>
               </li>
             </ul>
             <p className="text-xs text-white/50 mt-3 font-medium">
-              {faceQualityOk 
+              {cameraReady
                 ? '✓ Camera is ready. You can capture now!' 
-                : 'Please adjust lighting or camera position...'}
+                : 'Initializing camera...'}
             </p>
           </div>
         </div>

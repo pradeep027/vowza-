@@ -44,26 +44,37 @@ DROP POLICY IF EXISTS photography_videography_vendor_select ON public.photograph
 DROP POLICY IF EXISTS photography_videography_customer_select ON public.photography_videography_packages CASCADE;
 
 -- Vendors can only create/update their own packages
+-- Use subquery to correctly link provider_profiles.id to auth.users.id via user_id
 CREATE POLICY photography_videography_vendor_insert 
   ON public.photography_videography_packages 
   FOR INSERT 
-  WITH CHECK (provider_id = auth.uid());
+  WITH CHECK (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  );
 
 CREATE POLICY photography_videography_vendor_update 
   ON public.photography_videography_packages 
   FOR UPDATE 
-  USING (provider_id = auth.uid())
-  WITH CHECK (provider_id = auth.uid());
+  USING (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  );
 
 CREATE POLICY photography_videography_vendor_delete 
   ON public.photography_videography_packages 
   FOR DELETE 
-  USING (provider_id = auth.uid());
+  USING (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  );
 
 CREATE POLICY photography_videography_vendor_select 
   ON public.photography_videography_packages 
   FOR SELECT 
-  USING (provider_id = auth.uid());
+  USING (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  );
 
 -- Customers can view active packages
 CREATE POLICY photography_videography_customer_select 
@@ -79,19 +90,20 @@ DROP POLICY IF EXISTS photography_videography_images_vendor ON public.photograph
 DROP POLICY IF EXISTS photography_videography_images_customer ON public.photography_videography_package_images CASCADE;
 
 -- Vendors can manage their own package images
+-- Use subquery to correctly link via provider_profiles
 CREATE POLICY photography_videography_images_vendor 
   ON public.photography_videography_package_images 
   FOR ALL 
   USING (
     package_id IN (
       SELECT id FROM public.photography_videography_packages 
-      WHERE provider_id = auth.uid()
+      WHERE provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
     )
   )
   WITH CHECK (
     package_id IN (
       SELECT id FROM public.photography_videography_packages 
-      WHERE provider_id = auth.uid()
+      WHERE provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
     )
   );
 
@@ -114,19 +126,20 @@ DROP POLICY IF EXISTS photography_videography_addons_vendor ON public.photograph
 DROP POLICY IF EXISTS photography_videography_addons_customer ON public.photography_videography_package_addons CASCADE;
 
 -- Vendors can manage their own package add-ons
+-- Use subquery to correctly link via provider_profiles
 CREATE POLICY photography_videography_addons_vendor 
   ON public.photography_videography_package_addons 
   FOR ALL 
   USING (
     package_id IN (
       SELECT id FROM public.photography_videography_packages 
-      WHERE provider_id = auth.uid()
+      WHERE provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
     )
   )
   WITH CHECK (
     package_id IN (
       SELECT id FROM public.photography_videography_packages 
-      WHERE provider_id = auth.uid()
+      WHERE provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
     )
   );
 
@@ -151,10 +164,13 @@ DROP POLICY IF EXISTS photography_videography_bookings_customer ON public.photog
 DROP POLICY IF EXISTS photography_videography_bookings_insert ON public.photography_videography_package_bookings CASCADE;
 
 -- Vendors can view their own bookings
+-- Use subquery to correctly link via provider_profiles
 CREATE POLICY photography_videography_bookings_vendor 
   ON public.photography_videography_package_bookings 
   FOR SELECT 
-  USING (provider_id = auth.uid());
+  USING (
+    provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
+  );
 
 -- Customers can view their own bookings
 CREATE POLICY photography_videography_bookings_customer 

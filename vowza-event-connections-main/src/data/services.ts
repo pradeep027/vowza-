@@ -130,12 +130,12 @@ export const serviceCategories: ServiceCategory[] = [
     professionalCount: 312,
   },
   {
-    id: "photographers",
-    name: "Photographers & Videographers",
-    description: "Capture your special moments with professional photography",
+    id: "photography-videography",
+    name: "📸🎥 Photography & Videography",
+    description: "Capture your special moments with professional photography and videography",
     icon: "Camera",
     image: "/placeholder.svg",
-    professionalCount: 456,
+    professionalCount: 667,
   },
   {
     id: "dancers",
@@ -158,7 +158,7 @@ export const serviceCategories: ServiceCategory[] = [
 // ─── Trending Categories (15 categories) ─────────────────────────────────────
 
 export const trendingCategories: TrendingCategory[] = [
-  { id: "photographers", name: "Photographers", icon: "Camera", count: 456, color: "text-gold", bgColor: "bg-gold/10", slug: "photographers" },
+  { id: "photography-videography", name: "📸🎥 Photography & Videography", icon: "Camera", count: 667, color: "text-gold", bgColor: "bg-gold/10", slug: "photography-videography" },
   { id: "decorators", name: "Decorators", icon: "Palette", count: 234, color: "text-maroon", bgColor: "bg-maroon/10", slug: "decorators" },
   { id: "bands", name: "Live Bands", icon: "Music", count: 245, color: "text-royal", bgColor: "bg-royal/10", slug: "bands" },
   { id: "dj", name: "DJs", icon: "Disc3", count: 312, color: "text-gold", bgColor: "bg-gold/10", slug: "dj" },
@@ -171,7 +171,6 @@ export const trendingCategories: TrendingCategory[] = [
   { id: "planners", name: "Event Planners", icon: "CalendarDays", count: 201, color: "text-maroon", bgColor: "bg-maroon/10", slug: "planners" },
   { id: "lighting", name: "Lighting", icon: "Lightbulb", count: 156, color: "text-gold", bgColor: "bg-gold/10", slug: "lighting" },
   { id: "sound", name: "Sound Engineers", icon: "Volume2", count: 134, color: "text-royal", bgColor: "bg-royal/10", slug: "sound" },
-  { id: "videographers", name: "Videographers", icon: "Video", count: 211, color: "text-maroon", bgColor: "bg-maroon/10", slug: "videographers" },
   { id: "rentals", name: "Rental Services", icon: "Star", count: 87, color: "text-gold", bgColor: "bg-gold/10", slug: "rentals" },
 ];
 
