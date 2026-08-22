@@ -182,6 +182,7 @@ export default function VendorSettings() {
           variant="cover"
           folder="covers"
           filePrefix={vendorId ?? user?.id ?? 'cover'}
+          userId={user?.id}
           className="w-full"
         />
       </div>
@@ -196,6 +197,7 @@ export default function VendorSettings() {
             variant="avatar"
             folder="avatars"
             filePrefix={user?.id ?? 'avatar'}
+            userId={user?.id}
           />
           <div>
             <p className="text-sm font-medium text-foreground">Upload a clear photo of yourself</p>

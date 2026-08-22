@@ -26,6 +26,8 @@ export interface ImageUploadProps {
   folder?: string;
   /** Prefix for the generated filename (usually the provider/user id). */
   filePrefix?: string;
+  /** User ID for storage path structure (used as first folder level for RLS). */
+  userId?: string;
   /** `avatar` renders a round 1:1 control, `cover` a wide 3:1 banner. */
   variant?: 'avatar' | 'cover';
   /** Output edge length (avatar) or width (cover) in px. */
@@ -104,6 +106,7 @@ export default function ImageUpload({
   bucket = 'provider-media',
   folder = 'avatars',
   filePrefix = 'img',
+  userId,
   variant = 'avatar',
   outputSize,
   className,
@@ -151,15 +154,39 @@ export default function ImageUpload({
     setUploading(true);
     try {
       const blob = await processImage(pendingImg, aspect, outW, rotation);
-      const path = `${folder}/${filePrefix}_${Date.now()}.jpg`;
+      // Include user_id as first folder level for RLS policy to extract
+      const path = userId
+        ? `${userId}/${folder}/${filePrefix}_${Date.now()}.jpg`
+        : `${folder}/${filePrefix}_${Date.now()}.jpg`;
+
+      console.log('[ImageUpload] Starting upload', {
+        bucket,
+        folder,
+        filePrefix,
+        path,
+        blobSize: blob.size,
+        blobType: blob.type,
+      });
 
       const { error: upErr } = await supabase.storage
         .from(bucket)
         .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
 
-      if (upErr) throw new Error(upErr.message);
+      if (upErr) {
+        console.error('[ImageUpload] Storage upload failed', {
+          bucket,
+          path,
+          errorCode: upErr.name,
+          errorMessage: upErr.message,
+        });
+        throw new Error(upErr.message);
+      }
+
+      console.log('[ImageUpload] Storage upload succeeded', { bucket, path });
 
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+      console.log('[ImageUpload] Public URL generated', { publicUrl: pub.publicUrl });
+
       await onUploaded(pub.publicUrl);
 
       toast.success('Image updated');
@@ -167,6 +194,13 @@ export default function ImageUpload({
       setPendingImg(null);
       setRotation(0);
     } catch (e: any) {
+      console.error('[ImageUpload] Upload error', {
+        errorCode: e.name,
+        errorMessage: e.message,
+        bucket,
+        folder,
+        filePrefix,
+      });
       toast.error(e.message ?? 'Upload failed');
     } finally {
       setUploading(false);

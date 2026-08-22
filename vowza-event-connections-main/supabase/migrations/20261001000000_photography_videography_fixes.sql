@@ -76,11 +76,11 @@ CREATE POLICY photography_videography_vendor_select
     provider_id IN (SELECT id FROM public.provider_profiles WHERE user_id = auth.uid())
   );
 
--- Customers can view active packages
+-- Customers can view active packages only (not draft)
 CREATE POLICY photography_videography_customer_select 
   ON public.photography_videography_packages 
   FOR SELECT 
-  USING (is_active = TRUE AND is_visible = TRUE AND status IN ('active', 'draft'));
+  USING (is_active = TRUE AND is_visible = TRUE AND status = 'active');
 
 -- ═════════════════════════════════════════════════════════════════════════════════
 -- 4. CREATE RLS POLICIES FOR photography_videography_package_images

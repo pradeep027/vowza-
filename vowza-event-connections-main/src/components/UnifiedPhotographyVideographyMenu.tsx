@@ -80,7 +80,7 @@ export default function UnifiedPhotographyVideographyMenu({ provider, profile }:
         .eq('provider_id', provider.id)
         .eq('is_active', true)
         .eq('is_visible', true)
-        .eq('status', 'published')
+        .eq('status', 'active')
         .order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
