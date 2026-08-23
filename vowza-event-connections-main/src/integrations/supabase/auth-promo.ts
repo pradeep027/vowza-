@@ -290,7 +290,6 @@ export const fetchActiveAuthPromotionMedia = async (): Promise<VendorPackageProm
     .from('auth_promotion_media')
     .select('*')
     .eq('is_active', true)
-    .eq('is_published', true)
     .eq('media_type', 'image')
     .in('slot_number', [1, 2, 3, 4])
     .order('slot_number', { ascending: true })
