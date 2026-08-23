@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import MobileHero from "./MobileHero";
 import AuthPromotionMediaCards from "./AuthPromotionMediaCards";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
@@ -564,7 +565,9 @@ const DesktopHero = () => {
             </div>
 
             {/* ── Right column: premium visual composition (desktop only) ── */}
-            <HeroVisual />
+            <ErrorBoundary fallback={<div />}>
+              <HeroVisual />
+            </ErrorBoundary>
           </div>
 
         </div>

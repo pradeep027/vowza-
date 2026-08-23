@@ -3,6 +3,7 @@ import VowzaIcon from '@/components/VowzaIcon';
 import { ChevronDown, MapPin, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AuthPromotionMediaCards from "./AuthPromotionMediaCards";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const EVENT_OPTIONS = [
   "Wedding", "Reception", "Birthday Party", "Corporate Event",
@@ -127,7 +128,9 @@ const MobileHero = () => {
         )}
 
         {/* ── Auth Promotion media — one video plus three dynamic photo cards ── */}
-        <AuthPromotionMediaCards variant="mobile" />
+        <ErrorBoundary fallback={<div />}>
+          <AuthPromotionMediaCards variant="mobile" />
+        </ErrorBoundary>
       </div>
     </section>
   );

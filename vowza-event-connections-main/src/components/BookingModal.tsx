@@ -19,6 +19,18 @@ import {
   Calendar, Clock, MapPin, IndianRupee,
   AlertCircle, CheckCircle, ChevronRight, Loader2,
 } from 'lucide-react';
+// ─── Vendor Identity Types & Validation ──────────────────────────────────────
+import { 
+  type VendorId, 
+  type PackageId, 
+  type VendorPackage,
+  brandVendorId,
+  validateVendorPackageRelationship,
+} from '@/lib/vendorIdentity';
+import {
+  validatePreBooking,
+  formatValidationError,
+} from '@/lib/bookingValidation';
 
 interface EventType { id: string; name: string; }
 
@@ -31,7 +43,7 @@ interface BookingModalProps {
     price_max: number | null;
   };
   providerName: string;
-  selectedPackage?: any;
+  selectedPackage?: VendorPackage | null;  // Now typed as VendorPackage for validation
 }
 
 type Step = 'calendar' | 'details' | 'confirm';
@@ -182,6 +194,75 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
     setIsLoading(true);
 
     try {
+      // ─── COMPREHENSIVE PRE-BOOKING VALIDATION ────────────────────────────
+      // Build booking context for validation
+      const bookingContext = {
+        vendor: {
+          id: provider.id,
+          name: providerName,
+        },
+        package: selectedPackage ? {
+          id: selectedPackage.id,
+          name: selectedPackage.name,
+          provider_id: selectedPackage.provider_id || provider.id,
+        } : null,
+        booking: {
+          provider_id: provider.id,
+          customer_id: user.id,
+          package_id: selectedPackage?.id || null,
+          event_date: eventDate,
+          event_time: eventTime || null,
+          duration: parseInt(duration),
+          amount: parseInt(amount),
+          venue: venueAddress,
+        },
+        selectedDate: eventDate,
+        selectedTime: eventTime || null,
+      };
+
+      // Run comprehensive validation
+      const validationResult = validatePreBooking(bookingContext);
+      if (!validationResult.valid) {
+        const errorMsg = formatValidationError(validationResult);
+        toast.error(errorMsg);
+        setIsLoading(false);
+        return;
+      }
+
+      // ─── VENDOR IDENTITY VALIDATION ──────────────────────────────────────
+      // If a package is selected, validate it belongs to this vendor
+      if (selectedPackage && selectedPackage.id) {
+        try {
+          // Validate vendor-package relationship
+          const validation = validateVendorPackageRelationship(
+            {
+              vendorId: brandVendorId(provider.id) as VendorId,
+              vendorName: providerName,
+              packageId: (selectedPackage.id as unknown) as PackageId,
+              packageName: selectedPackage.name || 'Selected Package',
+              price: selectedPackage.price || parseInt(amount),
+            },
+            {
+              id: (selectedPackage.id as unknown) as PackageId,
+              provider_id: brandVendorId(selectedPackage.provider_id || provider.id) as VendorId,
+              name: selectedPackage.name || 'Package',
+              price: selectedPackage.price || 0,
+              description: selectedPackage.description,
+            }
+          );
+          
+          if (!validation) {
+            toast.error('Package does not belong to the selected vendor');
+            setIsLoading(false);
+            return;
+          }
+        } catch (validationError: any) {
+          toast.error(validationError.message || 'Vendor/package validation failed');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // ── Atomic availability check + insert ──────────────────────────────
       // Re-check one final time (handles concurrent requests)
       const result = await checkDateAvailable(provider.id, eventDate, eventTime || undefined, parseInt(duration));
@@ -194,11 +275,14 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
 
       const bookingAmount = parseInt(amount);
 
+      // ─── INSERT BOOKING WITH VALIDATED VENDOR ID ──────────────────────────
+      // provider.id is now validated to match selectedPackage.provider_id (if package selected)
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert({
           customer_id:          user.id,
-          provider_id:          provider.id,
+          provider_id:          provider.id,  // ✅ Real UUID from provider_profiles
+          package_id:           selectedPackage?.id || null,  // ✅ Real UUID from pricing_packages
           event_type_id:        eventTypeId || null,
           event_date:           eventDate,
           event_time:           eventTime || null,

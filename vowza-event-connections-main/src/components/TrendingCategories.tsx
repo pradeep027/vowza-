@@ -1,184 +1,77 @@
 // ─── TrendingCategories — Premium Categories ─────────────────────────────────
-// 20 categories with unique icons, brand colours, hover animations.
+// 15 main marketplace categories with unique icons, brand colours, hover animations.
 // Fully responsive: 3 cols mobile → 4 tablet → 5 desktop → 7 wide.
 // Uses live DB counts when available; gracefully shows static list as fallback.
+// USES AUTHORITATIVE SOURCE: src/config/mainCategoryMapping.ts
 
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
-  Camera,          // Photography & Videography (merged)
-  Guitar,          // Bands
-  Disc3,           // DJs
-  Mic,             // Singers
-  PersonStanding,  // Dancers
-  Flower2,         // Decorators
-  Palette,         // Makeup Artists
-  Fingerprint,     // Mehendi Artists
-  MicVocal,        // Anchors & Hosts
-  MonitorPlay,     // Drone
-  Utensils,        // Catering Services
-  Building2,       // Banquet Halls
-  Package,         // Rentals
-  Landmark,        // Pandits / Priests
-  Droplets,        // Drinking Water
+  Camera,
+  Guitar,
+  Disc3,
+  Mic,
+  PersonStanding,
+  Flower2,
+  Palette,
+  Fingerprint,
+  MicVocal,
+  MonitorPlay,
+  Utensils,
+  Building2,
+  Package,
+  Landmark,
+  Droplets,
 } from "lucide-react";
 import { useCategories } from "@/hooks/useArtists";
+import { MAIN_CATEGORIES } from "@/config/mainCategoryMapping";
 
-// ── 18 canonical categories (merged photography & videography) — module scope ─
-interface CategoryDef {
-  id:    string;                        // slug used for DB query
-  name:  string;                        // display label
-  icon:  React.ElementType;             // Lucide icon component
-  color: string;                        // Tailwind bg on icon wrapper
-  text:  string;                        // Tailwind text colour for icon
-  ring:  string;                        // Tailwind ring colour on hover
-  // Merged DB profession_types — any of these in the DB map to this card
+// ── Map icon names to Lucide components ──
+const ICON_MAP: Record<string, React.ElementType> = {
+  Camera,
+  Guitar,
+  Disc3,
+  Mic,
+  PersonStanding,
+  Flower2,
+  Palette,
+  Fingerprint,
+  MicVocal,
+  MonitorPlay,
+  Utensils,
+  Building2,
+  Package,
+  Landmark,
+  Droplets,
+};
+
+// ── Define display-specific properties not in mainCategoryMapping ──
+interface CategoryDisplayDef {
+  id:    string;
+  name:  string;
+  icon:  React.ElementType;
+  color: string;
+  text:  string;
+  ring:  string;
   types: string[];
 }
 
-const CATEGORIES: CategoryDef[] = [
-  {
-    id:    "photography-videography",
-    name:  "Photography & Videography",
-    icon:  Camera,
-    color: "bg-rose-50 dark:bg-rose-950/40",
-    text:  "text-rose-600 dark:text-rose-400",
-    ring:  "ring-rose-200 dark:ring-rose-800",
-    types: ["photographer", "videographer", "cinematographer", "photography_videography"],
-  },
-  {
-    id:    "drone_operator",
-    name:  "Drone Photography",
-    icon:  MonitorPlay,
-    color: "bg-slate-50 dark:bg-slate-950/40",
-    text:  "text-slate-600 dark:text-slate-400",
-    ring:  "ring-slate-200 dark:ring-slate-800",
-    types: ["drone_operator"],
-  },
-  {
-    id:    "music_band",
-    name:  "Bands",
-    icon:  Guitar,
-    color: "bg-amber-50 dark:bg-amber-950/40",
-    text:  "text-amber-600 dark:text-amber-400",
-    ring:  "ring-amber-200 dark:ring-amber-800",
-    types: ["music_band","maharashtra_band","traditional_band","instrumental_artist","classical_musician","wedding_band","dhol_band","brass_band"],
-  },
-  {
-    id:    "dj",
-    name:  "DJs",
-    icon:  Disc3,
-    color: "bg-violet-50 dark:bg-violet-950/40",
-    text:  "text-violet-600 dark:text-violet-400",
-    ring:  "ring-violet-200 dark:ring-violet-800",
-    types: ["dj"],
-  },
-  {
-    id:    "singer",
-    name:  "Singers",
-    icon:  Mic,
-    color: "bg-sky-50 dark:bg-sky-950/40",
-    text:  "text-sky-600 dark:text-sky-400",
-    ring:  "ring-sky-200 dark:ring-sky-800",
-    types: ["singer"],
-  },
-  {
-    id:    "dancer",
-    name:  "Dancers",
-    icon:  PersonStanding,
-    color: "bg-fuchsia-50 dark:bg-fuchsia-950/40",
-    text:  "text-fuchsia-600 dark:text-fuchsia-400",
-    ring:  "ring-fuchsia-200 dark:ring-fuchsia-800",
-    types: ["dancer","kuchipudi_dancer","classical_dancer","western_dancer"],
-  },
-  {
-    id:    "wedding_decorator",
-    name:  "Decorators",
-    icon:  Flower2,
-    color: "bg-lime-50 dark:bg-lime-950/40",
-    text:  "text-lime-700 dark:text-lime-400",
-    ring:  "ring-lime-200 dark:ring-lime-800",
-    types: ["wedding_decorator","stage_decorator","event_decorator"],
-  },
-  {
-    id:    "makeup_artist",
-    name:  "Makeup Artists",
-    icon:  Palette,
-    color: "bg-orange-50 dark:bg-orange-950/40",
-    text:  "text-orange-600 dark:text-orange-400",
-    ring:  "ring-orange-200 dark:ring-orange-800",
-    types: ["makeup_artist"],
-  },
-  {
-    id:    "mehendi_artist",
-    name:  "Mehendi Artists",
-    icon:  Fingerprint,
-    color: "bg-green-50 dark:bg-green-950/40",
-    text:  "text-green-600 dark:text-green-400",
-    ring:  "ring-green-200 dark:ring-green-800",
-    types: ["mehendi_artist"],
-  },
-  {
-    id:    "anchor",
-    name:  "Anchors & Hosts",
-    icon:  MicVocal,
-    color: "bg-cyan-50 dark:bg-cyan-950/40",
-    text:  "text-cyan-600 dark:text-cyan-400",
-    ring:  "ring-cyan-200 dark:ring-cyan-800",
-    types: ["anchor","host"],
-  },
-  {
-    id:    "catering_services",
-    name:  "Catering Services",
-    icon:  Utensils,
-    color: "bg-yellow-50 dark:bg-yellow-950/40",
-    text:  "text-yellow-700 dark:text-yellow-400",
-    ring:  "ring-yellow-200 dark:ring-yellow-800",
-    types: ["catering_services"],
-  },
-  // ── NEW CATEGORIES ─────────────────────────────────────────────────────────
-  {
-    id:    "banquet_hall",
-    name:  "Banquet Halls",
-    icon:  Building2,
-    color: "bg-emerald-50 dark:bg-emerald-950/40",
-    text:  "text-emerald-600 dark:text-emerald-400",
-    ring:  "ring-emerald-200 dark:ring-emerald-800",
-    types: ["banquet_hall","wedding_venue","event_venue"],
-  },
-  {
-    id:    "rentals",
-    name:  "Rentals",
-    icon:  Package,
-    color: "bg-orange-50 dark:bg-orange-950/40",
-    text:  "text-orange-600 dark:text-orange-400",
-    ring:  "ring-orange-200 dark:ring-orange-800",
-    types: ["rentals","tent_shamiana","stage_rental","furniture_rental","generator_rental","ac_cooler","led_wall"],
-  },
-  {
-    id:    "pandit",
-    name:  "Pandits / Priests",
-    icon:  Landmark,
-    color: "bg-yellow-50 dark:bg-yellow-950/40",
-    text:  "text-yellow-700 dark:text-yellow-400",
-    ring:  "ring-yellow-200 dark:ring-yellow-800",
-    types: ["pandit","priest","religious_services"],
-  },
-  {
-    id:    "water_supplier",
-    name:  "Drinking Water",
-    icon:  Droplets,
-    color: "bg-sky-50 dark:bg-sky-950/40",
-    text:  "text-sky-600 dark:text-sky-400",
-    ring:  "ring-sky-200 dark:ring-sky-800",
-    types: ["water_supplier","drinking_water","water_tanker"],
-  },
-];
+// ── Transform mainCategoryMapping into display format ──
+// This is the ONLY source of category data - everything comes from MAIN_CATEGORIES
+const CATEGORIES: CategoryDisplayDef[] = MAIN_CATEGORIES.map(cat => ({
+  id:    cat.id,
+  name:  cat.name,
+  icon:  ICON_MAP[cat.icon] || Camera,  // Fallback to Camera if icon name not found
+  color: cat.color,
+  text:  cat.text,
+  ring:  cat.ring,
+  types: cat.professionTypes,
+}));
 
 // ── Category Card — module scope to avoid focus/remount bugs ─────────────────
-interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }
+interface CardProps { cat: CategoryDisplayDef; count: number; onClick: () => void; idx: number; }
 
 const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {
   const hasImage = ['photography-videography', 'catering_services', 'drone_operator', 'music_band', 'dj', 'makeup_artist', 'anchor', 'mehendi_artist', 'singer', 'wedding_decorator', 'dancer', 'banquet_hall', 'rentals', 'pandit', 'water_supplier'].includes(cat.id);
@@ -308,7 +201,7 @@ const TrendingCategories = () => {
   }
 
   // For each canonical category, sum counts across all merged types
-  const getCategoryCount = (cat: CategoryDef): number =>
+  const getCategoryCount = (cat: CategoryDisplayDef): number =>
     cat.types.reduce((sum, t) => sum + (countMap.get(t) ?? 0), 0);
 
   return (
@@ -346,7 +239,7 @@ const TrendingCategories = () => {
         {/* ── Grid ── */}
         {isLoading ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-            {Array.from({ length: 20 }).map((_, i) => <SkeletonCard key={i} />)}
+            {Array.from({ length: 15 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">

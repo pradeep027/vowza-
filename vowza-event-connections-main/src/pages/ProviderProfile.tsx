@@ -1,6 +1,6 @@
 // ─── ProviderProfile — Enhanced with category-specific fields ────────────────
 import { useState, useEffect, memo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -119,8 +119,10 @@ CategoryDetails.displayName = "CategoryDetails";
 
 const ProviderProfile = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const promotedPackageId = searchParams.get('package');
 
   const [provider, setProvider] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -212,7 +214,25 @@ const ProviderProfile = () => {
   };
 
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  const handleBookNow = (pkg?: any) => { if (!user) { toast.error("Please login"); navigate("/auth"); return; } setSelectedPackage(pkg || null); setShowBooking(true); };
+  
+  // Pre-select promoted package if package_id in query params
+  useEffect(() => {
+    if (promotedPackageId && packages.length > 0) {
+      const promoted = packages.find((pkg) => pkg.id === promotedPackageId);
+      if (promoted) {
+        setSelectedPackage(promoted);
+      } else {
+        // Package no longer available
+        toast.error('This promoted package is no longer available.');
+      }
+    }
+  }, [promotedPackageId, packages]);
+
+  const handleBookNow = (pkg?: any) => { 
+    if (!user) { toast.error("Please login"); navigate("/auth"); return; } 
+    setSelectedPackage(pkg || selectedPackage || null); 
+    setShowBooking(true); 
+  };
 
   const submitReview = async () => {
     if (!user) { toast.error("Login to review"); return; }

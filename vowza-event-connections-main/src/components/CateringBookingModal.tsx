@@ -9,6 +9,17 @@ import {
   Utensils, Users, Calendar, MapPin, Clock,
   Star, Leaf, Plus, Minus, Images, AlertCircle,
 } from 'lucide-react';
+// ─── Vendor Identity & Validation ────────────────────────────────────────────
+import {
+  validateVendorPackageRelationship,
+  brandVendorId,
+  type VendorId,
+  type PackageId,
+} from '@/lib/vendorIdentity';
+import {
+  validateSpecialCategoryBooking,
+  formatValidationError,
+} from '@/lib/bookingValidation';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface CateringBookingModalProps {
@@ -156,13 +167,72 @@ export default function CateringBookingModal({ isOpen, onClose, pkg, provider, g
     if (!user) { toast.error('Please log in to book'); navigate('/auth'); return; }
     if (!termsAccepted) { toast.error('Please accept the terms'); return; }
 
+    // ─── VENDOR-PACKAGE VALIDATION ───────────────────────────────────────
+    // Validate that package belongs to this provider
+    try {
+      const validation = validateVendorPackageRelationship(
+        {
+          vendorId: brandVendorId(provider.id) as VendorId,
+          vendorName: provider.business_name || provider.full_name || 'Catering Vendor',
+          packageId: (pkg.id as unknown) as PackageId,
+          packageName: pkg.name,
+          price: pkg.price_per_plate || 0,
+        },
+        {
+          id: (pkg.id as unknown) as PackageId,
+          provider_id: brandVendorId(pkg.provider_id || provider.id) as VendorId,
+          name: pkg.name,
+          price: pkg.price_per_plate || 0,
+        }
+      );
+      
+      if (!validation) {
+        toast.error('Package does not belong to this vendor');
+        return;
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Vendor validation failed');
+      return;
+    }
+
+    // ─── SPECIAL CATEGORY BOOKING VALIDATION ─────────────────────────────
+    // Validate the catering booking context
+    const validationContext = {
+      vendor: {
+        id: provider.id,
+        name: provider.business_name || provider.full_name,
+        category: 'catering',
+      },
+      package: {
+        id: pkg.id,
+        name: pkg.name,
+        provider_id: pkg.provider_id || provider.id,
+      },
+      booking: {
+        event_date: event.eventDate,
+        guest_count: guests,
+        amount: baseAmount + addonsAmount,
+      },
+    };
+
+    const validationResult = validateSpecialCategoryBooking(validationContext);
+    if (!validationResult.valid) {
+      const errorMsg = formatValidationError(validationResult);
+      toast.error(errorMsg);
+      return;
+    }
+
+    // ─── STORE CART WITH VENDOR IDENTITY ──────────────────────────────────
     // Store all cart data in sessionStorage and navigate to full cart review page
-    sessionStorage.setItem('vowza_catering_cart', JSON.stringify({
+    // ✅ Provider ID is now validated before storage
+    const cartData = {
       pkg, provider, gallery, menuSections, addons,
       event: { ...event, venueName: location.venue_name, venueAddress: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '), city: location.town_city, state: location.state, pincode: location.pincode },
       location,
       guestCount: guests, selectedAddonIds, specialRequests, dietaryPrefs,
-    }));
+    };
+
+    sessionStorage.setItem('vowza_catering_cart', JSON.stringify(cartData));
 
     onClose();
     navigate('/catering-cart');

@@ -13,6 +13,17 @@ import {
   Pencil, Trash2, Images, ChevronLeft, ChevronRight, AlertCircle,
   ShoppingBag,
 } from 'lucide-react';
+// ─── Vendor Identity & Validation ────────────────────────────────────────────
+import {
+  validateVendorPackageRelationship,
+  brandVendorId,
+  type VendorId,
+  type PackageId,
+} from '@/lib/vendorIdentity';
+import {
+  validateCateringCartData,
+  formatValidationError,
+} from '@/lib/bookingValidation';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface CartData {
@@ -128,6 +139,51 @@ export default function CateringCartPage() {
     if (!termsAccepted) { toast.error('Please accept the terms'); return; }
     if (!event.eventDate) { toast.error('Please select an event date'); return; }
     if (guestCount < (pkg.min_guests || 1)) { toast.error(`Minimum ${pkg.min_guests} guests required`); return; }
+    
+    // ─── CART DATA VALIDATION ────────────────────────────────────────────
+    // Validate cart integrity before checkout
+    const cartValidation = validateCateringCartData({
+      vendorId: provider.id,
+      packageId: pkg.id,
+      guestCount,
+      eventDate: event.eventDate,
+      amount: baseAmount + addonsAmount,
+    }, 24 * 60 * 60 * 1000); // 24 hours expiration
+
+    if (!cartValidation.valid) {
+      const errorMsg = formatValidationError(cartValidation);
+      toast.error(errorMsg);
+      return;
+    }
+
+    // ─── VENDOR-PACKAGE RELATIONSHIP VALIDATION ──────────────────────────
+    // Verify package still belongs to this vendor
+    try {
+      const validation = validateVendorPackageRelationship(
+        {
+          vendorId: brandVendorId(provider.id) as VendorId,
+          vendorName: provider.business_name || provider.contact_person || 'Caterer',
+          packageId: (pkg.id as unknown) as PackageId,
+          packageName: pkg.name,
+          price: pkg.price_per_plate || 0,
+        },
+        {
+          id: (pkg.id as unknown) as PackageId,
+          provider_id: brandVendorId(pkg.provider_id || provider.id) as VendorId,
+          name: pkg.name,
+          price: pkg.price_per_plate || 0,
+        }
+      );
+
+      if (!validation) {
+        toast.error('Package no longer belongs to this vendor');
+        return;
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Vendor/package validation failed');
+      return;
+    }
+
     setBusy(true);
 
     try {
@@ -143,10 +199,11 @@ export default function CateringCartPage() {
       const { data: existing } = await supabase.from('catering_bookings' as any).select('id').eq('package_id', pkg.id).eq('customer_id', user.id).eq('event_date', event.eventDate).neq('status', 'cancelled');
       if (existing && existing.length > 0) { toast.error('You already have a booking for this package on this date'); setBusy(false); return; }
 
-      // Create booking
+      // ─── CREATE BOOKING WITH VALIDATED VENDOR ID ────────────────────────
+      // ✅ provider_id and package_id are now validated before database INSERT
       const { data: booking, error } = await supabase.from('catering_bookings' as any).insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
+        package_id: pkg.id,  // ✅ Real UUID from pricing_packages, validated
+        provider_id: provider.id,  // ✅ Real UUID from provider_profiles, validated
         customer_id: user.id,
         event_type: event.eventType || null,
         event_date: event.eventDate,

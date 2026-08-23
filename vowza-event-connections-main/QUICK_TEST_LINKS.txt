@@ -1,0 +1,202 @@
+================================================================================
+                    LOCALHOST PROMOTION TESTING - QUICK LINKS
+================================================================================
+
+APPLICATION: http://localhost:8080
+STATUS: ✅ Running (Vite Dev Server)
+
+================================================================================
+KEY LINKS
+================================================================================
+
+HOMEPAGE (View Promotions):
+  http://localhost:8080
+  → 2x2 grid of 4 promotion cards
+  → Hover to see "Book Now" button
+
+ADMIN LOGIN:
+  http://localhost:8080/auth
+  → Login with admin credentials
+  → Redirects to dashboard
+
+ADMIN PROMOTION MANAGER (Create/Edit):
+  http://localhost:8080/admin/auth-promotion
+  → Upload images for 4 slots
+  → Select Category → Vendor → Package
+  → Publish promotions
+
+VENDOR PROFILE (Static):
+  http://localhost:8080/provider/{vendor-id}
+  → Shows vendor details and packages
+
+VENDOR WITH PROMOTION (Pre-selected):
+  http://localhost:8080/provider/{vendor-id}?package={package-id}
+  → Exact package should be highlighted
+  → Pre-selected for booking
+
+================================================================================
+TEST FLOW (5 minutes)
+================================================================================
+
+1. CREATE PROMOTION (2 min)
+   → http://localhost:8080/admin/auth-promotion
+   → Upload Image → Select Category → Vendor → Package → Publish
+
+2. VIEW ON HOMEPAGE (1 min)
+   → http://localhost:8080
+   → See vendor name + package name on card
+   → Hover to see "Book Now"
+
+3. CLICK BOOK NOW (1 min)
+   → Click promotion card
+   → Check URL: /provider/{id}?package={pkgid}
+   → Package should be pre-selected
+
+4. COMPLETE BOOKING (1 min)
+   → Fill booking form
+   → Verify database: provider_id + package_id saved
+
+================================================================================
+SUCCESS INDICATORS
+================================================================================
+
+✅ Admin sees "Link to Vendor & Package" selector after upload
+✅ Category dropdown filters vendors correctly
+✅ Vendor dropdown filters packages correctly
+✅ Homepage displays vendor name + package name
+✅ URL includes ?package={id} query parameter
+✅ ProviderProfile has package pre-selected/highlighted
+✅ Booking saved with exact provider_id + package_id
+✅ No JavaScript errors in console (F12)
+
+================================================================================
+DEBUGGING COMMANDS
+================================================================================
+
+Check if dev server is running:
+  Open: http://localhost:8080
+  Expected: Page loads (no connection refused)
+
+Check migration applied:
+  supabase db list
+  supabase db push --include-all
+
+Check build passes:
+  npm run build
+  Expected: Exit code 0, 0 errors
+
+Restart dev server:
+  Kill: npm run dev
+  Restart: npm run dev
+
+Check database:
+  Supabase Dashboard → Tables → auth_promotion_media
+  Look for: provider_id, package_id columns with data
+
+================================================================================
+BROWSER DEVTOOLS (F12)
+================================================================================
+
+NETWORK TAB:
+  → Filter: "graphql"
+  → Look for: fetchActiveAuthPromotionMedia
+  → Check Response: contains provider_id, package_id, vendor_name, package_name
+
+CONSOLE TAB:
+  → Should be CLEAN (no red errors)
+  → Can see logs if console.log added
+
+APPLICATION TAB:
+  → Local Storage → Check auth tokens
+  → Session Storage → Check user data
+
+REACT DEVTOOLS:
+  → Find: ImageCarouselCard component
+  → Check props: media array has provider_id + package_id
+
+================================================================================
+EXPECTED DATABASE RECORD
+================================================================================
+
+After creating promotion:
+
+auth_promotion_media table:
+  id: UUID
+  slot_number: 1
+  provider_id: <vendor-uuid>
+  package_id: <package-uuid>
+  vendor_name: "Sri Lakshmi Catering"
+  package_name: "Premium Wedding Catering"
+  category: "catering"
+  is_published: true
+  created_at: <timestamp>
+
+After booking:
+
+bookings table:
+  id: UUID
+  provider_id: <vendor-uuid>  (matches promotion.provider_id)
+  package_id: <package-uuid>  (matches promotion.package_id)
+  customer_id: <user-uuid>
+  event_date: <date>
+  created_at: <timestamp>
+
+================================================================================
+COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE: Homepage shows blank promotion cards
+FIX:   1. Publish promotion in admin
+       2. Hard refresh page (Ctrl+F5)
+       3. Check console for errors
+
+ISSUE: Admin selector shows no vendors
+FIX:   1. Check vendors exist for category
+       2. Verify vendor profession matches category
+       3. Ensure vendors not deleted
+
+ISSUE: Booking doesn't save correct IDs
+FIX:   1. Verify migration applied
+       2. Check database schema has columns
+       3. Inspect network request payload
+
+ISSUE: Package not pre-selected
+FIX:   1. Check URL has ?package={id}
+       2. Verify package ID exists
+       3. Refresh page (browser cache)
+
+ISSUE: Vite HMR errors
+FIX:   1. npm run dev --host
+       2. Clear node_modules cache
+       3. Restart dev server
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+→ Migration must be applied: supabase db push --include-all
+→ Dev server must be running: npm run dev
+→ Localhost only: http://localhost:8080 (not 127.0.0.1:8080)
+→ Admin must be logged in to create promotions
+→ Promotions must be published to appear on homepage
+→ Query param: ?package= (exact spelling)
+→ No hyphens in package ID on URL (use actual UUID)
+
+================================================================================
+QUICK CHECKLIST
+================================================================================
+
+[ ] Dev server running: npm run dev
+[ ] Can access: http://localhost:8080
+[ ] Can login as admin: http://localhost:8080/auth
+[ ] Can create promotion: /admin/auth-promotion
+[ ] Can see on homepage: 4-card carousel
+[ ] Can click "Book Now"
+[ ] URL includes ?package={id}
+[ ] Package pre-selected
+[ ] Booking saved correctly
+[ ] Zero console errors
+
+✅ ALL CHECKED = INTEGRATION SUCCESSFUL
+
+================================================================================
