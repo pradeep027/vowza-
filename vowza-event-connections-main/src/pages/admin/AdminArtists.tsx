@@ -102,15 +102,37 @@ export default function AdminArtists() {
 
   // ── Load counts for all 3 tabs ────────────────────────────────────────────
   const loadCounts = useCallback(async () => {
-    const { data } = await supabase
-      .from('provider_profiles')
-      .select('verification_status');
-    if (data) {
+    try {
+      // Use .count('exact') with head: true to get counts without fetching rows
+      // This bypasses the 1000-row default limit in PostgREST
+      const [
+        { count: pendingCount },
+        { count: approvedCount },
+        { count: rejectedCount },
+      ] = await Promise.all([
+        supabase
+          .from('provider_profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('verification_status', 'pending'),
+        supabase
+          .from('provider_profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('verification_status', 'approved'),
+        supabase
+          .from('provider_profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('verification_status', 'rejected'),
+      ]);
+
       setCounts({
-        pending:  data.filter((a: any) => a.verification_status === 'pending').length,
-        approved: data.filter((a: any) => a.verification_status === 'approved').length,
-        rejected: data.filter((a: any) => a.verification_status === 'rejected').length,
+        pending: pendingCount ?? 0,
+        approved: approvedCount ?? 0,
+        rejected: rejectedCount ?? 0,
       });
+    } catch (err) {
+      console.error('[AdminArtists] loadCounts error:', err);
+      // Fallback to empty counts on error
+      setCounts({ pending: 0, approved: 0, rejected: 0 });
     }
   }, []);
 
