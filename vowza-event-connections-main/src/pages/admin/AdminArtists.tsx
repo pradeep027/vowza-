@@ -70,6 +70,8 @@ export default function AdminArtists() {
       const from = page * PAGE_SIZE;
       const to   = from + PAGE_SIZE - 1;
 
+      console.log('[AdminArtists.load] Fetching', tab, 'artists:', { from, to, page, PAGE_SIZE });
+
       const { data, count, error } = await supabase
         .from('provider_profiles')
         .select('*', { count: 'exact' })
@@ -77,24 +79,37 @@ export default function AdminArtists() {
         .order('created_at', { ascending: tab === 'pending' })
         .range(from, to);
 
+      console.log('[AdminArtists.load] Supabase response:', { data_length: data?.length, count, error });
+
       if (error) {
+        console.error('[AdminArtists.load] Supabase error:', error);
         toast.error(`Load error: ${error.message}`);
         return;
       }
 
       // Enrich with profile rows
       const ids = (data ?? []).map((a: any) => a.user_id).filter(Boolean);
+      console.log('[AdminArtists.load] User IDs to enrich:', ids.length);
+      
       const profileMap = new Map<string, any>();
       if (ids.length) {
-        const { data: profiles } = await supabase
+        const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('id,full_name,email,phone,avatar_url,city,state,area')
           .in('id', ids);
+        
+        console.log('[AdminArtists.load] Profile enrichment:', { profiles_length: profiles?.length, profileError });
         (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
       }
 
-      setArtists((data ?? []).map((a: any) => ({ ...a, ...(profileMap.get(a.user_id) ?? {}) })));
+      const enriched = (data ?? []).map((a: any) => ({ ...a, ...(profileMap.get(a.user_id) ?? {}) }));
+      console.log('[AdminArtists.load] Setting artists:', enriched.length, 'total:', count);
+      
+      setArtists(enriched);
       setTotal(count ?? 0);
+    } catch (err) {
+      console.error('[AdminArtists.load] Unexpected error:', err);
+      toast.error('Failed to load artists');
     } finally {
       setLoading(false);
     }
