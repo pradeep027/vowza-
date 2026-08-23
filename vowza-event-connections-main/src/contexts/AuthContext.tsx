@@ -47,6 +47,7 @@ export interface AuthContextType {
   signOut:  () => Promise<void>;
   refreshRoles: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshAuthState: () => Promise<void>;  // Force refresh both profile and roles
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -113,8 +114,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!data || data.length === 0) {
         console.warn('[AuthContext] No roles found for user', uid, '— seeding customer role');
-        // Seed default customer role silently
-        await supabase.from('user_roles').insert({ user_id: uid, role: 'customer' });
+        // Seed default customer role atomically
+        // Use upsert to prevent race conditions if this function is called multiple times
+        try {
+          const { error: upsertError } = await supabase
+            .from('user_roles')
+            .upsert(
+              { user_id: uid, role: 'customer' },
+              { onConflict: 'user_id,role' }
+            );
+          
+          if (upsertError) {
+            console.warn('[AuthContext] Failed to seed customer role:', upsertError.message);
+            // Still proceed with fallback
+          }
+        } catch (e) {
+          console.warn('[AuthContext] Upsert exception:', e);
+        }
+
         const fallback = ['customer'];
         _roleCache.set(uid, fallback);
         setRoles(fallback);
@@ -140,6 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── Refresh roles (called externally after approval etc.) ────────────────────
   const refreshRoles = useCallback(async () => {
     if (!user) return;
+    console.log('[AuthContext] Manually refreshing roles for', user.id);
     _roleCache.delete(user.id);
     await fetchRoles(user.id);
   }, [user, fetchRoles]);
@@ -147,8 +165,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── Refresh profile (called externally after My Profile edits) ───────────────
   const refreshProfile = useCallback(async () => {
     if (!user) return;
+    console.log('[AuthContext] Manually refreshing profile for', user.id);
     await fetchProfile(user.id);
   }, [user, fetchProfile]);
+
+  // ── Force complete profile AND role refresh (called after major changes like artist onboarding) ──
+  const refreshAuthState = useCallback(async () => {
+    if (!user) return;
+    console.log('[AuthContext] Force-refreshing complete auth state for', user.id);
+    _roleCache.delete(user.id);
+    await Promise.all([
+      fetchProfile(user.id),
+      fetchRoles(user.id),
+    ]);
+  }, [user, fetchProfile, fetchRoles]);
 
   // ── Subscribe to real-time role changes ──────────────────────────────────────
   const subscribeToRoles = useCallback((uid: string) => {
@@ -161,13 +191,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${uid}` },
-        async () => {
+        async (payload) => {
+          console.log('[AuthContext] Real-time role change detected:', payload.eventType);
           // Role changed — invalidate cache and re-fetch
           _roleCache.delete(uid);
           await fetchRoles(uid);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[AuthContext] Subscribed to real-time role changes for', uid);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[AuthContext] Role subscription error');
+        }
+      });
 
     rolesChannelRef.current = ch;
   }, [fetchRoles]);
@@ -203,6 +240,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────────
   useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // Hydrate from persisted session immediately
+        const { data: { session: existing }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[AuthContext] Session restoration error:', sessionError.message);
+          // Session restoration failed — proceed with no session
+          if (!initialised.current) {
+            handleAuthChange(null);
+          }
+        } else {
+          // Session restoration succeeded (or no session exists)
+          if (!initialised.current) {
+            handleAuthChange(existing);
+          }
+        }
+      } catch (e) {
+        console.error('[AuthContext] Bootstrap exception during session restore:', e);
+        if (!initialised.current) {
+          handleAuthChange(null);
+        }
+      }
+    };
+
     // Subscribe to future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
@@ -210,12 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Hydrate from persisted session immediately
-    supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      if (!initialised.current) {
-        handleAuthChange(existing);
-      }
-    });
+    // Trigger initial session restoration
+    initAuth();
 
     return () => {
       subscription.unsubscribe();
@@ -332,7 +390,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     refreshRoles,
     refreshProfile,
-  }), [user, session, profile, loading, roles, rolesLoaded, signUp, signIn, signInWithGoogle, signOut, refreshRoles, refreshProfile]);
+    refreshAuthState,
+  }), [user, session, profile, loading, roles, rolesLoaded, signUp, signIn, signInWithGoogle, signOut, refreshRoles, refreshProfile, refreshAuthState]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

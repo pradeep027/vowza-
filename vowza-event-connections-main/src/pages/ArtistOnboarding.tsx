@@ -36,7 +36,7 @@ interface PortfolioItem {
 const ArtistOnboarding = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, loading, refreshAuthState } = useAuth();
   const navigate = useNavigate();
   
   const { uploadImage, isUploading: isUploadingAvatar } = useImageUpload({ bucket: 'provider-media', folder: 'avatars' });
@@ -251,6 +251,10 @@ const ArtistOnboarding = () => {
       await supabase
         .from('user_roles')
         .insert({ user_id: user.id, role: 'provider' });
+
+      // Refresh auth state to pick up the new provider role immediately
+      console.log('[ArtistOnboarding] Refreshing auth state after provider role added');
+      await refreshAuthState();
 
       // Insert provider role then navigate to the correct dashboard
       const { data: rolesData } = await supabase

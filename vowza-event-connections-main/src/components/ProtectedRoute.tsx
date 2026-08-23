@@ -64,7 +64,7 @@ const ProtectedRoute = ({
   requireEmailVerified = false,
   showAuthModal = true,
 }: Props) => {
-  const { user, loading, roles, rolesLoaded } = useAuth();
+  const { user, loading, roles, rolesLoaded, authenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { setReturnTo, clearReturnTo } = useAuthRedirect();
@@ -82,13 +82,17 @@ const ProtectedRoute = ({
     }
   }, [loading, location.pathname, location.search, location.state, rolesLoaded, setReturnTo, showAuthModal, user]);
 
-  // ── Still resolving auth or roles ────────────────────────────────────────────
+  // ── CRITICAL: Still resolving auth or roles — MUST wait before rendering anything
+  // This prevents:
+  // - Showing logged-out state for authenticated users
+  // - Redirecting users to /auth when session is being restored
+  // - Users briefly appearing as Customer before their real role loads
   if (loading || !rolesLoaded) {
     return isAdminRoute ? <AdminLoadingScreen /> : <GeneralLoadingScreen />;
   }
 
   // ── Not authenticated ─────────────────────────────────────────────────────────
-  if (!user) {
+  if (!authenticated || !user) {
     if (showAuthModal) {
       return (
         <>

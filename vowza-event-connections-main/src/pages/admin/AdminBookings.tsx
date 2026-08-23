@@ -74,11 +74,11 @@ export default function AdminBookings() {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-bold text-foreground">Bookings</h1><p className="text-sm text-muted-foreground">{total} total</p></div>
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between flex-wrap">
+        <div><h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">Bookings</h1><p className="text-xs sm:text-sm text-muted-foreground">{total} total</p></div>
         <div className="flex gap-2">
-          <button onClick={load} className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-secondary"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-secondary"><Download className="w-4 h-4" />Export</button>
+          <button onClick={load} className="p-2.5 sm:p-2 rounded-lg border border-border text-muted-foreground hover:bg-secondary min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Refresh"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl border border-border text-xs sm:text-sm font-medium hover:bg-secondary min-h-[44px]"><Download className="w-3.5 sm:w-4 h-3.5 sm:h-4" /><span className="hidden sm:inline">Export</span></button>
         </div>
       </div>
 
@@ -100,37 +100,41 @@ export default function AdminBookings() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/60 bg-surface-2">
-                {['Booking ID','Status','Payment','Amount','Event Date','Created','Actions'].map(h => (
-                  <th key={h} className="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3">{h}</th>
-                ))}
+                <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">ID</th>
+                <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Status</th>
+                <th className="hidden sm:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Payment</th>
+                <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Amount</th>
+                <th className="hidden md:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Event</th>
+                <th className="hidden lg:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Created</th>
+                <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? Array.from({length:8}).map((_,i) => (
-                <tr key={i} className="border-b border-border/40">{Array.from({length:7}).map((_,j) => <td key={j} className="px-4 py-3"><div className="skeleton h-4 rounded w-20" /></td>)}</tr>
+                <tr key={i} className="border-b border-border/40">{Array.from({length:7}).map((_,j) => <td key={j} className="px-2 sm:px-4 py-3"><div className="skeleton h-4 rounded w-20" /></td>)}</tr>
               )) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No bookings found</td></tr>
               ) : filtered.map(b => (
                 <tr key={b.id} className="border-b border-border/40 hover:bg-surface-2 transition-colors">
-                  <td className="px-4 py-3 text-xs font-mono text-muted-foreground">#{b.id.slice(0,8)}</td>
-                  <td className="px-4 py-3"><span className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full ${statusColor(b.status)}`}>{b.status}</span></td>
-                  <td className="px-4 py-3"><span className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full ${statusColor(b.payment_status||'pending')}`}>{b.payment_status||'pending'}</span></td>
-                  <td className="px-4 py-3 text-xs font-semibold text-foreground">{b.total_amount ? `₹${Number(b.total_amount).toLocaleString()}` : '—'}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{b.event_date ? new Date(b.event_date).toLocaleDateString('en-IN') : '—'}</td>
-                  <td className="px-4 py-3 text-[10px] text-muted-foreground">{new Date(b.created_at).toLocaleDateString('en-IN')}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => setSelected(b)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><Eye className="w-3.5 h-3.5" /></button>
+                  <td className="px-2 sm:px-4 py-3 text-[10px] sm:text-xs font-mono text-muted-foreground">#{b.id.slice(0,6)}</td>
+                  <td className="px-2 sm:px-4 py-3"><span className={`text-[9px] sm:text-[10px] font-semibold border px-1.5 sm:px-2 py-0.5 rounded-full ${statusColor(b.status)}`}>{b.status}</span></td>
+                  <td className="hidden sm:table-cell px-2 sm:px-4 py-3"><span className={`text-[9px] sm:text-[10px] font-semibold border px-1.5 sm:px-2 py-0.5 rounded-full ${statusColor(b.payment_status||'pending')}`}>{b.payment_status||'pending'}</span></td>
+                  <td className="px-2 sm:px-4 py-3 text-[10px] sm:text-xs font-semibold text-foreground">{b.total_amount ? `₹${Number(b.total_amount).toLocaleString('en-IN', {notation: 'compact'})}` : '—'}</td>
+                  <td className="hidden md:table-cell px-2 sm:px-4 py-3 text-[10px] sm:text-xs text-muted-foreground">{b.event_date ? new Date(b.event_date).toLocaleDateString('en-IN', {day: '2-digit', month: 'short'}) : '—'}</td>
+                  <td className="hidden lg:table-cell px-2 sm:px-4 py-3 text-[10px] text-muted-foreground">{new Date(b.created_at).toLocaleDateString('en-IN', {day: '2-digit', month: 'short'})}</td>
+                  <td className="px-2 sm:px-4 py-3">
+                    <button onClick={() => setSelected(b)} className="p-1.5 sm:p-2 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="View booking"><Eye className="w-3 sm:w-3.5 h-3 sm:h-3.5" /></button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
-          <p className="text-xs text-muted-foreground">Page {page+1}</p>
+        <div className="flex items-center justify-between px-2 sm:px-4 py-3 border-t border-border/60 gap-2">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">Page {page+1}</p>
           <div className="flex gap-1">
-            <button disabled={page===0} onClick={() => setPage(p=>p-1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
-            <button disabled={(page+1)*PAGE_SIZE>=total} onClick={() => setPage(p=>p+1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronRight className="w-4 h-4" /></button>
+            <button disabled={page===0} onClick={() => setPage(p=>p-1)} className="p-1.5 sm:p-2 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary" aria-label="Previous page"><ChevronLeft className="w-3 sm:w-4 h-3 sm:h-4" /></button>
+            <button disabled={(page+1)*PAGE_SIZE>=total} onClick={() => setPage(p=>p+1)} className="p-1.5 sm:p-2 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary" aria-label="Next page"><ChevronRight className="w-3 sm:w-4 h-3 sm:h-4" /></button>
           </div>
         </div>
       </div>
@@ -146,32 +150,34 @@ export default function AdminBookings() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60 bg-surface-2">
-                  {['Booking','Status','Original Date','Requested Date','Refund','Decision','Created'].map(h => (
-                    <th key={h} className="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3">{h}</th>
-                  ))}
+                  <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Booking</th>
+                  <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Status</th>
+                  <th className="hidden sm:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Original</th>
+                  <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Requested</th>
+                  <th className="hidden md:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Refund</th>
+                  <th className="hidden lg:table-cell text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 sm:px-4 py-3">Decision</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingReschedules ? (
-                  <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
                 ) : reschedules.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No reschedule requests yet</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No reschedule requests yet</td></tr>
                 ) : reschedules.map((r: any) => (
                   <tr key={r.id} className="border-b border-border/40 hover:bg-surface-2 transition-colors">
-                    <td className="px-4 py-3 text-xs font-mono text-muted-foreground">#{r.booking_id?.slice(0,8)}</td>
-                    <td className="px-4 py-3">
-                      <span className={cn('text-[10px] font-semibold border px-2 py-0.5 rounded-full',
+                    <td className="px-2 sm:px-4 py-3 text-[10px] sm:text-xs font-mono text-muted-foreground">#{r.booking_id?.slice(0,6)}</td>
+                    <td className="px-2 sm:px-4 py-3">
+                      <span className={cn('text-[9px] sm:text-[10px] font-semibold border px-1.5 sm:px-2 py-0.5 rounded-full',
                         r.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                         r.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                         r.status === 'declined' ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-gray-50 text-gray-700 border-gray-200'
                       )}>{r.status}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs">{r.original_date ? new Date(r.original_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}</td>
-                    <td className="px-4 py-3 text-xs font-semibold">{r.requested_date ? new Date(r.requested_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}</td>
-                    <td className="px-4 py-3 text-xs">{Number(r.refund_amount) > 0 ? <span className="text-orange-600 font-semibold">₹{Number(r.refund_amount).toLocaleString()} ({r.refund_status})</span> : '—'}</td>
-                    <td className="px-4 py-3 text-[10px] text-muted-foreground">{r.decided_at ? new Date(r.decided_at).toLocaleDateString('en-IN') : 'Pending'}</td>
-                    <td className="px-4 py-3 text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
+                    <td className="hidden sm:table-cell px-2 sm:px-4 py-3 text-[10px] sm:text-xs">{r.original_date ? new Date(r.original_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</td>
+                    <td className="px-2 sm:px-4 py-3 text-[10px] sm:text-xs font-semibold">{r.requested_date ? new Date(r.requested_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</td>
+                    <td className="hidden md:table-cell px-2 sm:px-4 py-3 text-[10px] sm:text-xs">{Number(r.refund_amount) > 0 ? <span className="text-orange-600 font-semibold">₹{Number(r.refund_amount).toLocaleString('en-IN', {notation: 'compact'})} ({r.refund_status})</span> : '—'}</td>
+                    <td className="hidden lg:table-cell px-2 sm:px-4 py-3 text-[10px] text-muted-foreground">{r.decided_at ? new Date(r.decided_at).toLocaleDateString('en-IN') : 'Pending'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -181,15 +187,15 @@ export default function AdminBookings() {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl border border-border p-6 w-full max-w-md shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-background rounded-2xl border border-border p-4 sm:p-6 w-full max-w-md shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-foreground">Booking #{selected.id.slice(0,8)}</h2>
-              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+              <h2 className="font-bold text-foreground text-sm sm:text-base">Booking #{selected.id.slice(0,8)}</h2>
+              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground text-lg min-w-[44px] min-h-[44px] flex items-center justify-center">✕</button>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {[['Status',selected.status],['Amount',selected.total_amount?`₹${selected.total_amount}`:'—'],['Event Date',selected.event_date||'—'],['Package',selected.package_name||'—'],['Notes',selected.notes||'—']].map(([l,v]) => (
-                <div key={l}><p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">{l}</p><p className="font-medium text-foreground">{v}</p></div>
+                <div key={l}><p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">{l}</p><p className="font-medium text-foreground text-xs sm:text-sm">{v}</p></div>
               ))}
             </div>
             <div className="pt-3 border-t border-border space-y-2">
@@ -197,7 +203,7 @@ export default function AdminBookings() {
               <div className="flex flex-wrap gap-2">
                 {['confirmed','completed','cancelled'].map(s => (
                   <button key={s} onClick={() => updateStatus(selected.id, s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize ${s==='cancelled'?'bg-red-500 text-white':s==='completed'?'bg-blue-500 text-white':'bg-emerald-500 text-white'}`}>
+                    className={`px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold capitalize min-h-[44px] ${s==='cancelled'?'bg-red-500 text-white':s==='completed'?'bg-blue-500 text-white':'bg-emerald-500 text-white'}`}>
                     → {s}
                   </button>
                 ))}
@@ -205,7 +211,7 @@ export default function AdminBookings() {
             </div>
             <div className="pt-3 border-t border-border">
               <button onClick={() => { setChatBookingId(selected.id); setSelected(null); }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary w-full justify-center">
+                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary w-full justify-center min-h-[44px]">
                 <MessageSquare className="w-3.5 h-3.5" /> View Chat (Read Only)
               </button>
             </div>
@@ -214,13 +220,13 @@ export default function AdminBookings() {
       )}
       {/* ── Admin Chat Read-Only Modal ──────────────────────────────────── */}
       {chatBookingId && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl border border-border w-full max-w-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-              <h2 className="font-bold text-foreground text-sm">Chat — Booking #{chatBookingId.slice(0,8)}</h2>
-              <button onClick={() => setChatBookingId(null)} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-background rounded-2xl border border-border w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border flex-shrink-0">
+              <h2 className="font-bold text-foreground text-sm sm:text-base">Chat — Booking #{chatBookingId.slice(0,8)}</h2>
+              <button onClick={() => setChatBookingId(null)} className="text-muted-foreground hover:text-foreground text-lg min-w-[44px] min-h-[44px] flex items-center justify-center">✕</button>
             </div>
-            <div className="p-4">
+            <div className="p-3 sm:p-4 overflow-y-auto flex-1">
               <ChatBox bookingId={chatBookingId} otherUserName="Conversation" readOnly />
             </div>
           </div>
