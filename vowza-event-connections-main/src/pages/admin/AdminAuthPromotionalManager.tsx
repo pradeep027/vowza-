@@ -20,6 +20,7 @@ import {
   type AuthPromoMediaType,
   type HomepagePromotionSlotNumber,
 } from '@/integrations/supabase/auth-promo';
+import PromotionVendorPackageSelector from '@/components/admin/PromotionVendorPackageSelector';
 import {
   uploadPromotionVideo,
   createPromotionVideo,
@@ -50,10 +51,11 @@ interface HomepageMediaSlotCardProps {
   acceptedTypes: string;
   mediaType: AuthPromoMediaType;
   media: AuthPromotionMedia[];
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File, vendorData?: any) => Promise<void>;
   onDelete: (item: AuthPromotionMedia) => Promise<void>;
   onToggleActive: (item: AuthPromotionMedia) => Promise<void>;
   isUploading: boolean;
+  onEditVendorData?: (media: AuthPromotionMedia) => void;
 }
 
 const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
@@ -67,10 +69,13 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
   onDelete,
   onToggleActive,
   isUploading,
+  onEditVendorData,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [vendorData, setVendorData] = useState<any>(null);
+  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -91,9 +96,10 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
 
     setUploading(true);
     try {
-      await onUpload(selectedFile);
+      await onUpload(selectedFile, vendorData);
       setSelectedFile(null);
       setPreviewUrl('');
+      setVendorData(null);
     } catch (error) {
       console.error(`[AdminAuthPromo] Slot ${slotNumber} upload failed:`, error);
       toast.error(error instanceof Error ? error.message : `Failed to upload ${mediaType}.`);
@@ -105,6 +111,7 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
   const clearSelection = () => {
     setSelectedFile(null);
     setPreviewUrl('');
+    setVendorData(null);
   };
 
   useEffect(() => () => {
@@ -112,7 +119,7 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
   }, [previewUrl]);
 
   return (
-    <div className="rounded-lg border border-border bg-background p-6">
+    <div className="rounded-lg border border-border bg-background p-6 space-y-4">
       {/* Header */}
       <div className="mb-4">
         <h3 className="text-base font-semibold">{slotTitle}</h3>
@@ -143,10 +150,24 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
                     {item.is_active ? 'Published' : 'Hidden'}
                   </span>
                 </p>
+                {(item as any).vendor_name && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    📍 {(item as any).vendor_name}
+                    {(item as any).package_name && ` • 📦 ${(item as any).package_name}`}
+                  </p>
+                )}
               </div>
 
               {/* Actions */}
-              <div className="flex shrink-0 gap-1.5">
+              <div className="flex shrink-0 gap-1.5 flex-col">
+                <button
+                  type="button"
+                  onClick={() => { setEditingMediaId(item.id); onEditVendorData?.(item); }}
+                  disabled={isUploading || uploading}
+                  className="btn-secondary text-xs px-2.5 py-1.5"
+                >
+                  Edit Vendor
+                </button>
                 <button
                   type="button"
                   onClick={() => onToggleActive(item)}
@@ -196,6 +217,21 @@ const HomepageMediaSlotCard: React.FC<HomepageMediaSlotCardProps> = ({
               <video src={previewUrl} muted controls className="h-full w-full object-cover" />
             )}
           </div>
+
+          {/* Vendor/Package Selector */}
+          <div className="rounded-lg border border-border bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-foreground mb-3">📌 Link to Vendor & Package (Optional)</p>
+            <PromotionVendorPackageSelector
+              onSelect={(data) => setVendorData(data)}
+              disabled={uploading}
+            />
+            {vendorData && (
+              <div className="mt-3 p-2 rounded bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                ✓ {vendorData.vendor_name} • {vendorData.package_name}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -246,6 +282,7 @@ export const AdminAuthPromotionalManager: React.FC = () => {
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
   const [selectedVideoPreviewUrl, setSelectedVideoPreviewUrl] = useState('');
   const [videoPreviewModalUrl, setVideoPreviewModalUrl] = useState<string | null>(null);
+  const [editingMediaVendorData, setEditingMediaVendorData] = useState<any>(null);
 
   const loadConfiguration = async () => {
     try {
@@ -387,6 +424,8 @@ export const AdminAuthPromotionalManager: React.FC = () => {
             media_url: uploaded.url,
             storage_path: uploaded.path,
             display_order: nextDisplayOrder + index,
+            is_published: true,
+            ...editingMediaVendorData,
           });
           createdMedia.push(created);
         } catch (persistError) {
@@ -397,6 +436,7 @@ export const AdminAuthPromotionalManager: React.FC = () => {
 
       setHomepageMedia((current) => [...current, ...createdMedia].sort((a, b) => a.display_order - b.display_order));
       clearSelectedHomepageMedia();
+      setEditingMediaVendorData(null);
       notifyAuthPromoUpdated();
       toast.success(`${createdMedia.length} homepage promotion ${createdMedia.length === 1 ? 'item' : 'items'} uploaded.`);
     } catch (error) {
@@ -685,7 +725,7 @@ export const AdminAuthPromotionalManager: React.FC = () => {
             acceptedTypes="image/jpeg,image/png,image/webp"
             mediaType="image"
             media={homepageMedia.filter((m) => m.slot_number === slotNum)}
-            onUpload={async (file) => {
+            onUpload={async (file, vendorData) => {
               const uploaded = await uploadAuthPromoMedia(file);
               try {
                 const created = await createAuthPromotionMedia({
@@ -694,10 +734,12 @@ export const AdminAuthPromotionalManager: React.FC = () => {
                   storage_path: uploaded.path,
                   display_order: Math.max(...homepageMedia.filter((m) => m.slot_number === slotNum).map((m) => m.display_order), -1) + 1,
                   slot_number: slotNum as HomepagePromotionSlotNumber,
+                  is_published: true,
+                  ...vendorData,
                 });
                 setHomepageMedia((current) => [...current, created].sort((a, b) => a.display_order - b.display_order));
                 notifyAuthPromoUpdated();
-                toast.success('Image uploaded successfully.');
+                toast.success('Image uploaded successfully.' + (vendorData?.vendor_name ? ` Linked to ${vendorData.vendor_name}.` : ''));
               } catch (persistError) {
                 await deleteAuthPromoImage(uploaded.path);
                 throw persistError;
@@ -705,6 +747,7 @@ export const AdminAuthPromotionalManager: React.FC = () => {
             }}
             onDelete={(item) => deleteHomepageMedia(item)}
             onToggleActive={(item) => toggleHomepageMediaActive(item)}
+            onEditVendorData={(item) => setEditingMediaVendorData(item as any)}
             isUploading={mediaUploading}
           />
         ))}

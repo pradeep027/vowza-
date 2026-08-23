@@ -1,9 +1,32 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
-import { Image as ImageIcon } from 'lucide-react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Image as ImageIcon, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuthPromotionMedia } from '@/hooks/useAuthPromotionMedia';
-import type { AuthPromotionMedia, HomepagePromotionSlotNumber } from '@/integrations/supabase/auth-promo';
+import type { VendorPackagePromotion, HomepagePromotionSlotNumber } from '@/integrations/supabase/auth-promo';
 import { PHOTO_DURATION_MS, nextPlaylistIndex } from '@/lib/promotionMediaPlaylist';
+
+// Helper function to format price in Indian Rupee format
+const formatPrice = (price: number | undefined | null): string | null => {
+  if (price === null || price === undefined || isNaN(price)) return null;
+  return `₹${price.toLocaleString('en-IN')}`;
+};
+
+// Helper function to extract price from package record
+const extractPackagePrice = (packageData: any): number | null => {
+  if (!packageData) return null;
+  
+  // Try different price field names in order of preference
+  if (packageData.package_price) return packageData.package_price;
+  if (packageData.starting_price) return packageData.starting_price;
+  if (packageData.price_per_plate) return packageData.price_per_plate;
+  if (packageData.price) return packageData.price;
+  if (packageData.full_day_price) return packageData.full_day_price;
+  if (packageData.hourly_rate) return packageData.hourly_rate;
+  
+  return null;
+};
 
 type MediaCardsVariant = 'desktop' | 'mobile';
 
@@ -53,13 +76,15 @@ const Frame = ({
 );
 
 /**
- * Image Carousel Card — 10-second auto-rotating image carousel
- * Used for all four homepage promotion slots (image-only)
+ * Image Carousel Card — 3-second auto-rotating image carousel
+ * Displays vendor/package info and Book Now button for exact bookings
  */
 const ImageCarouselCard = memo(
-  ({ media, slot, loading }: { media: AuthPromotionMedia[]; slot: HomepagePromotionSlotNumber; loading: boolean }) => {
+  ({ media, slot, loading }: { media: VendorPackagePromotion[]; slot: HomepagePromotionSlotNumber; loading: boolean }) => {
+    const navigate = useNavigate();
     const [index, setIndex] = useState(0);
     const [failed, setFailed] = useState<Set<string>>(new Set());
+    const [priceMap, setPriceMap] = useState<Record<string, string | null>>({});
 
     const playable = useMemo(
       () => media.filter((item) => item.media_type === 'image' && !failed.has(item.id)),
@@ -74,7 +99,45 @@ const ImageCarouselCard = memo(
       setFailed(new Set());
     }, [signature]);
 
-    // Auto-rotate every 10 seconds (PHOTO_DURATION_MS)
+    // Fetch prices for all promotions in this carousel
+    useEffect(() => {
+      const fetchPrices = async () => {
+        const newPriceMap: Record<string, string | null> = {};
+        
+        for (const item of playable) {
+          if (!item.package_id || !item.package_table) {
+            newPriceMap[item.id] = null;
+            continue;
+          }
+
+          try {
+            const { data, error } = await supabase
+              .from(item.package_table)
+              .select('*')
+              .eq('id', item.package_id)
+              .single();
+
+            if (error || !data) {
+              newPriceMap[item.id] = null;
+            } else {
+              const price = extractPackagePrice(data);
+              newPriceMap[item.id] = formatPrice(price);
+            }
+          } catch (err) {
+            console.error('[AuthPromotionMediaCards] Price fetch error:', err);
+            newPriceMap[item.id] = null;
+          }
+        }
+        
+        setPriceMap(newPriceMap);
+      };
+
+      if (playable.length > 0) {
+        void fetchPrices();
+      }
+    }, [playable]);
+
+    // Auto-rotate every 3 seconds (PHOTO_DURATION_MS)
     useEffect(() => {
       if (playable.length < 2) return;
 
@@ -94,6 +157,21 @@ const ImageCarouselCard = memo(
       setIndex(0);
     };
 
+    const handleCardClick = () => {
+      if (!current?.provider_id) return;
+      // Navigate to exact vendor profile with package_id query param if available
+      const url = `/provider/${current.provider_id}${current.package_id ? `?package=${current.package_id}` : ''}`;
+      navigate(url);
+    };
+
+    const handleBookNow = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!current?.provider_id) return;
+      // Navigate to vendor profile with package_id query param - booking will be initiated from there
+      const url = `/provider/${current.provider_id}${current.package_id ? `?package=${current.package_id}` : ''}`;
+      navigate(url);
+    };
+
     return (
       <Frame label={`Homepage promotion slot ${slot}: image carousel`} index={slot - 1}>
         {current ? (
@@ -104,13 +182,50 @@ const ImageCarouselCard = memo(
               animate={{ opacity: 1 }}
               transition={{ duration: 0.45, ease: 'easeOut' }}
               src={current.media_url}
-              alt={`Vowza homepage promotion image ${slot}`}
+              alt={`Vowza homepage promotion: ${current.vendor_name || 'Vendor'}`}
               className="absolute inset-0 h-full w-full object-cover bg-black/25 brightness-[1.08]"
               loading="eager"
               decoding="async"
               onError={failedCurrent}
             />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/5" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-black/5" />
+            
+            {/* Vendor/Package Info Overlay */}
+            {current.vendor_name && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="absolute inset-0 flex flex-col items-start justify-end p-4 pointer-events-none"
+              >
+                <h3 className="text-sm font-bold text-white mb-1 leading-tight">
+                  {current.vendor_name}
+                </h3>
+                {current.package_name && (
+                  <p className="text-xs text-white/80 mb-1 leading-tight">
+                    {current.package_name}
+                  </p>
+                )}
+                {priceMap[current.id] && (
+                  <p className="text-sm font-semibold text-white mb-3 leading-tight">
+                    {priceMap[current.id]}
+                  </p>
+                )}
+                
+                {/* Book Now Button */}
+                <motion.button
+                  type="button"
+                  onClick={handleBookNow}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  whileHover={{ scale: 1.05, translateY: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="pointer-events-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#f4d58d] to-[#e6c76a] text-sm font-semibold text-[#3d1924] hover:shadow-lg transition-shadow"
+                >
+                  Book Now
+                  <ChevronRight className="w-4 h-4" />
+                </motion.button>
+              </motion.div>
+            )}
           </>
         ) : (
           <Fallback loading={loading} />
@@ -121,23 +236,23 @@ const ImageCarouselCard = memo(
 );
 ImageCarouselCard.displayName = 'ImageCarouselCard';
 
-const groupBySlot = (items: AuthPromotionMedia[]) => {
-  const result: Record<HomepagePromotionSlotNumber, AuthPromotionMedia[]> = {
+const groupBySlot = (items: VendorPackagePromotion[]) => {
+  const result: Record<HomepagePromotionSlotNumber, VendorPackagePromotion[]> = {
     1: [],
     2: [],
     3: [],
     4: [],
   };
   for (const item of items)
-    if (item.slot_number >= 1 && item.slot_number <= 4)
+    if (item.slot_number && item.slot_number >= 1 && item.slot_number <= 4)
       result[item.slot_number].push(item);
   return result;
 };
 
 /**
  * Homepage Image Carousel — 2×2 grid of auto-rotating image carousels
- * Replaces the former video + image system with image-only carousel
- * All four slots rotate images every 10 seconds
+ * Displays vendor/package promotions with clickable cards and Book Now buttons
+ * Each card represents an exact vendor + package combination for booking
  */
 const AuthPromotionMediaCards = ({ variant }: { variant: MediaCardsVariant }) => {
   const { media, isLoading } = useAuthPromotionMedia();

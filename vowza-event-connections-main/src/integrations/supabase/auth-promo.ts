@@ -206,11 +206,43 @@ export interface AuthPromotionMedia {
   updated_at: string;
 }
 
+// ─── VENDOR/PACKAGE PROMOTIONS ─────────────────────────────────────────────
+export interface VendorPackagePromotion extends AuthPromotionMedia {
+  category?: string; // catering, photography, dj, etc.
+  provider_id?: string; // UUID of provider_profiles.id
+  package_id?: string; // UUID of package in category-specific table
+  package_table?: string; // catering_packages, photography_packages, etc.
+  vendor_name?: string; // Display name (denormalized)
+  package_name?: string; // Display name (denormalized)
+  destination_type?: 'vendor' | 'package' | 'service'; // Where the promotion links
+  is_published?: boolean; // Controls public homepage visibility
+}
+
 export type HomepagePromotionSlotNumber = 1 | 2 | 3 | 4;
 
 type AuthPromotionMediaUpdates = Partial<
   Pick<AuthPromotionMedia, 'display_order' | 'is_active'>
 >;
+
+// ─── VENDOR/PACKAGE PROMOTION UPDATES ──────────────────────────────────────
+type VendorPackagePromotionUpdates = Partial<
+  Pick<
+    VendorPackagePromotion,
+    | 'media_url'
+    | 'storage_path'
+    | 'slot_number'
+    | 'display_order'
+    | 'is_active'
+    | 'category'
+    | 'provider_id'
+    | 'package_id'
+    | 'package_table'
+    | 'vendor_name'
+    | 'package_name'
+    | 'destination_type'
+    | 'is_published'
+  >
+>
 
 const decodeVideo = (file: File): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -253,11 +285,12 @@ export const validateAuthPromoMedia = async (file: File): Promise<AuthPromoMedia
 };
 
 /** Public reader for the homepage. Inactive media is excluded at the database query. */
-export const fetchActiveAuthPromotionMedia = async (): Promise<AuthPromotionMedia[]> => {
+export const fetchActiveAuthPromotionMedia = async (): Promise<VendorPackagePromotion[]> => {
   const { data, error } = await supabase
     .from('auth_promotion_media')
     .select('*')
     .eq('is_active', true)
+    .eq('is_published', true)
     .eq('media_type', 'image')
     .in('slot_number', [1, 2, 3, 4])
     .order('slot_number', { ascending: true })
@@ -265,11 +298,11 @@ export const fetchActiveAuthPromotionMedia = async (): Promise<AuthPromotionMedi
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return (data as AuthPromotionMedia[] | null) ?? [];
+  return (data as VendorPackagePromotion[] | null) ?? [];
 };
 
 /** Admin reader that includes inactive media so it can be published or reordered. */
-export const fetchAuthPromotionMediaForManagement = async (): Promise<AuthPromotionMedia[]> => {
+export const fetchAuthPromotionMediaForManagement = async (): Promise<VendorPackagePromotion[]> => {
   const { data, error } = await supabase
     .from('auth_promotion_media')
     .select('*')
@@ -277,7 +310,7 @@ export const fetchAuthPromotionMediaForManagement = async (): Promise<AuthPromot
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return (data as AuthPromotionMedia[] | null) ?? [];
+  return (data as VendorPackagePromotion[] | null) ?? [];
 };
 
 export const uploadAuthPromoMedia = async (
@@ -299,8 +332,11 @@ export const uploadAuthPromoMedia = async (
 };
 
 export const createAuthPromotionMedia = async (
-  media: Pick<AuthPromotionMedia, 'media_type' | 'media_url' | 'storage_path' | 'display_order' | 'slot_number'>,
-): Promise<AuthPromotionMedia> => {
+  media: Pick<
+    VendorPackagePromotion,
+    'media_type' | 'media_url' | 'storage_path' | 'display_order' | 'slot_number' | 'category' | 'provider_id' | 'package_id' | 'package_table' | 'vendor_name' | 'package_name' | 'destination_type' | 'is_published'
+  >,
+): Promise<VendorPackagePromotion> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!user) throw new Error('Your administrator session has expired. Please sign in again.');
@@ -312,13 +348,13 @@ export const createAuthPromotionMedia = async (
     .single();
 
   if (error) throw error;
-  return data as AuthPromotionMedia;
+  return data as VendorPackagePromotion;
 };
 
 export const updateAuthPromotionMedia = async (
   mediaId: string,
-  updates: AuthPromotionMediaUpdates,
-): Promise<AuthPromotionMedia> => {
+  updates: VendorPackagePromotionUpdates,
+): Promise<VendorPackagePromotion> => {
   const { data, error } = await supabase
     .from('auth_promotion_media')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -327,7 +363,7 @@ export const updateAuthPromotionMedia = async (
     .single();
 
   if (error) throw error;
-  return data as AuthPromotionMedia;
+  return data as VendorPackagePromotion;
 };
 
 /** Removes the database record. Call deleteAuthPromoImage with its storage_path afterwards. */

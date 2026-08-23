@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AUTH_PROMO_UPDATED_EVENT, fetchActiveAuthPromotionMedia, type AuthPromotionMedia } from '@/integrations/supabase/auth-promo';
+import { AUTH_PROMO_UPDATED_EVENT, fetchActiveAuthPromotionMedia, type VendorPackagePromotion } from '@/integrations/supabase/auth-promo';
 
 const CHANNEL_NAME = 'vowza-auth-promotion-media';
-export function useAuthPromotionMedia(): { media: AuthPromotionMedia[]; isLoading: boolean; refresh: () => Promise<void> } {
-  const [media, setMedia] = useState<AuthPromotionMedia[]>([]); const [isLoading, setIsLoading] = useState(true);
+export function useAuthPromotionMedia(): { media: VendorPackagePromotion[]; isLoading: boolean; refresh: () => Promise<void> } {
+  const [media, setMedia] = useState<VendorPackagePromotion[]>([]); const [isLoading, setIsLoading] = useState(true);
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try { setMedia(await fetchActiveAuthPromotionMedia()); }
