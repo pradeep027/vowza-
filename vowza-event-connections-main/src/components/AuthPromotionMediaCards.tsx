@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Image as ImageIcon, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
