@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Search, Trash2, Ban, RefreshCw, Download, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 
 interface Customer { id: string; full_name: string; email: string; phone: string; city: string; created_at: string; is_blocked?: boolean; }
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 100; // Changed from 15 to display all customers at once
 
 export default function AdminCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);

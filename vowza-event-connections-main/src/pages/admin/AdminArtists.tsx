@@ -28,7 +28,7 @@ interface Artist {
   service_areas?: string[]; social_links?: any;
 }
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 100; // Changed from 15 to show all approved artists at once
 
 const TAB_CFG: Record<Tab, { label: string; icon: React.ElementType; color: string }> = {
   pending:  { label: 'Pending',  icon: Clock,     color: 'text-amber-600'   },
