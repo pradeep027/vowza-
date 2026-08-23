@@ -4,8 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertCircle } from "lucide-react";
 import { AboutVowzaEditor } from "@/components/admin/AboutVowzaEditor";
-import { FounderManager } from "@/components/admin/FounderManager";
-import { CoFoundersManager } from "@/components/admin/CoFoundersManager";
 
 interface AboutContent {
   id: string;
@@ -13,26 +11,12 @@ interface AboutContent {
   description: string;
   mission: string;
   vision: string;
+  hero_image_url?: string;
   updated_at: string;
-}
-
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  bio: string;
-  photo_url?: string;
-  email?: string;
-  linkedin_url?: string;
-  member_type: "founder" | "co_founder";
-  display_order: number;
-  is_active: boolean;
 }
 
 export default function AdminAboutUs() {
   const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
-  const [founder, setFounder] = useState<TeamMember | null>(null);
-  const [coFounders, setCoFounders] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,27 +56,6 @@ export default function AdminAboutUs() {
         if (createError) throw createError;
         if (newAbout) setAboutContent(newAbout);
       }
-
-      // Fetch Team Members (admin can see all)
-      const { data: teamData, error: teamError } = await supabase
-        .from("about_team_members")
-        .select("*")
-        .order("member_type", { ascending: true })
-        .order("display_order", { ascending: true });
-
-      if (teamError) throw teamError;
-
-      if (teamData) {
-        const founderData = teamData.find((m) => m.member_type === "founder");
-        if (founderData) {
-          setFounder(founderData as TeamMember);
-        }
-
-        const coFoundersData = teamData.filter(
-          (m) => m.member_type === "co_founder"
-        );
-        setCoFounders(coFoundersData as TeamMember[]);
-      }
     } catch (err) {
       console.error("[AdminAboutUs] Error fetching:", err);
       setError(
@@ -127,7 +90,7 @@ export default function AdminAboutUs() {
           About Us Management
         </h1>
         <p className="text-muted-foreground">
-          Manage Vowza's public About page content, founder, and co-founders
+          Manage Vowza's public About page content and hero image
         </p>
       </div>
 
@@ -148,43 +111,20 @@ export default function AdminAboutUs() {
         initialDescription={aboutContent?.description}
         initialMission={aboutContent?.mission}
         initialVision={aboutContent?.vision}
+        initialHeroImageUrl={aboutContent?.hero_image_url}
         onSave={() => {
           toast.success("About Vowza updated");
           fetchData();
         }}
       />
 
-      {/* Divider */}
-      <div className="h-px bg-border" />
-
-      {/* Founder Manager */}
-      <FounderManager
-        founder={founder}
-        onSave={(newFounder) => {
-          setFounder(newFounder);
-          toast.success("Founder updated");
-        }}
-      />
-
-      {/* Divider */}
-      <div className="h-px bg-border" />
-
-      {/* Co-Founders Manager */}
-      <CoFoundersManager
-        coFounders={coFounders}
-        onRefresh={fetchData}
-      />
-
       {/* Info Box */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-medium">About Us Feature</p>
+        <p className="font-medium">About Us Management</p>
         <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
+          <li>Edit the About Us content and hero image from this dashboard</li>
+          <li>Hero image must be JPG, PNG, or WebP format (max 5MB)</li>
           <li>Changes are published immediately to the public About page</li>
-          <li>Photos must be JPG, PNG, or WebP format (max 5MB)</li>
-          <li>Maximum 1 founder and 8 co-founders</li>
-          <li>LinkedIn URLs are optional for founder and co-founders</li>
-          <li>Use the visibility toggle to show/hide co-founders without deleting</li>
-          <li>Reorder team members using the arrow buttons</li>
         </ul>
       </div>
     </div>

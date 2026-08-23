@@ -1,35 +1,51 @@
-// ─── About Us Public Page — Premium Redesign ──────────────────────────────────
-// Elegant, minimal company profile page with founder, mission/vision, and co-founder grid
+// ─── Vowza About Us — Premium Editorial Design with Uploadable Hero Image ───
+// Reference-inspired: premium, minimal, editorial, modern
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ExternalLink } from "lucide-react";
 
-interface AboutContent {
+interface AboutData {
+  id: string;
   title: string;
   description: string;
   mission: string;
   vision: string;
+  hero_image_url?: string;
 }
 
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  bio?: string;
-  photo_url?: string;
-  email?: string;
-  linkedin_url?: string;
-  member_type: "founder" | "co_founder";
-  display_order: number;
-  is_active: boolean;
-}
+// Hero Image Container — displays uploaded image or fallback
+const HeroImageContainer = ({ imageUrl }: { imageUrl?: string }) => {
+  console.log("[HeroImageContainer] RECEIVED imageUrl:", imageUrl ? `${imageUrl.substring(0, 100)}...` : "NULL/UNDEFINED");
+  
+  return (
+    <div className="relative w-full h-full min-h-64 md:min-h-80 flex items-center justify-center rounded-2xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200">
+      {imageUrl ? (
+        <>
+          <img
+            src={imageUrl}
+            alt="Vowza Hero"
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onLoad={() => console.log("[HeroImageContainer] ✓ Image loaded successfully")}
+            onError={(err) => console.error("[HeroImageContainer] ✗ Image load failed:", err)}
+          />
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center">
+            <div className="text-6xl font-display font-bold text-gold mb-4">V</div>
+            <p className="text-lg font-semibold text-slate-900 mb-2">Vowza</p>
+            <p className="text-sm text-slate-600">Plan • Connect • Celebrate</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export default function About() {
-  const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
-  const [founder, setFounder] = useState<TeamMember | null>(null);
-  const [coFounders, setCoFounders] = useState<TeamMember[]>([]);
+  const [aboutData, setAboutData] = useState<AboutData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,43 +55,36 @@ export default function About() {
         setIsLoading(true);
         setError(null);
 
-        // Fetch About Us content
-        const { data: aboutData, error: aboutError } = await supabase
+        // Fetch About Us content with hero image URL
+        // First try with hero_image_url, fall back to without it if column doesn't exist
+        let { data: aboutRawData, error: aboutError } = await supabase
           .from("about_us")
-          .select("*")
-          .limit(1)
+          .select("id, title, description, mission, vision, hero_image_url")
+          .eq("id", "00000000-0000-0000-0000-000000000001")
           .single();
 
-        if (aboutError && aboutError.code !== "PGRST116") {
-          throw aboutError;
+        // If hero_image_url column doesn't exist, try without it
+        if (aboutError && aboutError.message?.includes("does not exist")) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("about_us")
+            .select("id, title, description, mission, vision")
+            .eq("id", "00000000-0000-0000-0000-000000000001")
+            .single();
+          
+          aboutRawData = fallbackData;
+          aboutError = fallbackError;
         }
 
-        if (aboutData) {
-          setAboutContent({
-            title: aboutData.title || "About Vowza",
-            description: aboutData.description || "",
-            mission: aboutData.mission || "",
-            vision: aboutData.vision || "",
+        if (aboutError && aboutError.code !== "PGRST116") throw aboutError;
+
+        if (aboutRawData) {
+          setAboutData(aboutRawData as AboutData);
+          console.log("[About.tsx] RECEIVED DATA from database:", {
+            id: aboutRawData.id,
+            hero_image_url: aboutRawData.hero_image_url ? `${aboutRawData.hero_image_url.substring(0, 100)}...` : "NULL",
           });
-        }
-
-        // Fetch Team Members (public reads only active members)
-        const { data: teamData, error: teamError } = await supabase
-          .from("about_team_members")
-          .select("*")
-          .eq("is_active", true)
-          .order("display_order", { ascending: true });
-
-        if (teamError) throw teamError;
-
-        if (teamData) {
-          const founderData = teamData.find((m) => m.member_type === "founder");
-          if (founderData) {
-            setFounder(founderData as TeamMember);
-          }
-
-          const coFoundersData = teamData.filter((m) => m.member_type === "co_founder");
-          setCoFounders(coFoundersData as TeamMember[]);
+        } else {
+          console.log("[About.tsx] No About Us data found - query returned no results");
         }
       } catch (err) {
         console.error("[About] Error fetching data:", err);
@@ -92,223 +101,180 @@ export default function About() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen flex flex-col bg-stone-50">
+      <div className="min-h-screen flex flex-col bg-white overflow-x-hidden">
         <main className="flex-1">
-          {/* SECTION 1: Company Introduction — Premium & Compact */}
-          <section className="w-full py-16 md:py-20 lg:py-24">
-            <div className="max-w-3xl mx-auto px-4 md:px-6">
-              <h1 className="text-4xl md:text-5xl font-serif font-bold text-stone-900 mb-4 tracking-tight">
-                About Vowza
-              </h1>
-              
-              <div className="space-y-4 text-base md:text-lg text-stone-700 leading-relaxed">
-                <p>
-                  Vowza is an AI-powered event planning and service platform built to make every celebration simple, smart, and seamless.
-                </p>
-                <p>
-                  We connect customers with verified event professionals and artists, helping them discover, compare, plan, and book the right services for their special occasions.
-                </p>
-                <p>
-                  With Vowza Planner, our intelligent AI assistant helps users understand their event requirements, plan budgets and schedules, discover suitable services, and simplify the entire event-planning journey.
-                </p>
-                <p>
-                  Vowza also empowers event professionals with digital visibility, customer opportunities, and business growth.
-                </p>
-                
-                {/* Premium closing statement */}
-                <p className="pt-2 font-medium text-stone-900 italic">
-                  From the first idea to the final celebration, Vowza brings everything together in one trusted ecosystem.
-                </p>
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* HERO — Proper responsive two-column layout with uploadable image */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          <section className="w-full py-20 md:py-28 lg:py-32 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-6xl mx-auto w-full">
+              {/* Desktop: 2-column grid | Mobile: 1-column stacked */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 w-full">
+                {/* LEFT: Hero Text — NO overflow */}
+                <div className="flex flex-col justify-center min-w-0">
+                  {/* Eyebrow */}
+                  <div className="flex items-center gap-2 mb-6 sm:mb-8">
+                    <span className="inline-block w-6 sm:w-8 h-px bg-gold flex-shrink-0"></span>
+                    <span className="text-xs font-bold tracking-widest text-gold uppercase whitespace-nowrap">
+                      About Vowza
+                    </span>
+                  </div>
+
+                  {/* Main Headline — guaranteed no clipping */}
+                  <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-bold text-slate-900 mb-6 sm:mb-8 leading-tight break-words">
+                    The future of event planning starts here.
+                  </h1>
+
+                  {/* Primary Description */}
+                  <p className="text-base sm:text-lg md:text-xl text-slate-700 mb-4 sm:mb-6 leading-relaxed font-medium break-words">
+                    {aboutData?.description || "Vowza brings people, event professionals, and intelligent planning together in one connected platform."}
+                  </p>
+
+                  {/* Secondary Description */}
+                  <p className="text-sm sm:text-base md:text-lg text-slate-600 leading-relaxed break-words">
+                    Simplifying the discovery, organization, and execution of celebrations through technology.
+                  </p>
+                </div>
+
+                {/* RIGHT: Hero Image — contained, responsive */}
+                <div className="hidden lg:flex items-center justify-center min-w-0 w-full">
+                  <div className="w-full max-w-md aspect-square">
+                    <HeroImageContainer imageUrl={aboutData?.hero_image_url} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile Image — below text on mobile */}
+              <div className="mt-12 sm:mt-16 lg:hidden w-full flex justify-center px-2">
+                <div className="w-full max-w-xs aspect-square">
+                  <HeroImageContainer imageUrl={aboutData?.hero_image_url} />
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Subtle divider */}
-          <div className="w-full h-px bg-stone-200" />
-
-          {/* SECTION 2: Founder Profile — Refined & Balanced */}
-          {founder && !isLoading && (
-            <section className="w-full py-16 md:py-20">
-              <div className="max-w-4xl mx-auto px-4 md:px-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 items-center">
-                  {/* Founder Photo — LEFT */}
-                  {founder.photo_url && (
-                    <div className="md:col-span-1">
-                      <img
-                        src={founder.photo_url}
-                        alt={founder.name}
-                        className="w-48 h-48 md:w-56 md:h-56 rounded-lg object-cover shadow-sm border border-stone-200"
-                      />
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* MISSION + VISION — Premium composition */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          <section className="w-full py-20 md:py-28 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-6xl mx-auto">
+              <div className="border border-slate-300 rounded-3xl overflow-hidden bg-white shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-300">
+                  {/* Mission */}
+                  <div className="p-12 md:p-16 relative">
+                    {/* Icon */}
+                    <div className="absolute top-8 right-8 w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center">
+                      <span className="text-lg">🎯</span>
                     </div>
-                  )}
 
-                  {/* Founder Details — RIGHT */}
-                  <div className={founder.photo_url ? "md:col-span-2" : "md:col-span-3"}>
-                    <h2 className="text-2xl md:text-3xl font-serif font-bold text-stone-900 mb-1">
-                      {founder.name}
-                    </h2>
-                    <p className="text-sm md:text-base text-stone-600 font-medium mb-4">
-                      {founder.role}
+                    <div className="flex items-baseline gap-4 mb-8">
+                      <span className="text-6xl md:text-7xl font-bold text-gold/20">01</span>
+                    </div>
+
+                    <h3 className="text-2xl md:text-3xl font-display font-bold text-slate-900 mb-4">
+                      Our Mission
+                    </h3>
+
+                    <p className="text-base md:text-lg text-slate-700 leading-relaxed mb-4 font-medium">
+                      Make event planning simple, accessible, and reliable.
                     </p>
-                    
-                    {founder.bio && (
-                      <p className="text-base text-stone-700 leading-relaxed mb-4">
-                        {founder.bio}
-                      </p>
-                    )}
 
-                    {/* LinkedIn Link */}
-                    {founder.linkedin_url && (
-                      <a
-                        href={founder.linkedin_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm font-medium"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z" />
-                        </svg>
-                        View on LinkedIn
-                      </a>
-                    )}
+                    <p className="text-sm md:text-base text-slate-600 leading-relaxed">
+                      We connect people with trusted event professionals through one seamless platform, removing friction and stress from planning celebrations.
+                    </p>
+                  </div>
+
+                  {/* Vision */}
+                  <div className="p-12 md:p-16 relative">
+                    {/* Icon */}
+                    <div className="absolute top-8 right-8 w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center">
+                      <span className="text-lg">👁️</span>
+                    </div>
+
+                    <div className="flex items-baseline gap-4 mb-8">
+                      <span className="text-6xl md:text-7xl font-bold text-gold/20">02</span>
+                    </div>
+
+                    <h3 className="text-2xl md:text-3xl font-display font-bold text-slate-900 mb-4">
+                      Our Vision
+                    </h3>
+
+                    <p className="text-base md:text-lg text-slate-700 leading-relaxed mb-4 font-medium">
+                      India's most trusted event-planning ecosystem.
+                    </p>
+
+                    <p className="text-sm md:text-base text-slate-600 leading-relaxed">
+                      A future where technology makes event planning transparent, personalized, and effortless—where every celebration happens the way it should.
+                    </p>
                   </div>
                 </div>
-              </div>
-            </section>
-          )}
-
-          {/* Subtle divider */}
-          <div className="w-full h-px bg-stone-200" />
-
-          {/* SECTION 3: Our Story */}
-          {aboutContent?.description && (
-            <section className="w-full py-16 md:py-20">
-              <div className="max-w-3xl mx-auto px-4 md:px-6">
-                <h2 className="text-2xl md:text-3xl font-serif font-bold text-stone-900 mb-6">
-                  Our Story
-                </h2>
-                <p className="text-base text-stone-700 leading-relaxed">
-                  {aboutContent.description}
-                </p>
-              </div>
-            </section>
-          )}
-
-          {/* Subtle divider */}
-          <div className="w-full h-px bg-stone-200" />
-
-          {/* SECTION 4: Mission & Vision — Premium Cards */}
-          <section className="w-full py-16 md:py-20">
-            <div className="max-w-4xl mx-auto px-4 md:px-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Mission Card */}
-                {aboutContent?.mission && (
-                  <div className="space-y-3 p-6 rounded-lg border border-stone-200 bg-white hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-serif font-bold text-stone-900">
-                      🎯 Our Mission
-                    </h3>
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {aboutContent.mission}
-                    </p>
-                  </div>
-                )}
-
-                {/* Vision Card */}
-                {aboutContent?.vision && (
-                  <div className="space-y-3 p-6 rounded-lg border border-stone-200 bg-white hover:shadow-md transition-shadow">
-                    <h3 className="text-lg font-serif font-bold text-stone-900">
-                      👁 Our Vision
-                    </h3>
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {aboutContent.vision}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </section>
 
-          {/* Subtle divider */}
-          <div className="w-full h-px bg-stone-200" />
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* WE BELIEVE */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          <section className="w-full py-28 md:py-36 lg:py-40 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gold/5 via-gold/3 to-transparent relative">
+            {/* Decorative elements */}
+            <div className="absolute top-8 right-12 w-3 h-3 rounded-full bg-gold/40"></div>
+            <div className="absolute bottom-12 left-12 w-2 h-2 rounded-full bg-gold/30"></div>
 
-          {/* SECTION 5: Co-Founders — Premium 4-Column Responsive Grid */}
-          {coFounders.length > 0 && (
-            <section className="w-full py-16 md:py-20">
-              <div className="max-w-6xl mx-auto px-4 md:px-6">
-                <h2 className="text-2xl md:text-3xl font-serif font-bold text-stone-900 mb-10">
-                  Leadership Team
-                </h2>
+            <div className="max-w-4xl mx-auto text-center relative z-10">
+              <span className="inline-block text-xs font-bold tracking-widest text-gold uppercase mb-8">
+                We Believe
+              </span>
 
-                {/* Responsive Grid: 1 col mobile, 2 tablet, 4 desktop */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {coFounders.map((cofounder) => (
-                    <div
-                      key={cofounder.id}
-                      className="group rounded-lg border border-stone-200 bg-white overflow-hidden hover:shadow-lg transition-all duration-300"
-                    >
-                      {/* Photo */}
-                      {cofounder.photo_url && (
-                        <div className="overflow-hidden bg-stone-100 h-56">
-                          <img
-                            src={cofounder.photo_url}
-                            alt={cofounder.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        </div>
-                      )}
+              <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold text-slate-900 leading-tight mb-8">
+                Great celebrations should be about the moment — not the stress behind it.
+              </h2>
 
-                      {/* Content */}
-                      <div className="p-5 space-y-3">
-                        <div>
-                          <h3 className="text-base font-serif font-bold text-stone-900 line-clamp-2">
-                            {cofounder.name}
-                          </h3>
-                          <p className="text-xs text-stone-600 font-medium mt-1">
-                            {cofounder.role}
-                          </p>
-                        </div>
-
-                        {cofounder.bio && (
-                          <p className="text-xs text-stone-700 leading-relaxed line-clamp-3">
-                            {cofounder.bio}
-                          </p>
-                        )}
-
-                        {/* LinkedIn Link */}
-                        {cofounder.linkedin_url && (
-                          <a
-                            href={cofounder.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors pt-2"
-                            title="View LinkedIn profile"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            <span className="text-xs font-medium">LinkedIn</span>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {/* Decorative star */}
+              <div className="flex justify-center">
+                <span className="text-gold text-2xl">✦</span>
               </div>
-            </section>
-          )}
+            </div>
+          </section>
 
-          {/* Error State */}
-          {error && (
-            <section className="w-full py-12 md:py-16">
-              <div className="max-w-2xl mx-auto px-4 md:px-6">
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                  <p className="font-medium">Error loading content</p>
-                  <p className="mt-1">{error}</p>
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* CLOSING — Dark navy section like reference */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          <section className="w-full py-28 md:py-36 lg:py-40 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-900 to-slate-800 relative overflow-hidden">
+            {/* Decorative stars */}
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute top-10 left-1/4 w-1 h-1 bg-gold rounded-full"></div>
+              <div className="absolute top-20 right-1/3 w-1.5 h-1.5 bg-gold rounded-full"></div>
+              <div className="absolute bottom-20 left-1/3 w-1 h-1 bg-gold rounded-full"></div>
+              <div className="absolute bottom-10 right-1/4 w-1 h-1 bg-gold rounded-full"></div>
+            </div>
+
+            <div className="max-w-4xl mx-auto text-center relative z-10">
+              <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold text-white leading-tight mb-8">
+                Plan less.<br />
+                Celebrate more.
+              </h2>
+
+              <p className="text-lg md:text-xl text-slate-100 leading-relaxed">
+                Vowza is building a simpler way to bring every celebration together.
+              </p>
+            </div>
+          </section>
+
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ERROR STATE */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {error && !isLoading && (
+            <section className="w-full py-12 md:py-16 px-4 sm:px-6 lg:px-8">
+              <div className="max-w-2xl mx-auto">
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+                  <p className="font-semibold mb-1">Error loading content</p>
+                  <p>{error}</p>
                 </div>
               </div>
             </section>
           )}
         </main>
 
-        {/* Footer */}
         <Footer />
       </div>
     </ErrorBoundary>

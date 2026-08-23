@@ -130,7 +130,7 @@ export default function PhotoVideoPackageManager({ provider }: { provider: any }
     queryFn: async () => {
       const r = await supabase
         .from('photography_videography_packages')
-        .select('*')
+        .select('*, photography_videography_package_images(*)')
         .eq('provider_id', provider.id)
         .order('created_at', { ascending: false });
       if (r.error) throw r.error;
@@ -1075,7 +1075,10 @@ export default function PhotoVideoPackageManager({ provider }: { provider: any }
         ) : (
           <div className="grid gap-4">
             {packages.map((pkg: any) => {
-              const coverImg = pkg.cover_url || '';
+              // Extract cover image from related images array (is_cover = true)
+              const images = pkg.photography_videography_package_images || [];
+              const coverImage = images.find((img: any) => img.is_cover === true);
+              const coverImg = coverImage?.public_url || '';
               return (
                 <div key={pkg.id} className="overflow-hidden rounded-2xl border border-[#eadfcf] bg-[#fffaf3] shadow-sm transition hover:shadow-md">
                   {coverImg ? (

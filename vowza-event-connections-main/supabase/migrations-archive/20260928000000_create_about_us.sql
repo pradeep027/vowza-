@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS public.about_us (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title             TEXT NOT NULL DEFAULT 'Where Talent Meets Celebration',
   description       TEXT NOT NULL DEFAULT 'Loading...',
+  mission           TEXT DEFAULT 'To revolutionize event planning through AI-powered, smart, and seamless solutions.',
+  vision            TEXT DEFAULT 'To become India''s most trusted AI-powered event planning ecosystem.',
+  hero_image_url    TEXT,
   updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_by        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   
