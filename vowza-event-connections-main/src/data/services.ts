@@ -131,7 +131,7 @@ export const serviceCategories: ServiceCategory[] = [
   },
   {
     id: "photography-videography",
-    name: "📸🎥 Photography & Videography",
+    name: "Photography & Videography",
     description: "Capture your special moments with professional photography and videography",
     icon: "Camera",
     image: "/placeholder.svg",
@@ -158,7 +158,7 @@ export const serviceCategories: ServiceCategory[] = [
 // ─── Trending Categories (15 categories) ─────────────────────────────────────
 
 export const trendingCategories: TrendingCategory[] = [
-  { id: "photography-videography", name: "📸🎥 Photography & Videography", icon: "Camera", count: 667, color: "text-gold", bgColor: "bg-gold/10", slug: "photography-videography" },
+  { id: "photography-videography", name: "Photography & Videography", icon: "Camera", count: 667, color: "text-gold", bgColor: "bg-gold/10", slug: "photography-videography" },
   { id: "decorators", name: "Decorators", icon: "Palette", count: 234, color: "text-maroon", bgColor: "bg-maroon/10", slug: "decorators" },
   { id: "bands", name: "Live Bands", icon: "Music", count: 245, color: "text-royal", bgColor: "bg-royal/10", slug: "bands" },
   { id: "dj", name: "DJs", icon: "Disc3", count: 312, color: "text-gold", bgColor: "bg-gold/10", slug: "dj" },

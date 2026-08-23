@@ -41,7 +41,7 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   {
     id:    "photography-videography",
-    name:  "📸🎥 Photography & Videography",
+    name:  "Photography & Videography",
     icon:  Camera,
     color: "bg-rose-50 dark:bg-rose-950/40",
     text:  "text-rose-600 dark:text-rose-400",
