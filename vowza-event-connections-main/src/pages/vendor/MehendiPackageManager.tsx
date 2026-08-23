@@ -9,23 +9,55 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
+// PACKAGE TYPES - What kind of package is this?
+// CORRECTED: Only actual package types, NOT design styles
 const PACKAGE_TYPES = [
-  { value: 'Bridal Mehendi', name: 'Bridal Mehendi', inclusions: ['Bridal Mehendi','Custom Design','Touch-up','Aftercare Instructions'], deliverables: ['Bridal Design','Feet Design','Touch-up','Premium Cone'] },
-  { value: 'Arabic Mehendi', name: 'Arabic Mehendi', inclusions: ['Arabic Mehendi','Custom Design'], deliverables: ['Arabic Design','Aftercare Instructions'] },
-  { value: 'Rajasthani Mehendi', name: 'Rajasthani Mehendi', inclusions: ['Traditional Mehendi','Rajasthani Design','Custom Design'], deliverables: ['Rajasthani Design','Aftercare Instructions'] },
-  { value: 'Indo Arabic Mehendi', name: 'Indo Arabic Mehendi', inclusions: ['Arabic Mehendi','Custom Design'], deliverables: ['Indo Arabic Design'] },
-  { value: 'Portrait Mehendi', name: 'Portrait Mehendi', inclusions: ['Portrait Design','Custom Design','Mehendi Consultation'], deliverables: ['Portrait Design','Touch-up'] },
-  { value: 'Engagement Mehendi', name: 'Engagement Mehendi', inclusions: ['Arabic Mehendi','Custom Design','Design Customization'], deliverables: ['Custom Design','Aftercare Instructions'] },
-  { value: 'Group Booking', name: 'Group Booking', inclusions: ['Guest Mehendi','Arabic Mehendi'], deliverables: ['Guest Designs'] },
-  { value: 'Kids Mehendi', name: 'Kids Mehendi', inclusions: ['Guest Mehendi','Glitter Mehendi'], deliverables: ['Guest Designs'] },
-  { value: 'Custom Package', name: 'Custom Package', inclusions: [], deliverables: [] },
+  { value: 'Bridal Mehendi', name: 'Bridal Mehendi' },
+  { value: 'Engagement Mehendi', name: 'Engagement Mehendi' },
+  { value: 'Party / Guest Mehendi', name: 'Party / Guest Mehendi' },
+  { value: 'Kids Mehendi', name: 'Kids Mehendi' },
+  { value: 'Group Mehendi', name: 'Group Mehendi' },
+  { value: 'Custom Mehendi Package', name: 'Custom Mehendi Package' },
 ];
 
-const ALL_STYLES = ['Bridal Mehendi','Arabic','Indo-Arabic','Rajasthani','Marwari','Pakistani','Traditional','Minimal','Modern','Floral','Mandala','Portrait','Custom'];
-const ALL_COVERAGE = ['Front Hands','Back Hands','Full Hands','Half Hands','Feet','Full Bridal','Guest Mehendi','Kids Mehendi'];
-const ALL_INCLUSIONS = ['Bridal Mehendi','Guest Mehendi','Arabic Mehendi','Traditional Mehendi','Intricate Bridal Design','Custom Design','Glitter Mehendi','White Mehendi','Rajasthani Design','Mandala Design','Portrait Design','Mehendi Consultation','Design Customization','Touch-up','Aftercare Instructions','Mehendi Cone Included'];
-const ALL_DELIVERABLES = ['Bridal Mehendi','Feet Mehendi','Guest Designs','Aftercare Instructions','Touch-up','Premium Cone','Custom Design','Design Consultation'];
-const STEP_LABELS = ['Package Type','Pricing','Styles & Coverage','Services','Team','Gallery & Media','Deliverables','Preview'];
+// DESIGN STYLES - Pure design aesthetics (NOT package types)
+// CORRECTED: Added Arabic, Indo-Arabic, Rajasthani, Portrait which were incorrectly in package types
+const ALL_STYLES = [
+  'Arabic', 'Indo-Arabic', 'Rajasthani', 'Marwari', 'Pakistani', 'Portrait',
+  'Traditional', 'Minimal', 'Modern', 'Floral', 'Mandala', 'Intricate', 'Contemporary', 'Custom'
+];
+
+// COVERAGE - Physical coverage of the service
+const ALL_COVERAGE = ['Front Hands', 'Back Hands', 'Full Hands', 'Half Hands', 'Feet', 'Full Bridal', 'Guest Mehendi', 'Kids Mehendi'];
+
+// SERVICES/INCLUSIONS - What services are included with the package
+const ALL_INCLUSIONS = [
+  'Mehendi Consultation',
+  'Custom Design',
+  'Design Customization',
+  'Touch-up',
+  'Aftercare Guidance',
+  'Glitter Mehendi',
+  'White Mehendi',
+  'Premium Cone',
+  'Mehendi Cone Included',
+  'Bridal Design',
+  'Intricate Design'
+];
+
+// DELIVERABLES - What does the customer actually receive
+const ALL_DELIVERABLES = [
+  'Bridal Design',
+  'Feet Design',
+  'Guest Designs',
+  'Premium Cone Included',
+  'Aftercare Instructions',
+  'Design Consultation',
+  'Touch-up Session',
+  'Photo Portfolio'
+];
+
+const STEP_LABELS = ['Package Type', 'Pricing', 'Design & Coverage', 'Services & Inclusions', 'Team', 'Gallery & Media', 'Deliverables', 'Preview'];
 
 const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py-2.5 text-sm text-[#3d1924] outline-none transition placeholder:text-stone-400 focus:border-[#065f46] focus:ring-2 focus:ring-[#065f46]/15';
 
@@ -82,24 +114,149 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
     setStep(1);
   };
 
+  const validate = (): { valid: boolean; errors: { [key: string]: string } } => {
+    const errors: { [key: string]: string } = {};
+    
+    // Step 1: Package Basics
+    if (!draft!.name.trim()) errors['name'] = 'Package name is required.';
+    if (!draft!.package_type) errors['package_type'] = 'Package type is required.';
+    
+    // Step 2: Pricing
+    if (!draft!.package_price) errors['price'] = 'Package price is required.';
+    else if (Number(draft!.package_price) <= 0) errors['price'] = 'Price must be greater than 0.';
+    
+    const advPct = Number(draft!.advance_percentage || 20);
+    if (advPct < 0 || advPct > 100) errors['advance'] = 'Advance percentage must be between 0 and 100.';
+    
+    // Step 3: Design & Coverage
+    if (draft!.design_styles.length === 0) errors['styles'] = 'At least one design style is required.';
+    if (draft!.coverage.length === 0) errors['coverage'] = 'At least one coverage option is required.';
+    
+    // Step 4: Services & Inclusions
+    if (draft!.inclusions.length === 0) errors['inclusions'] = 'At least one service/inclusion is required.';
+    
+    // Step 5: Team
+    const leadArtist = Number(draft!.lead_artist || 1);
+    if (leadArtist < 1) errors['lead'] = 'Lead artist must be at least 1.';
+    
+    const assistantArtists = Number(draft!.assistant_artists || 0);
+    if (assistantArtists < 0) errors['assistants'] = 'Assistant artists cannot be negative.';
+    
+    // Step 6: Gallery & Media
+    if (!draft!.cover_file && !draft!.cover_url) errors['cover'] = 'Cover photo is required.';
+    if (draft!.gallery_urls.length + draft!.gallery_files.length > 10) errors['gallery'] = 'Maximum 10 gallery photos allowed.';
+    if (draft!.video_urls.length + draft!.video_files.length > 3) errors['videos'] = 'Maximum 3 videos allowed.';
+    
+    // Step 7: Deliverables
+    if (draft!.deliverables.length === 0) errors['deliverables'] = 'At least one deliverable is required.';
+    
+    return { valid: Object.keys(errors).length === 0, errors };
+  };
+
   const save = async () => {
-    if (!draft || !draft.name.trim()) { toast.error('Package name is required.'); setStep(1); return; }
-    if (!draft.package_price) { toast.error('Package price is required.'); setStep(2); return; }
-    if (!draft.cover_file && !draft.cover_url) { toast.error('Cover photo is required.'); setStep(6); return; }
+    if (!draft) return;
+    
+    const validation = validate();
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError);
+      
+      // Navigate to appropriate step based on error
+      if (validation.errors['name'] || validation.errors['package_type']) setStep(1);
+      else if (validation.errors['price'] || validation.errors['advance']) setStep(2);
+      else if (validation.errors['styles'] || validation.errors['coverage']) setStep(3);
+      else if (validation.errors['inclusions']) setStep(4);
+      else if (validation.errors['lead'] || validation.errors['assistants']) setStep(5);
+      else if (validation.errors['cover'] || validation.errors['gallery'] || validation.errors['videos']) setStep(6);
+      else if (validation.errors['deliverables']) setStep(7);
+      return;
+    }
+
     setBusy(true);
     try {
-      const payload: any = { provider_id: provider.id, name: draft.name.trim(), package_type: draft.package_type||null, description: draft.description.trim()||null, status: draft.status, package_price: Number(draft.package_price), advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20, design_styles: draft.design_styles, coverage: draft.coverage, inclusions: draft.inclusions, lead_artist: Number(draft.lead_artist)||1, assistant_artists: Number(draft.assistant_artists)||0, bridal_specialist: draft.bridal_specialist, deliverables: draft.deliverables };
+      const payload: any = {
+        provider_id: provider.id,
+        name: draft.name.trim(),
+        package_type: draft.package_type || null,
+        description: draft.description.trim() || null,
+        status: draft.status,
+        package_price: Number(draft.package_price),
+        advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20,
+        design_styles: draft.design_styles,
+        coverage: draft.coverage,
+        inclusions: draft.inclusions,
+        lead_artist: Number(draft.lead_artist) || 1,
+        assistant_artists: Number(draft.assistant_artists) || 0,
+        bridal_specialist: draft.bridal_specialist,
+        deliverables: draft.deliverables
+      };
+      
       let packageId = draft.id;
-      if (draft.id) { const r = await (supabase.from('mehendi_packages' as any).update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
-      else { const r = await (supabase.from('mehendi_packages' as any).insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
-      if (packageId) {
-        if (draft.cover_file) { const ext = draft.cover_file.name.split('.').pop(); const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type }); if (!upErr) { const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl; await (supabase.from('mehendi_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); } }
-        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl; await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
-        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl; await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
-        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('mehendi_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('mehendi_gallery' as any).delete().in('id', del)); }
+      
+      if (draft.id) {
+        const r = await (supabase.from('mehendi_packages' as any).update(payload).eq('id', draft.id).select('id').single());
+        if (r.error) throw r.error;
+      } else {
+        const r = await (supabase.from('mehendi_packages' as any).insert(payload).select('id').single());
+        if (r.error) throw r.error;
+        packageId = r.data.id;
       }
-      toast.success('Mehendi package saved!'); setDraft(null); setStep(1); refresh();
-    } catch (err: any) { toast.error(err.message || 'Could not save'); } finally { setBusy(false); }
+      
+      if (packageId) {
+        if (draft.cover_file) {
+          const ext = draft.cover_file.name.split('.').pop();
+          const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
+          if (!upErr) {
+            const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
+            await (supabase.from('mehendi_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true));
+            await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 }));
+          }
+        }
+        
+        if (draft.gallery_files.length > 0) {
+          for (let i = 0; i < draft.gallery_files.length; i++) {
+            const file = draft.gallery_files[i];
+            const ext = file.name.split('.').pop();
+            const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type });
+            if (!upErr) {
+              const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
+              await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 }));
+            }
+          }
+        }
+        
+        if (draft.video_files.length > 0) {
+          for (let i = 0; i < draft.video_files.length; i++) {
+            const file = draft.video_files[i];
+            const ext = file.name.split('.').pop();
+            const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type });
+            if (!upErr) {
+              const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
+              await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i }));
+            }
+          }
+        }
+        
+        if (draft.id) {
+          const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean);
+          const { data: ex } = await (supabase.from('mehendi_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false));
+          const del = (ex ?? []).map((e: any) => e.id).filter((id: string) => !cur.includes(id));
+          if (del.length > 0) await (supabase.from('mehendi_gallery' as any).delete().in('id', del));
+        }
+      }
+      
+      toast.success('Mehendi package saved!');
+      setDraft(null);
+      setStep(1);
+      refresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const toggleStatus = async (pkg: any) => { await (supabase.from('mehendi_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
@@ -177,11 +334,8 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
 /* ─── Step 1: Package Type ───────────────────────────────────────────────────── */
 function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
   const handleTypeChange = (value: string) => {
-    const sel = PACKAGE_TYPES.find(t => t.value === value);
-    if (sel) setDraft({ ...draft, package_type: value, name: sel.name, inclusions: [...sel.inclusions], deliverables: [...sel.deliverables] });
-    else setDraft({ ...draft, package_type: value });
+    setDraft({ ...draft, package_type: value });
   };
-  const selectedType = PACKAGE_TYPES.find(t => t.value === draft.package_type);
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5">
@@ -190,8 +344,8 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
           <option value="">Select Mehendi Package Type</option>
           {PACKAGE_TYPES.map(t => <option key={t.value} value={t.value}>{t.name}</option>)}
         </select>
-        {selectedType && selectedType.value !== 'Custom Package' && (
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3"><p className="text-xs font-semibold text-emerald-700 flex items-center gap-1"><Check className="h-3.5 w-3.5" />Auto-loaded "{selectedType.name}"</p></div>
+        {draft.package_type && (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3"><p className="text-xs font-semibold text-emerald-700 flex items-center gap-1"><Check className="h-3.5 w-3.5" />Package Type: {draft.package_type}</p></div>
         )}
       </div>
       <div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-4">
@@ -227,18 +381,25 @@ function StepPricing({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =
   );
 }
 
-/* ─── Step 3: Styles & Coverage ──────────────────────────────────────────────── */
+/* ─── Step 3: Design & Coverage ──────────────────────────────────────────────── */
 function StepStyles({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
   return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-5">
-    <h3 className="text-base font-bold text-emerald-800">Mehendi Styles & Coverage</h3>
-    <ChipSelect label="Mehendi Styles" options={ALL_STYLES} selected={draft.design_styles} onChange={(v: string[]) => setDraft({...draft,design_styles:v})} />
+    <h3 className="text-base font-bold text-emerald-800">Design Styles & Coverage</h3>
+    <div className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-3">
+      <p className="text-xs text-emerald-700"><strong>Package Type:</strong> {draft.package_type || '(Not selected yet)'}</p>
+    </div>
+    <ChipSelect label="Mehendi Design Styles" options={ALL_STYLES} selected={draft.design_styles} onChange={(v: string[]) => setDraft({...draft,design_styles:v})} />
     <ChipSelect label="Coverage" options={ALL_COVERAGE} selected={draft.coverage} onChange={(v: string[]) => setDraft({...draft,coverage:v})} />
   </div></div>);
 }
 
 /* ─── Step 4: Services & Inclusions ──────────────────────────────────────────── */
 function StepServices({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
-  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-5"><h3 className="text-base font-bold text-emerald-800">Services & Inclusions</h3><ChipSelect label="Select Services Included" options={ALL_INCLUSIONS} selected={draft.inclusions} onChange={(v: string[]) => setDraft({...draft,inclusions:v})} /></div></div>);
+  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-5">
+    <h3 className="text-base font-bold text-emerald-800">Services & Inclusions</h3>
+    <p className="text-sm text-stone-600">Select which services and features are included with this package.</p>
+    <ChipSelect label="Services Included" options={ALL_INCLUSIONS} selected={draft.inclusions} onChange={(v: string[]) => setDraft({...draft,inclusions:v})} />
+  </div></div>);
 }
 
 /* ─── Step 5: Team ───────────────────────────────────────────────────────────── */
@@ -294,7 +455,11 @@ function StepGallery({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =
 
 /* ─── Step 7: Deliverables ───────────────────────────────────────────────────── */
 function StepDeliverables({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
-  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-5"><h3 className="text-base font-bold text-emerald-800">Deliverables</h3><ChipSelect label="What's Included" options={ALL_DELIVERABLES} selected={draft.deliverables} onChange={(v: string[]) => setDraft({...draft,deliverables:v})} /></div></div>);
+  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#fcfffc] p-5 space-y-5">
+    <h3 className="text-base font-bold text-emerald-800">Deliverables</h3>
+    <p className="text-sm text-stone-600">What will the customer actually receive and take away from this package?</p>
+    <ChipSelect label="Package Deliverables" options={ALL_DELIVERABLES} selected={draft.deliverables} onChange={(v: string[]) => setDraft({...draft,deliverables:v})} />
+  </div></div>);
 }
 
 /* ─── Step 8: Preview ────────────────────────────────────────────────────────── */
