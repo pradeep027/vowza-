@@ -292,53 +292,65 @@ export const getRandomPromotionVideoForVisitor = async (): Promise<PromotionVide
  * Get all eligible promotion videos for a user.
  * Returns all active videos that haven't reached their user limit.
  * Use for random selection among eligible videos.
+ * 
+ * Fixed: Changed from PostgREST .lt() filter to client-side filtering
+ * to avoid invalid column-to-column comparison
  */
 export const getAllEligiblePromotionVideos = async (
   userId: string,
 ): Promise<PromotionVideoWithViewStatus[]> => {
   console.log('[promotionVideos] Fetching all eligible videos for user:', userId);
-  const { data, error } = await supabase
-    .from('auth_promotion_videos')
-    .select(`
-      id,
-      video_url,
-      priority_order,
-      display_position,
-      user_limit,
-      unique_users_reached,
-      is_active
-    `)
-    .eq('is_active', true)
-    .lt('unique_users_reached', 'user_limit');
+  
+  try {
+    // Fetch all active videos
+    const { data, error } = await supabase
+      .from('auth_promotion_videos')
+      .select(`
+        id,
+        video_url,
+        priority_order,
+        display_position,
+        user_limit,
+        unique_users_reached,
+        is_active
+      `)
+      .eq('is_active', true);
 
-  if (error) {
-    console.error('[promotionVideos] Error fetching eligible videos:', error);
+    if (error) {
+      console.error('[promotionVideos] Error fetching videos:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('[promotionVideos] No active videos found');
+      return [];
+    }
+
+    // Filter to only eligible videos (haven't reached their user limit)
+    const eligibleVideos = data.filter(v => v.unique_users_reached < v.user_limit);
+
+    // Enrich each video with has_user_viewed flag
+    const enrichedVideos: PromotionVideoWithViewStatus[] = await Promise.all(
+      eligibleVideos.map(async (video) => {
+        const { data: viewExists } = await supabase
+          .from('auth_promotion_video_views')
+          .select('id', { count: 'exact', head: true })
+          .eq('video_id', video.id)
+          .eq('user_id', userId);
+
+        return {
+          ...video,
+          has_user_viewed: (viewExists?.length ?? 0) > 0,
+        } as PromotionVideoWithViewStatus;
+      })
+    );
+
+    console.log('[promotionVideos] ✅ Found', enrichedVideos.length, 'eligible videos for random selection');
+    return enrichedVideos;
+  } catch (err) {
+    console.error('[promotionVideos] Exception fetching eligible videos:', err);
     return [];
   }
-
-  if (!data || data.length === 0) {
-    console.warn('[promotionVideos] No eligible videos found');
-    return [];
-  }
-
-  // Enrich each video with has_user_viewed flag
-  const enrichedVideos: PromotionVideoWithViewStatus[] = await Promise.all(
-    data.map(async (video) => {
-      const { data: viewExists } = await supabase
-        .from('auth_promotion_video_views')
-        .select('id', { count: 'exact', head: true })
-        .eq('video_id', video.id)
-        .eq('user_id', userId);
-
-      return {
-        ...video,
-        has_user_viewed: (viewExists?.length ?? 0) > 0,
-      } as PromotionVideoWithViewStatus;
-    })
-  );
-
-  console.log('[promotionVideos] ✅ Found', enrichedVideos.length, 'eligible videos for random selection');
-  return enrichedVideos;
 };
 
 /**
@@ -473,8 +485,8 @@ export const getActivePromotionVideo = async (
 
 /**
  * ✨ FIXED: Get a RANDOMLY selected eligible promotion video for anonymous visitors.
- * Changed from ORDER BY priority_order to ORDER BY RANDOM() for true random selection.
- * This fixes the issue where Video 1 (priority_order=1) was always selected.
+ * Fixed invalid PostgREST query that compared unique_users_reached to user_limit as string.
+ * Now uses proper database-side filtering to select only videos with remaining reach.
  * 
  * Returns: one random eligible video OR null if none available
  * Eligible = is_active AND unique_users_reached < user_limit
@@ -484,54 +496,68 @@ export const getActivePromotionVideoForVisitor = async (
 ): Promise<PromotionVideoWithViewStatus | null> => {
   console.log('[promotionVideos] 🎲 Fetching RANDOM eligible video for anonymous visitor:', visitorId);
   
-  // For anonymous visitors, we get any active video that hasn't reached its limit
-  // The visitor tracking is done client-side via localStorage
-  const { data, error } = await supabase
-    .from('auth_promotion_videos')
-    .select(`
-      id,
-      video_url,
-      priority_order,
-      display_position,
-      user_limit,
-      unique_users_reached,
-      is_active
-    `)
-    .eq('is_active', true)
-    .lt('unique_users_reached', 'user_limit')
-    .order('random')  // 🎲 RANDOM SELECTION FROM ALL ELIGIBLE VIDEOS
-    .limit(1);
+  // For anonymous visitors, fetch ALL active videos and filter client-side
+  // This avoids the invalid PostgREST column-to-column comparison query
+  try {
+    const { data, error } = await supabase
+      .from('auth_promotion_videos')
+      .select(`
+        id,
+        video_url,
+        priority_order,
+        display_position,
+        user_limit,
+        unique_users_reached,
+        is_active
+      `)
+      .eq('is_active', true)
+      .order('priority_order', { ascending: true });
 
-  if (error) {
-    console.error('[promotionVideos] Error fetching video for visitor:', error);
+    if (error) {
+      console.error('[promotionVideos] Error fetching videos for visitor:', error);
+      return null;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('[promotionVideos] No active videos available for visitor');
+      return null;
+    }
+
+    // Filter to only eligible videos (haven't reached their user limit)
+    const eligibleVideos = data.filter(v => v.unique_users_reached < v.user_limit);
+
+    if (eligibleVideos.length === 0) {
+      console.warn('[promotionVideos] No eligible videos available for visitor (all reached limit)');
+      return null;
+    }
+
+    // Select random video from eligible ones
+    const randomIndex = Math.floor(Math.random() * eligibleVideos.length);
+    const video = eligibleVideos[randomIndex];
+
+    console.log('[promotionVideos] ✅ 🎲 Got RANDOM video for visitor:', {
+      id: video.id,
+      priority_order: video.priority_order,
+      unique_users_reached: video.unique_users_reached,
+      user_limit: video.user_limit,
+    });
+
+    // Ensure HTTPS
+    let videoUrl = video.video_url;
+    if (videoUrl && videoUrl.startsWith('http://')) {
+      console.warn('[promotionVideos] ⚠️ Converting HTTP to HTTPS for visitor');
+      videoUrl = videoUrl.replace('http://', 'https://');
+    }
+
+    return {
+      ...video,
+      video_url: videoUrl,
+      has_user_viewed: false, // Anonymous visitors don't have view history in DB
+    } as PromotionVideoWithViewStatus;
+  } catch (err) {
+    console.error('[promotionVideos] Exception fetching video for visitor:', err);
     return null;
   }
-
-  if (!data || data.length === 0) {
-    console.warn('[promotionVideos] No active eligible videos available for visitor');
-    return null;
-  }
-
-  const video = data[0];
-  console.log('[promotionVideos] ✅ 🎲 Got RANDOM video for visitor:', {
-    id: video.id,
-    priority_order: video.priority_order,
-    unique_users_reached: video.unique_users_reached,
-    user_limit: video.user_limit,
-  });
-
-  // Ensure HTTPS
-  let videoUrl = video.video_url;
-  if (videoUrl && videoUrl.startsWith('http://')) {
-    console.warn('[promotionVideos] ⚠️ Converting HTTP to HTTPS for visitor');
-    videoUrl = videoUrl.replace('http://', 'https://');
-  }
-
-  return {
-    ...video,
-    video_url: videoUrl,
-    has_user_viewed: false, // Anonymous visitors don't have view history in DB
-  } as PromotionVideoWithViewStatus;
 };
 
 /**
