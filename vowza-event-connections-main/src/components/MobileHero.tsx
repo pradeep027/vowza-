@@ -40,7 +40,7 @@ const MobileHero = () => {
   };
 
   return (
-    <section className="flex w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-6 pt-[60px]">
+    <section className="flex w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-6 pt-[52px]">
       <div className="mx-auto flex w-full max-w-[600px] flex-col">
         {/* ── Heading block ── */}
         <div className="flex w-full flex-col text-center">
