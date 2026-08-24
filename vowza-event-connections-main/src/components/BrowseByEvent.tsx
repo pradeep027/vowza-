@@ -81,7 +81,7 @@ const BrowseByEvent = () => {
           <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-2">
             Browse by Event Type
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto text-sm md:text-base mb-5 md:mb-6">
+          <p className="text-muted-foreground max-w-xl mx-auto text-sm md:text-base">
             Whatever the occasion, we have verified professionals ready to make it unforgettable.
           </p>
         </div>
@@ -101,7 +101,7 @@ const BrowseByEvent = () => {
                 onClick={() => handleClick(event.id)}
                 className="group relative overflow-hidden rounded-2xl bg-card border border-border/60
                            hover:border-gold/30 hover:shadow-elevated transition-all duration-300
-                           hover:-translate-y-1 text-left p-6 md:p-5"
+                           hover:-translate-y-1 text-left p-4 md:p-5"
               >
                 {/* Subtle gradient accent top-right */}
                 <div
