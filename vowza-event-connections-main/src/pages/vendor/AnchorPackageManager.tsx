@@ -88,6 +88,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
   const [busy, setBusy] = useState(false);
   const [draggedType, setDraggedType] = useState<string | null>(null);
   const [dropZoneActive, setDropZoneActive] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   const { data: savedPackages = [], isLoading } = useQuery({
     queryKey: ['anchor-packages', provider.id],
@@ -179,6 +180,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
       }
 
       toast.success(`${packages.length} independent anchor package(s) saved!`);
+      setShowWizard(false);
       setPackages([]);
       setActivePackageId(null);
       setStep(1);
@@ -343,6 +345,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     setPackages([editPkg]);
     setActivePackageId(editPkg.tempId);
     setStep(1);
+    setShowWizard(true);
   };
 
   const toggleStatus = async (pkg: any) => {
@@ -401,6 +404,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
           setPackages([]);
           setActivePackageId(null);
           setStep(1);
+          setShowWizard(true);
         }} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
       </div>
 
@@ -412,6 +416,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
             setPackages([]);
             setActivePackageId(null);
             setStep(1);
+            setShowWizard(true);
           }} className="mt-4 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
         </div>
       ) : (
@@ -439,10 +444,11 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
         ))}</div>
       )}
 
-      {packages.length > 0 && activePackage && (
+      {showWizard && packages.length > 0 && activePackage && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#0e3d4e]/65 p-3 backdrop-blur-sm sm:p-6">
           <div className="mx-auto my-3 max-w-3xl overflow-hidden rounded-[24px] bg-[#fefffd] shadow-2xl">
             <header className="flex items-start justify-between gap-4 bg-cyan-800 px-5 py-5 sm:px-7"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Creating Packages</p><h2 className="mt-1 text-lg font-bold text-white">{activePackage.package_type} Package</h2></div><button onClick={() => {
+              setShowWizard(false);
               setPackages([]);
               setActivePackageId(null);
               setStep(1);
@@ -454,6 +460,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
                 if (step > 1) {
                   setStep(step - 1);
                 } else {
+                  setShowWizard(false);
                   setPackages([]);
                   setActivePackageId(null);
                   setStep(1);
