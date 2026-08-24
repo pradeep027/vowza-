@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Pencil, Trash2, Eye, EyeOff, X, Check,
@@ -10,7 +9,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
-// REFACTORED: Single PACKAGE_TYPES with 17 event classifications (replaces old 9 role-based types + separate event_types)
 const PACKAGE_TYPES = ['Wedding','Reception','Baraat','Engagement','Sangeet','Haldi','Mehendi','Birthday','Anniversary','Corporate Event','College Fest','Cultural Event','Private Party','Public Event','Religious Event','Award Function','Custom Event'];
 const ALL_COVERAGE = ['Full Event','Ceremony','Reception','Stage','Baraat','Multiple Sessions'];
 const ALL_INCLUSIONS = ['Event Hosting','Stage Hosting','Audience Interaction','Guest Engagement','Couple Introduction','Event Announcements','Games & Activities','Wedding Hosting','Reception Hosting','Baraat Hosting','Corporate Hosting','Award Ceremony Hosting','Script Preparation','Bilingual Hosting','Event Coordination'];
@@ -22,180 +20,342 @@ const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py
 
 /* ─── Types ─────────────────────────────────────────────────────────────────── */
 type Addon = { name: string; price: string; description: string };
-type Draft = {
-  id?: string; name: string; description: string; selectedPackageTypes: string[]; status: string;
-  package_price: string; advance_percentage: string;
-  design_styles: string[]; coverage: string[];
+
+/**
+ * CRITICAL ARCHITECTURE: Each package is COMPLETELY INDEPENDENT
+ * - Own tempId (unique identifier for UI state)
+ * - Own package_type (Wedding, Reception, Sangeet, etc.)
+ * - Own configuration (name, price, photos, etc.)
+ * - NO shared state with other packages
+ * 
+ * When saved: Each package creates its OWN database record
+ */
+type Package = {
+  tempId: string;
+  package_type: string;
+  name: string;
+  description: string;
+  status: string;
+  package_price: string;
+  advance_percentage: string;
+  design_styles: string[];
+  coverage: string[];
   inclusions: string[];
-  lead_artist: string; assistant_artists: string;
-  deliverables: string[]; addons: Addon[];
-  cover_file: File | null; cover_url: string;
-  gallery_files: File[]; gallery_urls: { id: string; url: string; is_cover: boolean }[];
-  video_files: File[]; video_urls: { id: string; url: string }[];
+  lead_artist: string;
+  assistant_artists: string;
+  deliverables: string[];
+  addons: Addon[];
+  cover_file: File | null;
+  cover_url: string;
+  gallery_files: File[];
+  gallery_urls: { id: string; url: string; is_cover: boolean }[];
+  video_files: File[];
+  video_urls: { id: string; url: string }[];
 };
 
-const blank = (): Draft => ({
-  name: '', description: '', selectedPackageTypes: [], status: 'draft',
-  package_price: '', advance_percentage: '20',
-  design_styles: [], coverage: [],
+const createBlankPackage = (packageType: string): Package => ({
+  tempId: crypto.randomUUID(),
+  package_type: packageType,
+  name: '',
+  description: '',
+  status: 'draft',
+  package_price: '',
+  advance_percentage: '20',
+  design_styles: [],
+  coverage: [],
   inclusions: [],
-  lead_artist: '1', assistant_artists: '0',
-  deliverables: [], addons: [],
-  cover_file: null, cover_url: '', gallery_files: [], gallery_urls: [],
-  video_files: [], video_urls: [],
+  lead_artist: '1',
+  assistant_artists: '0',
+  deliverables: [],
+  addons: [],
+  cover_file: null,
+  cover_url: '',
+  gallery_files: [],
+  gallery_urls: [],
+  video_files: [],
+  video_urls: [],
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
 export default function AnchorPackageManager({ provider }: { provider: any }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<Draft | null>(null);
+  
+  // CRITICAL: packages is array of INDEPENDENT packages, not a single draft
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [activePackageId, setActivePackageId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [draggedType, setDraggedType] = useState<string | null>(null);
+  const [dropZoneActive, setDropZoneActive] = useState(false);
 
-  const { data: packages = [], isLoading } = useQuery({
+  const { data: savedPackages = [], isLoading } = useQuery({
     queryKey: ['anchor-packages', provider.id],
     queryFn: async () => { const r = await (supabase.from('anchor_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false })); if (r.error) throw r.error; return r.data ?? []; },
   });
+  
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['anchor-packages', provider.id] });
   useEffect(() => { const ch = supabase.channel(`anchor-packages-${provider.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'anchor_packages', filter: `provider_id=eq.${provider.id}` }, refresh).subscribe(); return () => { supabase.removeChannel(ch); }; }, [provider.id]);
 
-  const edit = async (pkg: any) => {
-    let addons: Addon[] = []; let galleryUrls: { id: string; url: string; is_cover: boolean }[] = []; let videoUrls: { id: string; url: string }[] = []; let coverUrl = '';
-    try { const r = await (supabase.from('anchor_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order')); if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price??''), description: a.description||'' })); } catch (_) {}
-    try { const r = await (supabase.from('anchor_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data??[]).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url||''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch (_) {}
-    setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', selectedPackageTypes: [], status: pkg.status||'draft',
-      package_price: String(pkg.package_price??''), advance_percentage: String(pkg.advance_percentage??'20'),
-      design_styles: pkg.hosting_style??[], coverage: pkg.services_included?.filter((s: string) => ALL_COVERAGE.includes(s))??[],
-      inclusions: pkg.services_included?.filter((s: string) => !ALL_COVERAGE.includes(s))??[],
-      lead_artist: String(pkg.lead_anchor??'1'), assistant_artists: String(pkg.assistant??'0'),
-      deliverables: pkg.deliverables??[], addons,
-      cover_file: null, cover_url: coverUrl, gallery_files: [], gallery_urls: galleryUrls,
-      video_files: [], video_urls: videoUrls });
-    setStep(1);
+  // Get currently active/editing package
+  const getActivePackage = (): Package | null => {
+    if (!activePackageId) return null;
+    return packages.find(p => p.tempId === activePackageId) || null;
   };
 
-  const save = async () => {
-    if (!draft || !draft.name.trim()) { toast.error('Package name is required.'); setStep(1); return; }
-    if (!draft.package_price) { toast.error('Package price is required.'); setStep(2); return; }
-    if (!draft.cover_file && !draft.cover_url) { toast.error('Cover photo is required.'); setStep(1); return; }
-    if (!draft.selectedPackageTypes || draft.selectedPackageTypes.length === 0) { toast.error('At least one package type is required.'); setStep(1); return; }
+  // Update ONLY the active package (CRITICAL: no affecting other packages)
+  const updateActivePackage = (updates: Partial<Package>) => {
+    setPackages(packages.map(p =>
+      p.tempId === activePackageId ? { ...p, ...updates } : p
+    ));
+  };
+
+  // Add new independent package
+  const addPackage = (packageType: string) => {
+    if (packages.some(p => p.package_type === packageType)) {
+      toast.info(`${packageType} is already added. Duplicates not allowed.`);
+      return;
+    }
+    const newPackage = createBlankPackage(packageType);
+    setPackages([...packages, newPackage]);
+    setActivePackageId(newPackage.tempId);
+    setStep(1);
+    toast.success(`Added ${packageType} package`);
+  };
+
+  // Remove package (CRITICAL: only affects that package)
+  const removePackage = (tempId: string) => {
+    const pkg = packages.find(p => p.tempId === tempId);
+    setPackages(packages.filter(p => p.tempId !== tempId));
+    if (activePackageId === tempId) {
+      const remaining = packages.filter(p => p.tempId !== tempId);
+      setActivePackageId(remaining.length > 0 ? remaining[0].tempId : null);
+      setStep(1);
+    }
+    if (pkg) toast.success(`Removed ${pkg.package_type} package`);
+  };
+
+  // Save ALL packages (each becomes independent database record)
+  const saveAllPackages = async () => {
+    if (packages.length === 0) { toast.error('No packages to save.'); return; }
     
+    // Validate EACH package independently
+    for (let i = 0; i < packages.length; i++) {
+      const pkg = packages[i];
+      if (!pkg.name.trim()) { toast.error(`Package ${i + 1} (${pkg.package_type}): Name is required.`); return; }
+      if (!pkg.package_price) { toast.error(`Package ${i + 1} (${pkg.package_type}): Price is required.`); return; }
+      if (!pkg.cover_file && !pkg.cover_url) { toast.error(`Package ${i + 1} (${pkg.package_type}): Cover photo is required.`); return; }
+    }
+
     setBusy(true);
     try {
-      // BATCH CREATION: Create ONE independent package record for EACH selected type
-      // This means: if user selects Wedding + Reception + Sangeet, we create 3 separate records
-      // NOT one record with package_type = ["Wedding", "Reception", "Sangeet"]
-      
-      const basePayload: any = {
-        provider_id: provider.id,
-        name: draft.name.trim(),
-        description: draft.description.trim() || null,
-        status: draft.status,
-        package_price: Number(draft.package_price),
-        advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20,
-        hosting_style: draft.design_styles,
-        services_included: [...draft.coverage, ...draft.inclusions],
-        deliverables: draft.deliverables,
-        lead_anchor: Number(draft.lead_artist) || 1,
-        assistant: Number(draft.assistant_artists) || 0
-      };
+      // CRITICAL: Create ONE independent database record for EACH package
+      // NOT shared - each package has its own media, its own database ID
+      const createdIds: string[] = [];
 
-      // If editing a single package, update it (for backward compatibility)
-      if (draft.id && draft.selectedPackageTypes.length === 1) {
-        const payload = { ...basePayload, package_type: draft.selectedPackageTypes[0] };
-        const r = await (supabase.from('anchor_packages' as any).update(payload).eq('id', draft.id).select('id').single());
+      for (const pkg of packages) {
+        const payload: any = {
+          provider_id: provider.id,
+          package_type: pkg.package_type, // SINGULAR - each record has ONE type
+          name: pkg.name.trim(),
+          description: pkg.description.trim() || null,
+          status: pkg.status,
+          package_price: Number(pkg.package_price),
+          advance_percentage: pkg.advance_percentage ? Number(pkg.advance_percentage) : 20,
+          hosting_style: pkg.design_styles,
+          services_included: [...pkg.coverage, ...pkg.inclusions],
+          deliverables: pkg.deliverables,
+          lead_anchor: Number(pkg.lead_artist) || 1,
+          assistant: Number(pkg.assistant_artists) || 0
+        };
+
+        // Insert as INDEPENDENT record
+        const r = await (supabase.from('anchor_packages' as any).insert(payload).select('id').single());
         if (r.error) throw r.error;
-        await processPictures(draft.id);
-      } 
-      // If creating new or modifying multiple types, use batch creation
-      else if (!draft.id) {
-        // Create ONE package per selected type
-        const createdPackageIds: string[] = [];
-        
-        for (const packageType of draft.selectedPackageTypes) {
-          const payload = { ...basePayload, package_type: packageType };
-          const r = await (supabase.from('anchor_packages' as any).insert(payload).select('id').single());
-          if (r.error) throw r.error;
-          createdPackageIds.push(r.data.id);
-        }
+        createdIds.push(r.data.id);
 
-        // Upload media to the FIRST created package (for simplicity)
-        if (createdPackageIds.length > 0) {
-          await processPictures(createdPackageIds[0]);
-        }
+        // Upload media ONLY for THIS package (not shared)
+        await processPicturesForPackage(r.data.id, pkg);
       }
 
-      toast.success(`${draft.selectedPackageTypes.length} anchor package(s) saved!`);
-      setDraft(null);
+      toast.success(`${packages.length} independent anchor package(s) saved!`);
+      setPackages([]);
+      setActivePackageId(null);
       setStep(1);
       refresh();
     } catch (err: any) {
-      toast.error(err.message || 'Could not save');
+      toast.error(err.message || 'Could not save packages');
     } finally {
       setBusy(false);
     }
   };
 
-  const processPictures = async (packageId: string) => {
-    if (!draft) return;
+  // Upload media ONLY for specific package (not shared across packages)
+  const processPicturesForPackage = async (packageId: string, pkg: Package) => {
     // Addons
     await (supabase.from('anchor_addons' as any).delete().eq('package_id', packageId));
-    const valid = draft.addons.filter(a => a.name.trim());
-    if (valid.length > 0) await (supabase.from('anchor_addons' as any).insert(valid.map((a, i) => ({ package_id: packageId, name: a.name.trim(), price: Number(a.price)||0, description: a.description||null, sort_order: i }))));
-    
-    // Cover
-    if (draft.cover_file) { 
-      const ext = draft.cover_file.name.split('.').pop(); 
-      const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`; 
-      const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type }); 
-      if (!upErr) { 
-        const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
-        await (supabase.from('anchor_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); 
-        await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); 
-      } 
+    const validAddons = pkg.addons.filter(a => a.name.trim());
+    if (validAddons.length > 0) {
+      await (supabase.from('anchor_addons' as any).insert(validAddons.map((a, i) => ({
+        package_id: packageId,
+        name: a.name.trim(),
+        price: Number(a.price) || 0,
+        description: a.description || null,
+        sort_order: i
+      }))));
     }
-    
-    // Gallery photos
-    if (draft.gallery_files.length > 0) { 
-      for (let i = 0; i < draft.gallery_files.length; i++) { 
-        const file = draft.gallery_files[i]; 
-        const ext = file.name.split('.').pop(); 
-        const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; 
-        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); 
-        if (!upErr) { 
-          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
-          await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); 
-        } 
-      } 
+
+    // Cover photo - upload ONLY for THIS package
+    if (pkg.cover_file) {
+      const ext = pkg.cover_file.name.split('.').pop();
+      const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, pkg.cover_file, { contentType: pkg.cover_file.type });
+      if (!upErr) {
+        const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
+        await (supabase.from('anchor_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true));
+        await (supabase.from('anchor_gallery' as any).insert({
+          package_id: packageId,
+          storage_path: path,
+          public_url: url,
+          is_cover: true,
+          media_type: 'image',
+          sort_order: 0
+        }));
+      }
     }
-    
-    // Videos
-    if (draft.video_files.length > 0) { 
-      for (let i = 0; i < draft.video_files.length; i++) { 
-        const file = draft.video_files[i]; 
-        const ext = file.name.split('.').pop(); 
-        const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; 
-        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); 
-        if (!upErr) { 
-          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
-          await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); 
-        } 
-      } 
+
+    // Gallery - upload ONLY THIS package's gallery
+    if (pkg.gallery_files.length > 0) {
+      for (let i = 0; i < pkg.gallery_files.length; i++) {
+        const file = pkg.gallery_files[i];
+        const ext = file.name.split('.').pop();
+        const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type });
+        if (!upErr) {
+          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
+          await (supabase.from('anchor_gallery' as any).insert({
+            package_id: packageId,
+            storage_path: path,
+            public_url: url,
+            is_cover: false,
+            media_type: 'image',
+            sort_order: pkg.gallery_urls.length + i + 1
+          }));
+        }
+      }
     }
-    
-    // Delete removed
-    if (draft.id) { 
-      const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); 
-      const { data: ex } = await (supabase.from('anchor_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); 
-      const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); 
-      if (del.length > 0) await (supabase.from('anchor_gallery' as any).delete().in('id', del)); 
+
+    // Videos - upload ONLY THIS package's videos
+    if (pkg.video_files.length > 0) {
+      for (let i = 0; i < pkg.video_files.length; i++) {
+        const file = pkg.video_files[i];
+        const ext = file.name.split('.').pop();
+        const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type });
+        if (!upErr) {
+          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
+          await (supabase.from('anchor_gallery' as any).insert({
+            package_id: packageId,
+            storage_path: path,
+            public_url: url,
+            is_cover: false,
+            media_type: 'video',
+            sort_order: 100 + i
+          }));
+        }
+      }
     }
   };
 
-  const toggleStatus = async (pkg: any) => { await (supabase.from('anchor_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
-  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('anchor_packages' as any).delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
-  const openNew = () => { setDraft(blank()); setStep(1); };
+  // Drag-and-drop handlers
+  const handleDragStart = (type: string, e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedType(type);
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('packageType', type);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDropZoneActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget === e.target) {
+      setDropZoneActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const type = e.dataTransfer.getData('packageType');
+    if (type) addPackage(type);
+    setDropZoneActive(false);
+    setDraggedType(null);
+  };
+
+  // Edit existing package from Supabase
+  const editPackage = async (pkg: any) => {
+    // Load addons
+    let addons: Addon[] = [];
+    try {
+      const r = await (supabase.from('anchor_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order'));
+      if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' }));
+    } catch (_) {}
+
+    // Load gallery/videos
+    let galleryUrls: { id: string; url: string; is_cover: boolean }[] = [];
+    let videoUrls: { id: string; url: string }[] = [];
+    let coverUrl = '';
+    try {
+      const r = await (supabase.from('anchor_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order'));
+      const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover }));
+      coverUrl = g.find((x: any) => x.is_cover)?.url || '';
+      galleryUrls = g.filter((x: any) => !x.is_cover);
+      videoUrls = g.filter((x: any) => x.is_cover === false).map((x: any) => ({ id: x.id, url: x.url }));
+    } catch (_) {}
+
+    // Create single package object for editing existing package
+    const editPkg: Package = {
+      tempId: pkg.id, // Use DB ID for existing packages
+      package_type: pkg.package_type,
+      name: pkg.name || '',
+      description: pkg.description || '',
+      status: pkg.status || 'draft',
+      package_price: String(pkg.package_price ?? ''),
+      advance_percentage: String(pkg.advance_percentage ?? '20'),
+      design_styles: pkg.hosting_style ?? [],
+      coverage: pkg.services_included?.filter((s: string) => ALL_COVERAGE.includes(s)) ?? [],
+      inclusions: pkg.services_included?.filter((s: string) => !ALL_COVERAGE.includes(s)) ?? [],
+      lead_artist: String(pkg.lead_anchor ?? '1'),
+      assistant_artists: String(pkg.assistant ?? '0'),
+      deliverables: pkg.deliverables ?? [],
+      addons,
+      cover_file: null,
+      cover_url: coverUrl,
+      gallery_files: [],
+      gallery_urls: galleryUrls.map(g => ({ ...g, is_cover: false })),
+      video_files: [],
+      video_urls: videoUrls,
+    };
+
+    setPackages([editPkg]);
+    setActivePackageId(editPkg.tempId);
+    setStep(1);
+  };
+
+  const toggleStatus = async (pkg: any) => {
+    await (supabase.from('anchor_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id));
+    refresh();
+  };
+
+  const removeFromList = async (pkg: any) => {
+    if (!confirm('Delete this package?')) return;
+    await (supabase.from('anchor_packages' as any).delete().eq('id', pkg.id));
+    refresh();
+    toast.success('Deleted');
+  };
 
   const ChipSelect = ({ options, selected, onChange, label }: { options: string[]; selected: string[]; onChange: (v: string[]) => void; label: string }) => (
     <div><span className="text-sm font-semibold text-[#0e4d5c]">{label}</span><div className="mt-1.5 flex flex-wrap gap-2">{options.map(opt => (
@@ -204,33 +364,58 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     ))}</div></div>
   );
 
-  const renderStep = () => { if (!draft) return null; switch(step) {
-    case 1: return <StepPackageType draft={draft} setDraft={setDraft} />;
-    case 2: return <StepPricing draft={draft} setDraft={setDraft} />;
-    case 3: return <StepPerformanceStyle draft={draft} setDraft={setDraft} ChipSelect={ChipSelect} />;
-    case 4: return <StepInclusions draft={draft} setDraft={setDraft} ChipSelect={ChipSelect} />;
-    case 5: return <StepTeam draft={draft} setDraft={setDraft} />;
-    case 6: return <StepDeliverables draft={draft} setDraft={setDraft} ChipSelect={ChipSelect} />;
-    case 7: return <StepAddons draft={draft} setDraft={setDraft} />;
-    case 8: return <StepPreview draft={draft} />;
-    default: return null;
-  }};
+  const activePackage = getActivePackage();
 
+  const renderStep = () => {
+    if (!activePackage) return null;
+    switch (step) {
+      case 1: return <StepPackageType 
+        pkg={activePackage}
+        packages={packages}
+        onUpdate={updateActivePackage}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        draggedType={draggedType}
+        dropZoneActive={dropZoneActive}
+        onAddPackage={addPackage}
+        onRemovePackage={removePackage}
+      />;
+      case 2: return <StepPricing pkg={activePackage} onUpdate={updateActivePackage} />;
+      case 3: return <StepPerformanceStyle pkg={activePackage} onUpdate={updateActivePackage} ChipSelect={ChipSelect} />;
+      case 4: return <StepInclusions pkg={activePackage} onUpdate={updateActivePackage} ChipSelect={ChipSelect} />;
+      case 5: return <StepTeam pkg={activePackage} onUpdate={updateActivePackage} />;
+      case 6: return <StepDeliverables pkg={activePackage} onUpdate={updateActivePackage} ChipSelect={ChipSelect} />;
+      case 7: return <StepAddons pkg={activePackage} onUpdate={updateActivePackage} />;
+      case 8: return <StepPreview pkg={activePackage} />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="max-w-[1200px] space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div><h1 className="text-xl font-bold text-[#0e4d5c]">Anchor Packages</h1><p className="text-sm text-muted-foreground">Create and manage your hosting & anchoring packages.</p></div>
-        <button onClick={openNew} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
+        <button onClick={() => {
+          setPackages([]);
+          setActivePackageId(null);
+          setStep(1);
+        }} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
       </div>
+
       {isLoading ? (<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[1,2,3].map(i => <div key={i} className="h-64 animate-pulse rounded-2xl bg-muted" />)}</div>
-      ) : packages.length === 0 ? (
+      ) : savedPackages.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#eadfcf] py-16 text-center">
           <Mic2 className="h-12 w-12 text-cyan-700/30" /><p className="mt-3 font-semibold text-[#0e4d5c]">No packages yet</p>
-          <button onClick={openNew} className="mt-4 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
+          <button onClick={() => {
+            setPackages([]);
+            setActivePackageId(null);
+            setStep(1);
+          }} className="mt-4 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{packages.map((pkg: any) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{savedPackages.map((pkg: any) => (
           <div key={pkg.id} className="overflow-hidden rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] shadow-sm hover:shadow-md transition">
             <div className="flex h-28 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50"><Mic2 className="h-10 w-10 text-cyan-700/40" /></div>
             <div className="p-4">
@@ -245,24 +430,37 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
                 </div>
               )}
               <div className="mt-4 flex gap-2">
-                <button onClick={() => edit(pkg)} className="flex-1 rounded-lg border border-[#e7d9c4] py-2 text-xs font-medium text-[#0e4d5c] hover:bg-[#f0fdfa]"><Pencil className="mr-1 inline h-3 w-3" />Edit</button>
+                <button onClick={() => editPackage(pkg)} className="flex-1 rounded-lg border border-[#e7d9c4] py-2 text-xs font-medium text-[#0e4d5c] hover:bg-[#f0fdfa]"><Pencil className="mr-1 inline h-3 w-3" />Edit</button>
                 <button onClick={() => toggleStatus(pkg)} className="rounded-lg border border-[#e7d9c4] p-2 hover:bg-[#f0fdfa]">{pkg.status==='active'?<EyeOff className="h-3.5 w-3.5 text-stone-600" />:<Eye className="h-3.5 w-3.5 text-stone-600" />}</button>
-                <button onClick={() => remove(pkg)} className="rounded-lg border border-red-200 p-2 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5 text-red-600" /></button>
+                <button onClick={() => removeFromList(pkg)} className="rounded-lg border border-red-200 p-2 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5 text-red-600" /></button>
               </div>
             </div>
           </div>
         ))}</div>
       )}
-      {draft && (
+
+      {packages.length > 0 && activePackage && (
         <div className="fixed inset-0 z-[70] overflow-y-auto bg-[#0e3d4e]/65 p-3 backdrop-blur-sm sm:p-6">
           <div className="mx-auto my-3 max-w-3xl overflow-hidden rounded-[24px] bg-[#fefffd] shadow-2xl">
-            <header className="flex items-start justify-between gap-4 bg-cyan-800 px-5 py-5 sm:px-7"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Vowza Anchors</p><h2 className="mt-1 text-lg font-bold text-white">{draft.id?'Edit Package':'Add New Package'}</h2></div><button onClick={() => {setDraft(null);setStep(1);}} className="rounded-full p-2 text-white/85 hover:bg-white/15"><X className="h-5 w-5" /></button></header>
+            <header className="flex items-start justify-between gap-4 bg-cyan-800 px-5 py-5 sm:px-7"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">Creating Packages</p><h2 className="mt-1 text-lg font-bold text-white">{activePackage.package_type} Package</h2></div><button onClick={() => {
+              setPackages([]);
+              setActivePackageId(null);
+              setStep(1);
+            }} className="rounded-full p-2 text-white/85 hover:bg-white/15"><X className="h-5 w-5" /></button></header>
             <div className="border-b border-[#eadfcf] bg-[#f0fdfa] px-5 py-4 sm:px-7"><div className="flex items-center justify-between">{STEP_LABELS.map((label, i) => { const sn=i+1; const done=step>sn; const cur=step===sn; return (<div key={i} className="flex flex-1 items-center"><div className="flex flex-col items-center"><div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${done?'bg-cyan-500 text-white':cur?'bg-cyan-700 text-white shadow-md':'border-2 border-[#e7d9c4] text-stone-400'}`}>{done?<Check className="h-4 w-4" />:sn}</div><span className={`mt-1 hidden text-[10px] font-medium sm:block ${cur?'text-cyan-700':done?'text-cyan-600':'text-stone-400'}`}>{label}</span></div>{i<7&&<div className={`mx-1 h-0.5 flex-1 rounded ${done?'bg-cyan-400':'bg-[#e7d9c4]'}`}/>}</div>);})}</div></div>
             <div className="p-5 sm:p-7 max-h-[60vh] overflow-y-auto">{renderStep()}</div>
             <div className="flex items-center justify-between border-t border-[#eadfcf] bg-[#f0fdfa]/95 px-5 py-4 backdrop-blur sm:px-7">
-              <button type="button" onClick={() => step>1?setStep(step-1):setDraft(null)} className="flex items-center gap-1.5 rounded-xl border border-[#d7c5ae] px-4 py-2.5 text-sm font-semibold text-[#0e4d5c] hover:bg-white"><ChevronLeft className="h-4 w-4" />{step===1?'Cancel':'Back'}</button>
+              <button type="button" onClick={() => {
+                if (step > 1) {
+                  setStep(step - 1);
+                } else {
+                  setPackages([]);
+                  setActivePackageId(null);
+                  setStep(1);
+                }
+              }} className="flex items-center gap-1.5 rounded-xl border border-[#d7c5ae] px-4 py-2.5 text-sm font-semibold text-[#0e4d5c] hover:bg-white"><ChevronLeft className="h-4 w-4" />{step===1?'Cancel':'Back'}</button>
               {step<8?(<button type="button" onClick={() => setStep(step+1)} className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-cyan-800">Next<ChevronRight className="h-4 w-4" /></button>
-              ):(<button type="button" disabled={busy} onClick={save} className="rounded-xl bg-cyan-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-60">{busy?'Saving…':'Save Package'}</button>)}
+              ):(<button type="button" disabled={busy} onClick={saveAllPackages} className="rounded-xl bg-cyan-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-60">{busy?'Saving…':'Save All Packages'}</button>)}
             </div>
           </div>
         </div>
@@ -271,83 +469,36 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
   );
 }
 
-
-/* ─── Step 1: Package Type (DRAG-AND-DROP FOR BATCH CREATION) ──────────────── */
-function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
-  const [draggedType, setDraggedType] = useState<string | null>(null);
-  const [dropZoneActive, setDropZoneActive] = useState(false);
-
-  // Handle drag start from available types
-  const handleDragStart = (type: string, e: React.DragEvent<HTMLDivElement>) => {
-    setDraggedType(type);
-    e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('packageType', type);
-  };
-
-  // Handle drag over drop zone
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    setDropZoneActive(true);
-  };
-
-  // Handle drag leave drop zone
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    // Only deactivate if leaving the actual drop zone, not child elements
-    if (e.currentTarget === e.target) {
-      setDropZoneActive(false);
-    }
-  };
-
-  // Handle drop to create package
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const type = e.dataTransfer.getData('packageType');
-    
-    if (type && !draft.selectedPackageTypes.includes(type)) {
-      setDraft({
-        ...draft,
-        selectedPackageTypes: [...draft.selectedPackageTypes, type]
-      });
-      toast.success(`Added ${type} package`);
-    } else if (type && draft.selectedPackageTypes.includes(type)) {
-      toast.info(`${type} is already added. Duplicates not allowed.`);
-    }
-    
-    setDropZoneActive(false);
-    setDraggedType(null);
-  };
-
-  // Handle removal of package
-  const handleRemove = (type: string) => {
-    setDraft({
-      ...draft,
-      selectedPackageTypes: draft.selectedPackageTypes.filter(t => t !== type)
-    });
-    toast.success(`Removed ${type} package`);
-  };
-
-  // Available types (not yet added)
-  const availableTypes = PACKAGE_TYPES.filter(type => !draft.selectedPackageTypes.includes(type));
+/* ─── Step 1: Package Type (DRAG-AND-DROP) ──────────────────────────────────── */
+function StepPackageType({ 
+  pkg, 
+  packages, 
+  onUpdate, 
+  onDragStart, 
+  onDragOver, 
+  onDragLeave, 
+  onDrop,
+  draggedType,
+  dropZoneActive,
+  onAddPackage,
+  onRemovePackage
+}: any) {
+  const availableTypes = PACKAGE_TYPES.filter(type => !packages.some(p => p.package_type === type));
 
   return (
     <div className="space-y-6">
-      {/* SOURCE AREA: Draggable Package Types */}
+      {/* Source Area */}
       <div className="rounded-2xl border border-[#eadfcf] bg-gradient-to-br from-[#f0fdfa] to-[#ecfdf5] p-5 space-y-3">
         <h3 className="text-base font-bold text-cyan-800">📦 Available Package Types</h3>
-        <p className="text-xs text-stone-600">
-          Drag any package type below to the drop zone to create an independent package.
-        </p>
+        <p className="text-xs text-stone-600">Drag any package type to create an independent package with its own configuration.</p>
         
-        {/* Draggable Types Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
           {availableTypes.map(type => (
             <div
               key={type}
               draggable
-              onDragStart={(e) => handleDragStart(type, e)}
-              onDragEnd={() => setDraggedType(null)}
+              onDragStart={(e) => onDragStart(type, e)}
+              onDragEnd={() => {}}
               className={`flex items-center justify-center rounded-xl border-2 border-dashed border-cyan-400 bg-white p-3 text-center cursor-move transition-all hover:shadow-lg hover:border-cyan-600 hover:bg-cyan-50 ${
                 draggedType === type ? 'opacity-50 ring-2 ring-cyan-500' : ''
               }`}
@@ -360,17 +511,15 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
         </div>
 
         {availableTypes.length === 0 && (
-          <p className="text-center text-sm text-stone-400 py-4">
-            All available package types have been added! 🎉
-          </p>
+          <p className="text-center text-sm text-stone-400 py-4">All available package types have been added! 🎉</p>
         )}
       </div>
 
-      {/* DROP ZONE: Where packages are created */}
+      {/* Drop Zone */}
       <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
         className={`rounded-2xl border-2 border-dashed p-6 transition-all ${
           dropZoneActive
             ? 'border-cyan-600 bg-cyan-50 shadow-lg ring-2 ring-cyan-200'
@@ -390,51 +539,39 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
         </div>
       </div>
 
-      {/* CREATED PACKAGES: Independent cards */}
-      {draft.selectedPackageTypes.length > 0 && (
+      {/* Created Packages */}
+      {packages.length > 0 && (
         <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-bold text-cyan-800">
-              📋 Created Packages ({draft.selectedPackageTypes.length})
+              📋 Created Packages ({packages.length})
             </h3>
             <span className="text-xs font-semibold text-cyan-700 bg-cyan-100 px-2.5 py-1 rounded-full">
-              {draft.selectedPackageTypes.length} package{draft.selectedPackageTypes.length !== 1 ? 's' : ''}
+              {packages.length} package{packages.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <p className="text-xs text-stone-600">
-            Each card below represents an independent package that will be created with its own database record.
-          </p>
 
-          {/* Package Cards */}
-          <div className="grid gap-3 mt-4">
-            {draft.selectedPackageTypes.map((type, idx) => (
+          <div className="grid gap-3">
+            {packages.map((p: Package, idx: number) => (
               <div
-                key={`${type}-${idx}`}
+                key={p.tempId}
                 className="flex items-center gap-3 rounded-xl border border-cyan-300 bg-white shadow-sm hover:shadow-md transition p-4"
               >
-                {/* Package Number Badge */}
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-700 text-sm font-bold text-white">
                   {idx + 1}
                 </div>
-
-                {/* Package Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-cyan-800">{type} Package</p>
+                  <p className="text-sm font-bold text-cyan-800">{p.package_type} Package</p>
                   <p className="text-xs text-stone-500">Independent record • Unique database ID</p>
                 </div>
-
-                {/* Status Badge */}
                 <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 border border-cyan-200 px-2.5 py-1 text-[11px] font-semibold text-cyan-700 whitespace-nowrap">
                   <span className="h-1.5 w-1.5 rounded-full bg-cyan-600 animate-pulse"></span>
                   Ready
                 </span>
-
-                {/* Remove Button */}
                 <button
                   type="button"
-                  onClick={() => handleRemove(type)}
+                  onClick={() => onRemovePackage(p.tempId)}
                   className="rounded-lg p-2 text-red-500 hover:bg-red-50 transition"
-                  title="Remove this package"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -444,20 +581,20 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
         </div>
       )}
 
-      {/* PACKAGE INFO SECTION */}
+      {/* Package Info */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
         <h3 className="text-base font-bold text-cyan-800">ℹ️ Package Information</h3>
         <p className="text-xs text-stone-600">
-          <strong>Note:</strong> The name, description, pricing, photos, and other details below will be applied to <strong>all {draft.selectedPackageTypes.length || 'selected'} packages</strong>. 
-          However, each will have its own independent database record with the package type you selected.
+          <strong>Important:</strong> Each package has its OWN independent fields. 
+          Changing {pkg.package_type}'s name does NOT affect other packages.
         </p>
 
         <label className="block">
           <span className="text-sm font-semibold text-[#0e4d5c]">Package Name <span className="text-red-500">*</span></span>
           <input
-            className={inputClass}
-            value={draft.name}
-            onChange={e => setDraft({ ...draft, name: e.target.value })}
+            className={`${inputClass}`}
+            value={pkg.name}
+            onChange={e => onUpdate({ name: e.target.value })}
             placeholder="e.g. Professional Anchor Package"
           />
         </label>
@@ -466,8 +603,8 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
           <span className="text-sm font-semibold text-[#0e4d5c]">Description</span>
           <textarea
             className={`${inputClass} min-h-[80px] resize-y`}
-            value={draft.description}
-            onChange={e => setDraft({ ...draft, description: e.target.value })}
+            value={pkg.description}
+            onChange={e => onUpdate({ description: e.target.value })}
             placeholder="Describe your anchoring package..."
           />
         </label>
@@ -476,8 +613,8 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
           <span className="text-sm font-semibold text-[#0e4d5c]">Status</span>
           <select
             className={inputClass}
-            value={draft.status}
-            onChange={e => setDraft({ ...draft, status: e.target.value })}
+            value={pkg.status}
+            onChange={e => onUpdate({ status: e.target.value })}
           >
             <option value="draft">Draft</option>
             <option value="active">Active</option>
@@ -489,11 +626,17 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
       {/* Cover Photo */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">🖼️ Cover Photo <span className="text-red-500">*</span></span>
-        {(draft.cover_file||draft.cover_url) ? (
-          <div className="relative rounded-xl overflow-hidden border border-[#eadfcf] bg-stone-50 mt-2"><img src={draft.cover_file?URL.createObjectURL(draft.cover_file):draft.cover_url} alt="Cover" className="w-full h-40 object-cover" /><button type="button" onClick={() => setDraft({...draft, cover_file: null, cover_url: ''})} className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><X className="h-3.5 w-3.5" /></button></div>
+        {(pkg.cover_file||pkg.cover_url) ? (
+          <div className="relative rounded-xl overflow-hidden border border-[#eadfcf] bg-stone-50 mt-2">
+            <img src={pkg.cover_file?URL.createObjectURL(pkg.cover_file):pkg.cover_url} alt="Cover" className="w-full h-40 object-cover" />
+            <button type="button" onClick={() => onUpdate({cover_file: null, cover_url: ''})} className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><X className="h-3.5 w-3.5" /></button>
+          </div>
         ) : (
-          <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 p-6 hover:border-cyan-600"><Upload className="h-6 w-6 text-cyan-700 mb-2" /><span className="text-sm font-semibold text-[#0e4d5c]">Upload cover photo</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f&&f.size<=5*1024*1024) setDraft({...draft,cover_file:f}); else if(f) toast.error('Max 5MB'); }} /></label>
+          <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 p-6 hover:border-cyan-600">
+            <Upload className="h-6 w-6 text-cyan-700 mb-2" />
+            <span className="text-sm font-semibold text-[#0e4d5c]">Upload cover photo</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f&&f.size<=5*1024*1024) onUpdate({cover_file:f}); else if(f) toast.error('Max 5MB'); }} />
+          </label>
         )}
       </div>
 
@@ -501,20 +644,20 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">🖼️ Gallery Photos (max 10)</span>
         <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
-          {draft.gallery_urls.map((img,i) => (<div key={img.id||i} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={img.url} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => setDraft({...draft,gallery_urls:draft.gallery_urls.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
-          {draft.gallery_files.map((f,i) => (<div key={`new-${i}`} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => setDraft({...draft,gallery_files:draft.gallery_files.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
-          {(draft.gallery_urls.length+draft.gallery_files.length)<10 && (<label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 aspect-square hover:border-cyan-600"><Plus className="h-5 w-5 text-cyan-700" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { const files=Array.from(e.target.files??[]).filter(f=>f.size<=5*1024*1024).slice(0,10-draft.gallery_urls.length-draft.gallery_files.length); if(files.length) setDraft({...draft,gallery_files:[...draft.gallery_files,...files]}); }} /></label>)}
+          {pkg.gallery_urls.map((img:any,i:any) => (<div key={img.id||i} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={img.url} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => onUpdate({gallery_urls:pkg.gallery_urls.filter((_:any,idx:any)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
+          {pkg.gallery_files.map((f:any,i:any) => (<div key={`new-${i}`} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => onUpdate({gallery_files:pkg.gallery_files.filter((_:any,idx:any)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
+          {(pkg.gallery_urls.length+pkg.gallery_files.length)<10 && (<label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 aspect-square hover:border-cyan-600"><Plus className="h-5 w-5 text-cyan-700" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { const files=Array.from(e.target.files??[]).filter(f=>f.size<=5*1024*1024).slice(0,10-pkg.gallery_urls.length-pkg.gallery_files.length); if(files.length) onUpdate({gallery_files:[...pkg.gallery_files,...files]}); }} /></label>)}
         </div>
       </div>
 
-      {/* Performance Videos */}
+      {/* Videos */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">🎥 Performance Videos (max 5)</span>
         <p className="text-xs text-stone-500 mb-2">Upload hosting/anchoring videos (MP4/MOV/WEBM, max 100MB)</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {draft.video_urls.map((vid,i) => (<div key={vid.id||i} className="relative rounded-xl overflow-hidden border border-cyan-200 bg-cyan-50 aspect-video"><video src={vid.url} className="w-full h-full object-cover rounded-xl" muted preload="metadata" /><span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] text-white font-bold">VIDEO</span><button type="button" onClick={() => setDraft({...draft,video_urls:draft.video_urls.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><X className="h-3 w-3" /></button></div>))}
-          {draft.video_files.map((f,i) => (<div key={`newv-${i}`} className="relative rounded-xl overflow-hidden border border-cyan-200 bg-cyan-50 aspect-video"><video src={URL.createObjectURL(f)} className="w-full h-full object-cover rounded-xl" muted preload="metadata" /><span className="absolute bottom-1 left-1 rounded bg-cyan-700 px-1.5 py-0.5 text-[9px] text-white font-bold">NEW</span><button type="button" onClick={() => setDraft({...draft,video_files:draft.video_files.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><X className="h-3 w-3" /></button></div>))}
-          {(draft.video_urls.length+draft.video_files.length)<5 && (<label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 aspect-video hover:border-cyan-600"><Upload className="h-5 w-5 text-cyan-700" /><span className="text-[10px] text-stone-500 mt-1">+ Add Video</span><input type="file" accept="video/mp4,video/mov,video/webm,video/quicktime" multiple className="hidden" onChange={e => { const files=Array.from(e.target.files??[]).filter(f=>f.size<=100*1024*1024).slice(0,5-draft.video_urls.length-draft.video_files.length); if(files.length) setDraft({...draft,video_files:[...draft.video_files,...files]}); else if(e.target.files?.length) toast.error('Max 100MB per video'); }} /></label>)}
+          {pkg.video_urls.map((vid:any,i:any) => (<div key={vid.id||i} className="relative rounded-xl overflow-hidden border border-cyan-200 bg-cyan-50 aspect-video"><video src={vid.url} className="w-full h-full object-cover rounded-xl" muted preload="metadata" /><span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] text-white font-bold">VIDEO</span><button type="button" onClick={() => onUpdate({video_urls:pkg.video_urls.filter((_:any,idx:any)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><X className="h-3 w-3" /></button></div>))}
+          {pkg.video_files.map((f:any,i:any) => (<div key={`newv-${i}`} className="relative rounded-xl overflow-hidden border border-cyan-200 bg-cyan-50 aspect-video"><video src={URL.createObjectURL(f)} className="w-full h-full object-cover rounded-xl" muted preload="metadata" /><span className="absolute bottom-1 left-1 rounded bg-cyan-700 px-1.5 py-0.5 text-[9px] text-white font-bold">NEW</span><button type="button" onClick={() => onUpdate({video_files:pkg.video_files.filter((_:any,idx:any)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><X className="h-3 w-3" /></button></div>))}
+          {(pkg.video_urls.length+pkg.video_files.length)<5 && (<label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 aspect-video hover:border-cyan-600"><Upload className="h-5 w-5 text-cyan-700" /><span className="text-[10px] text-stone-500 mt-1">+ Add Video</span><input type="file" accept="video/mp4,video/mov,video/webm,video/quicktime" multiple className="hidden" onChange={e => { const files=Array.from(e.target.files??[]).filter(f=>f.size<=100*1024*1024).slice(0,5-pkg.video_urls.length-pkg.video_files.length); if(files.length) onUpdate({video_files:[...pkg.video_files,...files]}); else if(e.target.files?.length) toast.error('Max 100MB per video'); }} /></label>)}
         </div>
       </div>
     </div>
@@ -522,15 +665,15 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
 }
 
 /* ─── Step 2: Pricing ────────────────────────────────────────────────────────── */
-function StepPricing({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
-  const price = Number(draft.package_price||0); const advPct = Number(draft.advance_percentage||20);
+function StepPricing({ pkg, onUpdate }: any) {
+  const price = Number(pkg.package_price||0); const advPct = Number(pkg.advance_percentage||20);
   const advAmount = Math.round(price * advPct / 100); const remaining = price - advAmount;
   return (
     <div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
       <h3 className="mb-4 text-base font-bold text-cyan-800">Pricing</h3>
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Package Price <span className="text-red-500">*</span></span><div className="relative"><span className="absolute left-3.5 top-2.5 text-sm text-stone-500">₹</span><input className={`${inputClass} pl-7`} type="number" min="0" value={draft.package_price} onChange={e => setDraft({...draft,package_price:e.target.value})} placeholder="Package price" /></div></label>
-        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Advance %</span><div className="relative"><span className="absolute right-3.5 top-2.5 text-sm text-stone-500">%</span><input className={`${inputClass} pr-7`} type="number" min="0" max="100" value={draft.advance_percentage} onChange={e => setDraft({...draft,advance_percentage:e.target.value})} placeholder="20" /></div></label>
+        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Package Price <span className="text-red-500">*</span></span><div className="relative"><span className="absolute left-3.5 top-2.5 text-sm text-stone-500">₹</span><input className={`${inputClass} pl-7`} type="number" min="0" value={pkg.package_price} onChange={e => onUpdate({package_price:e.target.value})} placeholder="Package price" /></div></label>
+        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Advance %</span><div className="relative"><span className="absolute right-3.5 top-2.5 text-sm text-stone-500">%</span><input className={`${inputClass} pr-7`} type="number" min="0" max="100" value={pkg.advance_percentage} onChange={e => onUpdate({advance_percentage:e.target.value})} placeholder="20" /></div></label>
       </div>
       {price > 0 && (<div className="mt-4 rounded-xl border border-[#eadfcf] bg-[#f7fffe] p-4 space-y-2">
         <div className="flex justify-between text-sm"><span className="text-stone-600">Package Price</span><span className="font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</span></div>
@@ -541,189 +684,147 @@ function StepPricing({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =
   );
 }
 
-/* ─── Step 3: Performance Style & Coverage ───────────────────────────────────── */
-function StepPerformanceStyle({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
+/* ─── Step 3-7: Other Steps (abbreviated for space) ────────────────────────── */
+function StepPerformanceStyle({ pkg, onUpdate, ChipSelect }: any) {
   return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-5">
     <h3 className="text-base font-bold text-cyan-800">Performance Style & Coverage</h3>
-    <ChipSelect label="Coverage" options={ALL_COVERAGE} selected={draft.coverage} onChange={(v: string[]) => setDraft({...draft,coverage:v})} />
+    <ChipSelect label="Coverage" options={ALL_COVERAGE} selected={pkg.coverage} onChange={(v: string[]) => onUpdate({coverage:v})} />
   </div></div>);
 }
 
-/* ─── Step 4: Inclusions ─────────────────────────────────────────────────────── */
-function StepInclusions({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
-  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-5"><h3 className="text-base font-bold text-cyan-800">Services Included</h3><ChipSelect label="Inclusions" options={ALL_INCLUSIONS} selected={draft.inclusions} onChange={(v: string[]) => setDraft({...draft,inclusions:v})} /></div></div>);
+function StepInclusions({ pkg, onUpdate, ChipSelect }: any) {
+  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-5"><h3 className="text-base font-bold text-cyan-800">Services Included</h3><ChipSelect label="Inclusions" options={ALL_INCLUSIONS} selected={pkg.inclusions} onChange={(v: string[]) => onUpdate({inclusions:v})} /></div></div>);
 }
 
-/* ─── Step 5: Team ───────────────────────────────────────────────────────────── */
-function StepTeam({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
+function StepTeam({ pkg, onUpdate }: any) {
   return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
     <h3 className="text-base font-bold text-cyan-800">Team</h3>
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Lead Anchor</span><input className={inputClass} type="number" min="1" value={draft.lead_artist} onChange={e => setDraft({...draft,lead_artist:e.target.value})} placeholder="1" /></label>
-      <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Assistant Anchors</span><input className={inputClass} type="number" min="0" value={draft.assistant_artists} onChange={e => setDraft({...draft,assistant_artists:e.target.value})} placeholder="0" /></label>
+      <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Lead Anchor</span><input className={inputClass} type="number" min="1" value={pkg.lead_artist} onChange={e => onUpdate({lead_artist:e.target.value})} placeholder="1" /></label>
+      <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Assistant Anchors</span><input className={inputClass} type="number" min="0" value={pkg.assistant_artists} onChange={e => onUpdate({assistant_artists:e.target.value})} placeholder="0" /></label>
     </div>
   </div></div>);
 }
 
-/* ─── Step 6: Deliverables ───────────────────────────────────────────────────── */
-function StepDeliverables({ draft, setDraft, ChipSelect }: { draft: Draft; setDraft: (d: Draft) => void; ChipSelect: any }) {
-  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-5"><h3 className="text-base font-bold text-cyan-800">Deliverables</h3><ChipSelect label="What's Included" options={ALL_DELIVERABLES} selected={draft.deliverables} onChange={(v: string[]) => setDraft({...draft,deliverables:v})} /></div></div>);
+function StepDeliverables({ pkg, onUpdate, ChipSelect }: any) {
+  return (<div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-5"><h3 className="text-base font-bold text-cyan-800">Deliverables</h3><ChipSelect label="What's Included" options={ALL_DELIVERABLES} selected={pkg.deliverables} onChange={(v: string[]) => onUpdate({deliverables:v})} /></div></div>);
 }
 
-/* ─── Step 7: Add-ons ────────────────────────────────────────────────────────── */
-function StepAddons({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
-  const addAddon = (name?: string) => { setDraft({...draft,addons:[...draft.addons,{name:name||'',price:'',description:''}]}); };
-  const removeAddon = (i: number) => { setDraft({...draft,addons:draft.addons.filter((_,idx)=>idx!==i)}); };
-  const updateAddon = (i: number, field: keyof Addon, value: string) => { const a=[...draft.addons]; a[i]={...a[i],[field]:value}; setDraft({...draft,addons:a}); };
-  const addFromTemplate = (t: string) => { if (!draft.addons.some(a => a.name.toLowerCase()===t.toLowerCase())) addAddon(t); else toast.info(`Already added`); };
+function StepAddons({ pkg, onUpdate }: any) {
+  const addAddon = (name?: string) => { onUpdate({addons:[...pkg.addons,{name:name||'',price:'',description:''}]}); };
+  const removeAddon = (i: number) => { onUpdate({addons:pkg.addons.filter((_:any,idx:any)=>idx!==i)}); };
+  const updateAddon = (i: number, field: keyof Addon, value: string) => { const a=[...pkg.addons]; a[i]={...a[i],[field]:value}; onUpdate({addons:a}); };
+  const addFromTemplate = (t: string) => { if (!pkg.addons.some((a:any) => a.name.toLowerCase()===t.toLowerCase())) addAddon(t); else toast.info(`Already added`); };
   return (
     <div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
       <div className="flex items-center justify-between mb-4"><div><h3 className="text-base font-bold text-cyan-800">Add-ons</h3></div><button type="button" onClick={() => addAddon()} className="rounded-lg bg-cyan-700/10 px-3 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-700/20"><Plus className="mr-1 inline h-3 w-3" />Custom</button></div>
       <div className="mb-4"><span className="text-xs font-semibold text-[#0e4d5c] mb-2 block">Quick Add:</span><div className="flex flex-wrap gap-1.5">{ADDON_TEMPLATES.map(t => (<button key={t} type="button" onClick={() => addFromTemplate(t)} className="rounded-full border border-[#e7d9c4] bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600 hover:border-cyan-600 hover:bg-cyan-50 hover:text-cyan-700">+ {t}</button>))}</div></div>
-      {draft.addons.length===0?(<p className="text-center text-sm text-stone-400 py-4">No add-ons yet.</p>):(<div className="space-y-2">{draft.addons.map((addon,i) => (<div key={i} className="grid grid-cols-[1fr_90px_1fr_32px] gap-2 items-center"><input className={inputClass} value={addon.name} onChange={e => updateAddon(i,'name',e.target.value)} placeholder="Name" /><div className="relative"><span className="absolute left-2.5 top-2.5 text-xs text-stone-400">₹</span><input className={`${inputClass} pl-6`} type="number" value={addon.price} onChange={e => updateAddon(i,'price',e.target.value)} placeholder="0" /></div><input className={inputClass} value={addon.description} onChange={e => updateAddon(i,'description',e.target.value)} placeholder="Description" /><button type="button" onClick={() => removeAddon(i)} className="flex h-9 w-9 items-center justify-center rounded-lg text-red-400 hover:bg-red-50"><X className="h-4 w-4" /></button></div>))}</div>)}
+      {pkg.addons.length===0?(<p className="text-center text-sm text-stone-400 py-4">No add-ons yet.</p>):(<div className="space-y-2">{pkg.addons.map((addon:any,i:any) => (<div key={i} className="grid grid-cols-[1fr_90px_1fr_32px] gap-2 items-center"><input className={inputClass} value={addon.name} onChange={e => updateAddon(i,'name',e.target.value)} placeholder="Name" /><div className="relative"><span className="absolute left-2.5 top-2.5 text-xs text-stone-400">₹</span><input className={`${inputClass} pl-6`} type="number" value={addon.price} onChange={e => updateAddon(i,'price',e.target.value)} placeholder="0" /></div><input className={inputClass} value={addon.description} onChange={e => updateAddon(i,'description',e.target.value)} placeholder="Description" /><button type="button" onClick={() => removeAddon(i)} className="flex h-9 w-9 items-center justify-center rounded-lg text-red-400 hover:bg-red-50"><X className="h-4 w-4" /></button></div>))}</div>)}
     </div></div>
   );
 }
 
-/* ─── Step 8: Preview ────────────────────────────────────────────────────────── */
-function StepPreview({ draft }: { draft: Draft }) {
-  const price = Number(draft.package_price||0); const advPct = Number(draft.advance_percentage||20);
+function StepPreview({ pkg }: any) {
+  const price = Number(pkg.package_price||0); const advPct = Number(pkg.advance_percentage||20);
   const advAmount = Math.round(price * advPct / 100); const remaining = price - advAmount;
-  
   return (
     <div className="space-y-6">
-      {/* BATCH CREATION PREVIEW */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-        <h3 className="mb-3 text-base font-bold text-cyan-800">📦 Packages to Create: {draft.selectedPackageTypes.length}</h3>
+        <h3 className="mb-3 text-base font-bold text-cyan-800">📦 {pkg.package_type} Package Preview</h3>
         <p className="text-xs text-stone-600 mb-4">
-          When saved, the wizard will create <span className="font-semibold text-cyan-700">{draft.selectedPackageTypes.length} separate, independent package record(s)</span>. 
-          Each will have its own database ID and exactly one Package Type.
+          This {pkg.package_type} package is <span className="font-semibold text-cyan-700">completely independent</span> from other packages.
+          It will be saved as its own database record with unique ID.
         </p>
       </div>
 
-      {/* INDIVIDUAL PACKAGE PREVIEWS */}
-      {draft.selectedPackageTypes.map((packageType, pkgIndex) => (
-        <div key={packageType} className="rounded-2xl border border-[#eadfcf] bg-white shadow-md overflow-hidden">
-          <div className="overflow-hidden">
-            {draft.cover_file || draft.cover_url ? (
-              <div className="h-36 overflow-hidden">
-                <img src={draft.cover_file ? URL.createObjectURL(draft.cover_file) : draft.cover_url} alt="Cover" className="w-full h-full object-cover" />
-              </div>
-            ) : (
-              <div className="flex h-36 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50">
-                <Mic2 className="h-8 w-8 text-cyan-700/40" />
-              </div>
-            )}
+      <div className="rounded-2xl border border-[#eadfcf] bg-white shadow-md overflow-hidden">
+        <div className="overflow-hidden">
+          {pkg.cover_file || pkg.cover_url ? (
+            <div className="h-36 overflow-hidden">
+              <img src={pkg.cover_file ? URL.createObjectURL(pkg.cover_file) : pkg.cover_url} alt="Cover" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="flex h-36 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50">
+              <Mic2 className="h-8 w-8 text-cyan-700/40" />
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h4 className="text-lg font-bold text-[#0e4d5c]">{pkg.name || 'Package Name'}</h4>
+              <p className="text-xs text-cyan-600 font-semibold mt-1">Type: {pkg.package_type}</p>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${pkg.status === 'active' ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-50 text-blue-700'}`}>
+              {pkg.status}
+            </span>
           </div>
 
-          <div className="p-5 space-y-3">
-            {/* Package Header */}
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cyan-700 text-xs font-bold text-white">
-                    {pkgIndex + 1}
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 border border-cyan-200 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800">
+              <Mic2 className="h-3 w-3" />
+              {pkg.package_type}
+            </span>
+          </div>
+
+          {pkg.description && <p className="text-sm text-stone-600 line-clamp-2">{pkg.description}</p>}
+
+          {price > 0 && (
+            <div className="border-t border-stone-100 pt-3">
+              <p className="text-2xl font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</p>
+              <p className="text-xs text-stone-500">Advance: {advPct}% (₹{advAmount.toLocaleString('en-IN')}) · Remaining: ₹{remaining.toLocaleString('en-IN')}</p>
+            </div>
+          )}
+
+          {pkg.coverage.length > 0 && (
+            <div className="border-t border-stone-100 pt-3">
+              <p className="text-xs font-semibold text-stone-600 mb-1.5">Coverage:</p>
+              <div className="flex flex-wrap gap-1">
+                {pkg.coverage.map(c => (
+                  <span key={c} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[11px] text-teal-800">
+                    {c}
                   </span>
-                  <h4 className="text-lg font-bold text-[#0e4d5c]">{draft.name || 'Package Name'}</h4>
-                </div>
-                <p className="text-xs text-cyan-600 font-semibold mt-1">Type: {packageType}</p>
-              </div>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draft.status === 'active' ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-50 text-blue-700'}`}>
-                {draft.status}
-              </span>
-            </div>
-
-            {/* Package Type Badge */}
-            <div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 border border-cyan-200 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800">
-                <Mic2 className="h-3 w-3" />
-                {packageType}
-              </span>
-            </div>
-
-            {/* Description */}
-            {draft.description && <p className="text-sm text-stone-600 line-clamp-2">{draft.description}</p>}
-
-            {/* Pricing */}
-            {price > 0 && (
-              <div className="border-t border-stone-100 pt-3">
-                <p className="text-2xl font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-stone-500">Advance: {advPct}% (₹{advAmount.toLocaleString('en-IN')}) · Remaining: ₹{remaining.toLocaleString('en-IN')}</p>
-              </div>
-            )}
-
-            {/* Coverage */}
-            {draft.coverage.length > 0 && (
-              <div className="border-t border-stone-100 pt-3">
-                <p className="text-xs font-semibold text-stone-600 mb-1.5">Coverage:</p>
-                <div className="flex flex-wrap gap-1">
-                  {draft.coverage.map(c => (
-                    <span key={c} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[11px] text-teal-800">
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Inclusions */}
-            {draft.inclusions.length > 0 && (
-              <div className="border-t border-stone-100 pt-3">
-                <p className="text-xs font-semibold text-stone-600 mb-1.5">Inclusions:</p>
-                <div className="flex flex-wrap gap-1">
-                  {draft.inclusions.map(i => (
-                    <span key={i} className="rounded-full border border-cyan-200 px-2 py-0.5 text-[11px] text-cyan-800">
-                      {i}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Deliverables */}
-            {draft.deliverables.length > 0 && (
-              <div className="border-t border-stone-100 pt-3">
-                <p className="text-xs font-semibold text-stone-600 mb-1.5">Deliverables:</p>
-                <div className="flex flex-wrap gap-1">
-                  {draft.deliverables.map(d => (
-                    <span key={d} className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-800">
-                      {d}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Team */}
-            <div className="border-t border-stone-100 pt-3 flex gap-4 text-[11px] text-stone-600">
-              {Number(draft.lead_artist) > 0 && <span>👤 Lead: {draft.lead_artist}</span>}
-              {Number(draft.assistant_artists) > 0 && <span>👥 Assistants: {draft.assistant_artists}</span>}
-            </div>
-
-            {/* Add-ons */}
-            {draft.addons.filter(a => a.name.trim()).length > 0 && (
-              <div className="border-t border-stone-100 pt-3">
-                <p className="text-xs font-semibold text-stone-600 mb-1.5">Add-ons:</p>
-                {draft.addons.filter(a => a.name.trim()).map((a, i) => (
-                  <div key={i} className="flex justify-between text-xs mt-1">
-                    <span className="text-stone-700">{a.name}</span>
-                    {a.price && <span className="font-semibold text-cyan-800">+₹{Number(a.price).toLocaleString('en-IN')}</span>}
-                  </div>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
-      ))}
+            </div>
+          )}
 
-      {/* Summary */}
+          {pkg.inclusions.length > 0 && (
+            <div className="border-t border-stone-100 pt-3">
+              <p className="text-xs font-semibold text-stone-600 mb-1.5">Inclusions:</p>
+              <div className="flex flex-wrap gap-1">
+                {pkg.inclusions.map(i => (
+                  <span key={i} className="rounded-full border border-cyan-200 px-2 py-0.5 text-[11px] text-cyan-800">
+                    {i}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pkg.deliverables.length > 0 && (
+            <div className="border-t border-stone-100 pt-3">
+              <p className="text-xs font-semibold text-stone-600 mb-1.5">Deliverables:</p>
+              <div className="flex flex-wrap gap-1">
+                {pkg.deliverables.map(d => (
+                  <span key={d} className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-800">
+                    {d}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold mb-1">✓ Ready to Create</p>
+        <p className="font-semibold mb-1">✓ Ready to Save</p>
         <ul className="text-xs space-y-0.5 ml-4">
-          <li>• {draft.selectedPackageTypes.length} independent package record(s) will be created</li>
-          <li>• Each gets its own Package Type: {draft.selectedPackageTypes.join(', ')}</li>
-          <li>• All share the same name, pricing, and media</li>
-          <li>• Each will have a unique database ID</li>
+          <li>• This {pkg.package_type} package has its own database record</li>
+          <li>• All configuration data will be saved independently</li>
+          <li>• Media (photos/videos) are unique to this package</li>
+          <li>• Other packages remain completely unaffected</li>
         </ul>
       </div>
     </div>
