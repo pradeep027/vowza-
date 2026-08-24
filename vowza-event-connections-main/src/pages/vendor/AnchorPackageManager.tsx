@@ -9,19 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
-const PACKAGE_TYPES = [
-  { value: 'Wedding Anchor', name: 'Wedding Anchor', services: ['Event Hosting','Couple Introduction','Event Announcements','Games & Activities','Wedding Hosting'], deliverables: ['Full Event Hosting','Couple Introduction','Guest Engagement','Games Session'] },
-  { value: 'Reception Host', name: 'Reception Host', services: ['Event Hosting','Guest Engagement','Couple Introduction','Event Announcements'], deliverables: ['Reception Hosting','Guest Engagement','Announcements'] },
-  { value: 'Corporate Event Host', name: 'Corporate Event Host', services: ['Corporate Hosting','Event Coordination','Award Ceremony Hosting','Stage Hosting'], deliverables: ['Full Event Hosting','Corporate Script','Event Coordination'] },
-  { value: 'Birthday Host', name: 'Birthday Host', services: ['Event Hosting','Games & Activities','Audience Interaction','Event Announcements'], deliverables: ['Birthday Hosting','Games Session','Audience Interaction'] },
-  { value: 'Sangeet Host', name: 'Sangeet Host', services: ['Event Hosting','Games & Activities','Audience Interaction','Stage Hosting'], deliverables: ['Sangeet Hosting','Games','Dance Coordination'] },
-  { value: 'Stage Show Host', name: 'Stage Show Host', services: ['Stage Hosting','Event Announcements','Audience Interaction'], deliverables: ['Full Stage Hosting','Script','Coordination'] },
-  { value: 'College Fest Host', name: 'College Fest Host', services: ['Event Hosting','Audience Interaction','Stage Hosting','Event Coordination'], deliverables: ['Fest Hosting','Crowd Engagement','Event Flow'] },
-  { value: 'Private Party Host', name: 'Private Party Host', services: ['Event Hosting','Games & Activities','Guest Engagement'], deliverables: ['Party Hosting','Games','Guest Interaction'] },
-  { value: 'Custom Package', name: 'Custom Package', services: [], deliverables: [] },
-];
-
-const ALL_EVENT_TYPES = ['Wedding','Reception','Baraat','Engagement','Sangeet','Haldi','Mehendi','Birthday','Anniversary','Corporate Event','College Fest','Cultural Event','Private Party','Public Event','Religious Event','Award Function','Custom Event'];
+// REFACTORED: Single PACKAGE_TYPES with 17 event classifications (replaces old 9 role-based types + separate event_types)
+const PACKAGE_TYPES = ['Wedding','Reception','Baraat','Engagement','Sangeet','Haldi','Mehendi','Birthday','Anniversary','Corporate Event','College Fest','Cultural Event','Private Party','Public Event','Religious Event','Award Function','Custom Event'];
 const ALL_COVERAGE = ['Full Event','Ceremony','Reception','Stage','Baraat','Multiple Sessions'];
 const ALL_INCLUSIONS = ['Event Hosting','Stage Hosting','Audience Interaction','Guest Engagement','Couple Introduction','Event Announcements','Games & Activities','Wedding Hosting','Reception Hosting','Baraat Hosting','Corporate Hosting','Award Ceremony Hosting','Script Preparation','Bilingual Hosting','Event Coordination'];
 const ALL_DELIVERABLES = ['Full Event Hosting','Couple Introduction','Guest Engagement','Games Session','Announcements','Event Coordination','Script','Stage Management','Crowd Engagement','Dance Coordination'];
@@ -33,8 +22,7 @@ const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py
 /* ─── Types ─────────────────────────────────────────────────────────────────── */
 type Addon = { name: string; price: string; description: string };
 type Draft = {
-  id?: string; name: string; description: string; package_type: string; status: string;
-  event_types: string[];
+  id?: string; name: string; description: string; package_type: string[]; status: string;
   package_price: string; advance_percentage: string;
   design_styles: string[]; coverage: string[];
   inclusions: string[];
@@ -46,8 +34,7 @@ type Draft = {
 };
 
 const blank = (): Draft => ({
-  name: '', description: '', package_type: '', status: 'draft',
-  event_types: [],
+  name: '', description: '', package_type: [], status: 'draft',
   package_price: '', advance_percentage: '20',
   design_styles: [], coverage: [],
   inclusions: [],
@@ -76,8 +63,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     let addons: Addon[] = []; let galleryUrls: { id: string; url: string; is_cover: boolean }[] = []; let videoUrls: { id: string; url: string }[] = []; let coverUrl = '';
     try { const r = await (supabase.from('anchor_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order')); if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price??''), description: a.description||'' })); } catch (_) {}
     try { const r = await (supabase.from('anchor_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data??[]).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url||''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch (_) {}
-    setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', package_type: pkg.package_type||'', status: pkg.status||'draft',
-      event_types: pkg.event_types??[],
+    setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', package_type: Array.isArray(pkg.package_type) ? pkg.package_type : (pkg.package_type ? [pkg.package_type] : []), status: pkg.status||'draft',
       package_price: String(pkg.package_price??''), advance_percentage: String(pkg.advance_percentage??'20'),
       design_styles: pkg.hosting_style??[], coverage: pkg.services_included?.filter((s: string) => ALL_COVERAGE.includes(s))??[],
       inclusions: pkg.services_included?.filter((s: string) => !ALL_COVERAGE.includes(s))??[],
@@ -92,10 +78,10 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     if (!draft || !draft.name.trim()) { toast.error('Package name is required.'); setStep(1); return; }
     if (!draft.package_price) { toast.error('Package price is required.'); setStep(2); return; }
     if (!draft.cover_file && !draft.cover_url) { toast.error('Cover photo is required.'); setStep(1); return; }
-    if (draft.event_types.length === 0) { toast.error('At least one event type is required.'); setStep(1); return; }
+    if (!draft.package_type || draft.package_type.length === 0) { toast.error('At least one package classification is required.'); setStep(1); return; }
     setBusy(true);
     try {
-      const payload: any = { provider_id: provider.id, name: draft.name.trim(), package_type: draft.package_type||null, description: draft.description.trim()||null, status: draft.status, event_types: draft.event_types, package_price: Number(draft.package_price), advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20, hosting_style: draft.design_styles, services_included: [...draft.coverage, ...draft.inclusions], deliverables: draft.deliverables, lead_anchor: Number(draft.lead_artist)||1, assistant: Number(draft.assistant_artists)||0 };
+      const payload: any = { provider_id: provider.id, name: draft.name.trim(), package_type: draft.package_type, description: draft.description.trim()||null, status: draft.status, package_price: Number(draft.package_price), advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20, hosting_style: draft.design_styles, services_included: [...draft.coverage, ...draft.inclusions], deliverables: draft.deliverables, lead_anchor: Number(draft.lead_artist)||1, assistant: Number(draft.assistant_artists)||0 };
       let packageId = draft.id;
       if (draft.id) { const r = await (supabase.from('anchor_packages' as any).update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
       else { const r = await (supabase.from('anchor_packages' as any).insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
@@ -161,7 +147,25 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
               <div className="flex items-start justify-between gap-2"><h2 className="font-bold text-[#0e4d5c] leading-tight">{pkg.name}</h2>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${pkg.status==='active'?'bg-cyan-100 text-cyan-700':pkg.status==='paused'?'bg-amber-100 text-amber-700':'bg-blue-50 text-blue-700'}`}>{pkg.status}</span></div>
               {pkg.package_price && <p className="mt-1.5 text-lg font-bold text-cyan-700">₹{Number(pkg.package_price).toLocaleString('en-IN')}</p>}
-              {pkg.package_type && <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Mic2 className="h-3.5 w-3.5" />{pkg.package_type}</div>}
+              {pkg.package_type && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {Array.isArray(pkg.package_type) 
+                    ? pkg.package_type.slice(0, 2).map((type: string) => (
+                        <span key={type} className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 border border-cyan-200 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
+                          <Mic2 className="h-2.5 w-2.5" />{type}
+                        </span>
+                      ))
+                    : <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 border border-cyan-200 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
+                        <Mic2 className="h-2.5 w-2.5" />{pkg.package_type}
+                      </span>
+                  }
+                  {Array.isArray(pkg.package_type) && pkg.package_type.length > 2 && (
+                    <span className="inline-flex items-center rounded-full bg-cyan-50 border border-cyan-100 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
+                      +{pkg.package_type.length - 2}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="mt-4 flex gap-2">
                 <button onClick={() => edit(pkg)} className="flex-1 rounded-lg border border-[#e7d9c4] py-2 text-xs font-medium text-[#0e4d5c] hover:bg-[#f0fdfa]"><Pencil className="mr-1 inline h-3 w-3" />Edit</button>
                 <button onClick={() => toggleStatus(pkg)} className="rounded-lg border border-[#e7d9c4] p-2 hover:bg-[#f0fdfa]">{pkg.status==='active'?<EyeOff className="h-3.5 w-3.5 text-stone-600" />:<Eye className="h-3.5 w-3.5 text-stone-600" />}</button>
@@ -190,48 +194,93 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
 }
 
 
-/* ─── Step 1: Package Type ───────────────────────────────────────────────────── */
+/* ─── Step 1: Package Type (REFACTORED) ──────────────────────────────────────── */
 function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
-  const handleTypeChange = (value: string) => {
-    const sel = PACKAGE_TYPES.find(t => t.value === value);
-    if (sel) setDraft({ ...draft, package_type: value, name: sel.name, inclusions: [...sel.services], deliverables: [...sel.deliverables] });
-    else setDraft({ ...draft, package_type: value });
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleSelect = (type: string) => {
+    const isSelected = draft.package_type.includes(type);
+    setDraft({
+      ...draft,
+      package_type: isSelected
+        ? draft.package_type.filter(t => t !== type)
+        : [...draft.package_type, type]
+    });
   };
-  const selectedType = PACKAGE_TYPES.find(t => t.value === draft.package_type);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDropAfter = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+    const newSelected = [...draft.package_type];
+    const item = newSelected[draggedIndex];
+    newSelected.splice(draggedIndex, 1);
+    newSelected.splice(index + (draggedIndex < index ? 0 : 1), 0, item);
+    setDraft({ ...draft, package_type: newSelected });
+    setDraggedIndex(null);
+  };
+
+  const handleRemove = (type: string) => {
+    setDraft({
+      ...draft,
+      package_type: draft.package_type.filter(t => t !== type)
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-        <h3 className="mb-4 text-base font-bold text-cyan-800">Select Package Type</h3>
-        <select className={`${inputClass} text-base py-3`} value={draft.package_type} onChange={e => handleTypeChange(e.target.value)}>
-          <option value="">Select Anchor Package Type</option>
-          {PACKAGE_TYPES.map(t => <option key={t.value} value={t.value}>{t.name}</option>)}
-        </select>
-        {selectedType && selectedType.value !== 'Custom Package' && (
-          <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/50 p-3"><p className="text-xs font-semibold text-cyan-700 flex items-center gap-1"><Check className="h-3.5 w-3.5" />Auto-loaded "{selectedType.name}"</p></div>
-        )}
-      </div>
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
-        <h3 className="text-base font-bold text-cyan-800">Event Types <span className="text-red-500">*</span></h3>
-        <p className="text-xs text-stone-500">Select the types of events your anchoring package covers</p>
+        <h3 className="text-base font-bold text-cyan-800">Package Classifications <span className="text-red-500">*</span></h3>
+        <p className="text-xs text-stone-500">Select the types of events your anchoring package covers. Click to select, drag to reorder.</p>
+        
+        {/* Selection Buttons */}
         <div className="flex flex-wrap gap-2">
-          {ALL_EVENT_TYPES.map(evt => (
-            <button key={evt} type="button" onClick={() => {
-              const isSelected = draft.event_types.includes(evt);
-              setDraft({ ...draft, event_types: isSelected ? draft.event_types.filter(e => e !== evt) : [...draft.event_types, evt] });
-            }} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-              draft.event_types.includes(evt) ? 'border-cyan-700 bg-cyan-700/10 text-cyan-700' : 'border-[#e7d9c4] text-stone-600 hover:border-cyan-500'
-            }`}>{evt}</button>
+          {PACKAGE_TYPES.map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleSelect(type)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                draft.package_type.includes(type)
+                  ? 'border-cyan-700 bg-cyan-700/10 text-cyan-700'
+                  : 'border-[#e7d9c4] text-stone-600 hover:border-cyan-500'
+              }`}
+            >
+              {type}
+            </button>
           ))}
         </div>
-        {draft.event_types.length > 0 && (
-          <div className="mt-3 rounded-lg bg-cyan-50 border border-cyan-200 p-3">
-            <p className="text-xs font-semibold text-cyan-700 mb-2">Selected: {draft.event_types.length}</p>
-            <div className="flex flex-wrap gap-1">
-              {draft.event_types.map(evt => (
-                <span key={evt} className="rounded-full bg-cyan-600/20 px-2 py-0.5 text-xs text-cyan-700 flex items-center gap-1">
-                  {evt}
-                  <button type="button" onClick={() => setDraft({ ...draft, event_types: draft.event_types.filter(e => e !== evt) })} className="hover:text-cyan-800"><X className="h-3 w-3" /></button>
-                </span>
+
+        {/* Draggable Selected Items */}
+        {draft.package_type.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-cyan-700 mb-2">Selected ({draft.package_type.length}) - Drag to reorder:</p>
+            <div className="space-y-1">
+              {draft.package_type.map((type, idx) => (
+                <div
+                  key={idx}
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={handleDragOver}
+                  onDrop={() => handleDropAfter(idx)}
+                  className="flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50/60 p-2.5 cursor-move hover:shadow-sm transition"
+                >
+                  <span className="text-[10px] font-bold text-stone-400 w-4 text-center">{idx + 1}</span>
+                  <span className="flex-1 text-xs font-medium text-cyan-700">{type}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(type)}
+                    className="text-red-400 hover:text-red-600 transition"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -354,10 +403,21 @@ function StepPreview({ draft }: { draft: Draft }) {
         {draft.cover_file||draft.cover_url?(<div className="h-36 overflow-hidden"><img src={draft.cover_file?URL.createObjectURL(draft.cover_file):draft.cover_url} alt="Cover" className="w-full h-full object-cover" /></div>):(<div className="flex h-36 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50"><Mic2 className="h-8 w-8 text-cyan-700/40" /></div>)}
         <div className="p-5">
           <div className="flex items-start justify-between"><h4 className="text-lg font-bold text-[#0e4d5c]">{draft.name||'Package Name'}</h4><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draft.status==='active'?'bg-cyan-100 text-cyan-700':'bg-blue-50 text-blue-700'}`}>{draft.status}</span></div>
-          {draft.package_type && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800"><Mic2 className="h-3 w-3" />{draft.package_type}</span>}
+          {draft.package_type && draft.package_type.length > 0 && (
+            <div className="mt-1">
+              <div className="flex flex-wrap gap-1">
+                {draft.package_type.slice(0, 3).map(pt => (
+                  <span key={pt} className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800"><Mic2 className="h-3 w-3" />{pt}</span>
+                ))}
+                {draft.package_type.length > 3 && <span className="text-[11px] text-muted-foreground">+{draft.package_type.length - 3} more</span>}
+              </div>
+            </div>
+          )}
           {draft.description && <p className="mt-2 text-sm text-stone-500 line-clamp-2">{draft.description}</p>}
           {price > 0 && (<div className="mt-3"><p className="text-2xl font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</p><p className="text-xs text-stone-500">Advance: {advPct}% (₹{advAmount.toLocaleString('en-IN')}) · Remaining: ₹{remaining.toLocaleString('en-IN')}</p></div>)}
-          {draft.event_types.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Event Types:</p><div className="flex flex-wrap gap-1">{draft.event_types.map(e => <span key={e} className="rounded-full bg-cyan-700/8 px-2 py-0.5 text-[11px] text-cyan-700">{e}</span>)}</div></div>)}
+          {draft.package_type.length > 0 && (
+            <div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Package Classifications:</p><div className="flex flex-wrap gap-1">{draft.package_type.map(pt => <span key={pt} className="rounded-full bg-cyan-700/8 px-2 py-0.5 text-[11px] text-cyan-700">{pt}</span>)}</div></div>
+          )}
           {draft.coverage.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Coverage:</p><div className="flex flex-wrap gap-1">{draft.coverage.map(c => <span key={c} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[11px] text-teal-800">{c}</span>)}</div></div>)}
           {draft.inclusions.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Inclusions:</p><div className="flex flex-wrap gap-1">{draft.inclusions.map(i => <span key={i} className="rounded-full border border-cyan-200 px-2 py-0.5 text-[11px] text-cyan-800">{i}</span>)}</div></div>)}
           {draft.deliverables.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Deliverables:</p><div className="flex flex-wrap gap-1">{draft.deliverables.map(d => <span key={d} className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-800">{d}</span>)}</div></div>)}

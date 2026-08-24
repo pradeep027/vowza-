@@ -81,12 +81,24 @@ export default function AnchorMenu({ provider, profile }: { provider: any; profi
                 </div>
                 {pkg.description && <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{pkg.description}</p>}
 
-                {/* Package type badge */}
+                {/* Package type classifications */}
                 {pkg.package_type && (
-                  <div className="mt-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 border border-indigo-200 px-2.5 py-0.5 text-[11px] font-medium text-[#70102d]">
-                      <Mic2 className="h-3 w-3" />{pkg.package_type}
-                    </span>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {Array.isArray(pkg.package_type) 
+                      ? pkg.package_type.slice(0, 3).map((type: string) => (
+                          <span key={type} className="inline-flex items-center gap-1 rounded-full bg-indigo-100 border border-indigo-200 px-2.5 py-0.5 text-[11px] font-medium text-[#70102d]">
+                            <Mic2 className="h-3 w-3" />{type}
+                          </span>
+                        ))
+                      : <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 border border-indigo-200 px-2.5 py-0.5 text-[11px] font-medium text-[#70102d]">
+                          <Mic2 className="h-3 w-3" />{pkg.package_type}
+                        </span>
+                    }
+                    {Array.isArray(pkg.package_type) && pkg.package_type.length > 3 && (
+                      <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700">
+                        +{pkg.package_type.length - 3} more
+                      </span>
+                    )}
                   </div>
                 )}
 
