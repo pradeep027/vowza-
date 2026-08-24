@@ -36,9 +36,9 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
   const save = async () => {
     if(!draft||!draft.name.trim()){toast.error('Package name required.');setStep(1);return;} 
     if(!draft.package_type){toast.error('Package type required.');setStep(1);return;}
+    if(draft.event_types.length===0){toast.error('At least one event type required.');setStep(1);return;}
     if(!draft.package_price){toast.error('Price required.');setStep(2);return;} 
     if(!draft.cover_file&&!draft.cover_url){toast.error('Cover photo required.');setStep(1);return;} 
-    if(draft.event_types.length===0){toast.error('At least one event type required.');setStep(3);return;}
     if(draft.languages.length===0){toast.error('At least one language required.');setStep(4);return;}
     if(draft.music_styles.length===0){toast.error('At least one music style required.');setStep(4);return;}
     
@@ -117,7 +117,7 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
   const EventTypeSelector=({selected,onChange}:{selected:string[];onChange:(v:string[])=>void})=>{const [customInput,setCustomInput]=useState('');const [draggedItem,setDraggedItem]=useState<number|null>(null);const handleAddEvent=(opt:string)=>{if(!selected.includes(opt))onChange([...selected,opt]);};const handleRemoveEvent=(opt:string)=>{onChange(selected.filter(s=>s!==opt));};const handleDragStart=(index:number)=>{setDraggedItem(index);};const handleDragOver=(e:React.DragEvent)=>{e.preventDefault();};const handleDropAfter=(index:number)=>{if(draggedItem===null||draggedItem===index)return;const newSelected=[...selected];const item=newSelected[draggedItem];newSelected.splice(draggedItem,1);newSelected.splice(index+(draggedItem<index?0:1),0,item);onChange(newSelected);setDraggedItem(null);};const handleAddCustom=()=>{if(customInput.trim()&&!selected.includes(customInput.trim())){onChange([...selected,customInput.trim()]);setCustomInput('');}};return(<div><span className="text-sm font-semibold text-[#4b134f]">Event Types *</span><p className="text-xs text-stone-500 mt-1">Click to select, drag to reorder</p><div className="mt-1.5 flex flex-wrap gap-2">{EVENT_TYPES.map(opt=>(<button key={opt} type="button" onClick={()=>selected.includes(opt)?handleRemoveEvent(opt):handleAddEvent(opt)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${selected.includes(opt)?'border-rose-600 bg-rose-600/10 text-rose-700':'border-[#e7d9c4] text-stone-600 hover:border-rose-500'}`}>{opt}</button>))}</div><div className="mt-3 space-y-2"><p className="text-xs font-medium text-stone-600">Selected (drag to reorder):</p><div className="space-y-1">{selected.length===0?<p className="text-xs text-stone-400 italic">No events selected</p>:selected.map((item,idx)=>(<div key={idx} draggable onDragStart={()=>handleDragStart(idx)} onDragOver={handleDragOver} onDrop={()=>handleDropAfter(idx)} className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 cursor-move hover:shadow-sm transition"><span className="text-[10px] font-bold text-stone-400 w-4 text-center">{idx+1}</span><span className="flex-1 text-xs font-medium text-rose-700">{item}</span><button type="button" onClick={()=>handleRemoveEvent(item)} className="text-red-400 hover:text-red-600"><X className="h-3 w-3"/></button></div>))}</div></div><div className="mt-3 flex gap-2"><input type="text" placeholder="Enter custom event type" value={customInput} onChange={e=>setCustomInput(e.target.value)} onKeyPress={e=>{if(e.key==='Enter'){e.preventDefault();handleAddCustom();}}} className={`${inputClass} flex-1`}/><button type="button" onClick={handleAddCustom} className="rounded-lg bg-rose-700/10 px-3 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-700/20"><Plus className="h-3.5 w-3.5"/></button></div></div>);};
 
   const renderStep=()=>{if(!draft)return null;switch(step){
-    case 1: // Basics: Package Type, Name, Description, Cover Photo
+    case 1: // Basics: Package Type, Event Types, Name, Description, Cover Photo
       return(<div className="space-y-4">
         <div className="rounded-2xl border border-[#eadfcf] bg-[#fff9f9] p-5">
           <h3 className="mb-4 text-base font-bold text-rose-800">Package Type *</h3>
@@ -125,6 +125,9 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
             <option value="">Select Package Type</option>
             {PACKAGE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
           </select>
+        </div>
+        <div className="rounded-2xl border border-[#eadfcf] bg-[#fff9f9] p-5">
+          <EventTypeSelector selected={draft.event_types} onChange={(v:string[])=>setDraft({...draft,event_types:v})}/>
         </div>
         <div className="rounded-2xl border border-[#eadfcf] bg-[#fff9f9] p-5 space-y-4">
           <label className="block">
@@ -186,7 +189,7 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
         </div>
       </div>);
     
-    case 3: // Performance & Event Types
+    case 3: // Performance & Duration
       return(<div className="space-y-4">
         <div className="rounded-2xl border border-[#eadfcf] bg-[#fff9f9] p-5 space-y-4">
           <h3 className="text-base font-bold text-rose-800">Performance Details</h3>
@@ -207,7 +210,6 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
             <span className="text-sm font-semibold text-[#4b134f]">Set Duration</span>
             <input className={inputClass} value={draft.set_duration} onChange={e=>setDraft({...draft,set_duration:e.target.value})} placeholder="e.g. 45 mins"/>
           </label>
-          <EventTypeSelector selected={draft.event_types} onChange={(v:string[])=>setDraft({...draft,event_types:v})}/>
         </div>
       </div>);
     
