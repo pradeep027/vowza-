@@ -204,24 +204,24 @@ const TrendingCategories = () => {
     cat.types.reduce((sum, t) => sum + (countMap.get(t) ?? 0), 0);
 
   return (
-    <section className="py-10 md:py-20 bg-background">
-      <div className="container px-4">
+    <section className="py-6 md:py-20 bg-background">
+      <div className="container px-3 md:px-4">
 
         {/* ── Section header ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8 md:mb-10"
+          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6 md:mb-10"
         >
           <div>
-            <div className="section-label bg-maroon/8 text-maroon mb-4 inline-flex">
+            <div className="section-label bg-maroon/8 text-maroon mb-2 inline-flex">
               Browse Categories
             </div>
             <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
               What are you looking for?
             </h2>
-            <p className="text-muted-foreground mt-2 max-w-lg text-sm">
+            <p className="text-muted-foreground mt-1 max-w-lg text-sm">
               From photographers to caterers — every service you need for a perfect event.
             </p>
           </div>
