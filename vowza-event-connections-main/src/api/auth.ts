@@ -1,5 +1,6 @@
 import { otpService, type OTPRequest, type OTPVerification } from '../services/otp'
 import { authService, type AuthUser, type TokenPair } from '../services/auth'
+import { supabase } from '../integrations/supabase/client'
 
 export interface LoginRequest {
   phone: string
@@ -72,30 +73,52 @@ class AuthAPI {
         }
       }
 
-      // Authenticate user and generate tokens
-      const authResult = await authService.authenticateWithOTP(
-        request.phone,
-        request.purpose,
-        request.deviceInfo,
-        request.ipAddress
-      )
-
-      if (!authResult.success) {
+      // The Edge Function has already verified the OTP and minted the
+      // Supabase session server-side. The browser only persists that session.
+      if (!otpResult.accessToken || !otpResult.refreshToken) {
         return {
           success: false,
-          message: authResult.message
+          message: 'Authentication service did not return a session'
         }
       }
 
-      // Check if user needs onboarding (for workers)
-      const requiresOnboarding = request.purpose === 'worker_onboarding'
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: otpResult.accessToken,
+        refresh_token: otpResult.refreshToken,
+      })
+
+      if (sessionError) {
+        return {
+          success: false,
+          message: 'Unable to establish the authenticated session'
+        }
+      }
+
+      const sessionUser = otpResult.user as {
+        id: string
+        phone?: string
+        email?: string
+        user_metadata?: { full_name?: string }
+      } | undefined
+      const user: AuthUser | undefined = sessionUser ? {
+        id: sessionUser.id,
+        phone: sessionUser.phone,
+        email: sessionUser.email,
+        fullName: sessionUser.user_metadata?.full_name,
+        roles: [],
+        isVerified: true,
+      } : undefined
 
       return {
         success: true,
-        message: authResult.message,
-        user: authResult.user,
-        tokens: authResult.tokens,
-        requiresOnboarding
+        message: otpResult.message,
+        user,
+        tokens: {
+          accessToken: otpResult.accessToken,
+          refreshToken: otpResult.refreshToken,
+          expiresIn: otpResult.expiresIn ?? 3600,
+        },
+        requiresOnboarding: otpResult.requiresOnboarding ?? request.purpose === 'worker_onboarding'
       }
     } catch (error) {
       console.error('Login verification error:', error)

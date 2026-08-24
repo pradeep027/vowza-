@@ -1,4 +1,5 @@
 import { supabase } from '../integrations/supabase/client'
+import { otpService } from './otp'
 import type { Database } from '../integrations/supabase/types'
 
 export interface WorkerOnboardingStep1 {
@@ -66,19 +67,22 @@ class WorkerOnboardingService {
    */
   async startOnboarding(phone: string, otp: string): Promise<WorkerOnboardingResponse> {
     try {
-      // Verify OTP first
-      const { data: otpData, error: otpError } = await supabase
-        .from('otp_verifications')
-        .select('*')
-        .eq('phone', phone)
-        .eq('purpose', 'worker_onboarding')
-        .eq('verified', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (otpError || !otpData) {
-        return { success: false, message: 'Please verify OTP first' }
+      // Verify through auth-otp. The Edge Function verifies and mints the
+      // Supabase session server-side; the browser only persists that session.
+      const otpResult = await otpService.verifyOTP({
+        phone,
+        otp,
+        purpose: 'worker_onboarding',
+      })
+      if (!otpResult.success || !otpResult.accessToken || !otpResult.refreshToken) {
+        return { success: false, message: otpResult.message || 'Please verify OTP first' }
+      }
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: otpResult.accessToken,
+        refresh_token: otpResult.refreshToken,
+      })
+      if (sessionError) {
+        return { success: false, message: 'Unable to establish the authenticated session' }
       }
 
       // Check if user exists
