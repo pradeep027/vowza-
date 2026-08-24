@@ -1,0 +1,127 @@
+warning: in the working copy of 'vowza-event-connections-main/src/data/categoryConfig.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vowza-event-connections-main/src/data/services.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vowza-event-connections-main/src/hooks/useArtists.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vowza-event-connections-main/src/pages/ProviderProfile.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vowza-event-connections-main/supabase/migrations/20261001000000_photography_videography_fixes.sql', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/.auth-promo-production-deploy b/.auth-promo-production-deploy[m
+[1m--- a/.auth-promo-production-deploy[m
+[1m+++ b/.auth-promo-production-deploy[m
+[36m@@ -1 +1 @@[m
+[31m-Subproject commit 38616be27e518036352a13f57a77e957987e53cc[m
+[32m+[m[32mSubproject commit 38616be27e518036352a13f57a77e957987e53cc-dirty[m
+[1mdiff --git a/.service-start-deploy b/.service-start-deploy[m
+[1m--- a/.service-start-deploy[m
+[1m+++ b/.service-start-deploy[m
+[36m@@ -1 +1 @@[m
+[31m-Subproject commit 38616be27e518036352a13f57a77e957987e53cc[m
+[32m+[m[32mSubproject commit 38616be27e518036352a13f57a77e957987e53cc-dirty[m
+[1mdiff --git a/.service-start-deploy-v2 b/.service-start-deploy-v2[m
+[1m--- a/.service-start-deploy-v2[m
+[1m+++ b/.service-start-deploy-v2[m
+[36m@@ -1 +1 @@[m
+[31m-Subproject commit 38616be27e518036352a13f57a77e957987e53cc[m
+[32m+[m[32mSubproject commit 38616be27e518036352a13f57a77e957987e53cc-dirty[m
+[1mdiff --git a/.service-start-deploy-v3 b/.service-start-deploy-v3[m
+[1m--- a/.service-start-deploy-v3[m
+[1m+++ b/.service-start-deploy-v3[m
+[36m@@ -1 +1 @@[m
+[31m-Subproject commit 38616be27e518036352a13f57a77e957987e53cc[m
+[32m+[m[32mSubproject commit 38616be27e518036352a13f57a77e957987e53cc-dirty[m
+[1mdiff --git a/vowza-event-connections-main/src/components/Navbar.tsx b/vowza-event-connections-main/src/components/Navbar.tsx[m
+[1mindex 17c336d..81edfdd 100644[m
+[1m--- a/vowza-event-connections-main/src/components/Navbar.tsx[m
+[1m+++ b/vowza-event-connections-main/src/components/Navbar.tsx[m
+[36m@@ -24,7 +24,7 @@[m [mimport { cn } from "@/lib/utils";[m
+ [m
+ // ── Mega menu data ─────────────────────────────────────────────────────────[m
+ const megaCategories = [[m
+[31m-  { label: "Photographers",    icon: Camera,   slug: "photographer",       featured: true  },[m
+[32m+[m[32m  { label: "📸🎥 Photography & Videography", icon: Camera, slug: "photography-videography", featured: true },[m
+   { label: "DJs",              icon: Disc3,    slug: "dj",                 featured: false },[m
+   { label: "Live Bands",       icon: Music,    slug: "music_band",         featured: true  },[m
+   { label: "Makeup Artists",   icon: Palette,  slug: "makeup_artist",      featured: false },[m
+[1mdiff --git a/vowza-event-connections-main/src/components/TrendingCategories.tsx b/vowza-event-connections-main/src/components/TrendingCategories.tsx[m
+[1mindex 5e57ebc..bff1c14 100644[m
+[1m--- a/vowza-event-connections-main/src/components/TrendingCategories.tsx[m
+[1m+++ b/vowza-event-connections-main/src/components/TrendingCategories.tsx[m
+[36m@@ -8,8 +8,7 @@[m [mimport { motion } from "framer-motion";[m
+ import { useNavigate } from "react-router-dom";[m
+ import {[m
+   ArrowRight,[m
+[31m-  Camera,          // Photographers[m
+[31m-  Video,           // Videographers[m
+[32m+[m[32m  Camera,          // Photography & Videography (merged)[m
+   Guitar,          // Bands[m
+   Disc3,           // DJs[m
+   Mic,             // Singers[m
+[36m@@ -27,7 +26,7 @@[m [mimport {[m
+ } from "lucide-react";[m
+ import { useCategories } from "@/hooks/useArtists";[m
+ [m
+[31m-// ── 19 canonical categories — module scope, never re-created ─────────────────[m
+[32m+[m[32m// ── 18 canonical categories (merged photography & videography) — module scope ─[m
+ interface CategoryDef {[m
+   id:    string;                        // slug used for DB query[m
+   name:  string;                        // display label[m
+[36m@@ -39,29 +38,15 @@[m [minterface CategoryDef {[m
+   types: string[];[m
+ }[m
+ [m
+[31m-// Custom photographer icon component using the provided PNG[m
+[31m-const PhotographerIcon = ({ className }: { className?: string }) => ([m
+[31m-  <img src="/images/wedding-photography.jpg" alt="" className={`${className} object-cover rounded-lg`} />[m
+[31m-);[m
+[31m-[m
+ const CATEGORIES: CategoryDef[] = [[m
+   {[m
+[31m-    id:    "photographer",[m
+[31m-    name:  "Photographers",[m
+[31m-    icon:  PhotographerIcon as any,[m
+[32m+[m[32m    id:    "photography-videography",[m
+[32m+[m[32m    name:  "📸🎥 Photography & Videography",[m
+[32m+[m[32m    icon:  Camera,[m
+     color: "bg-rose-50 dark:bg-rose-950/40",[m
+     text:  "text-rose-600 dark:text-rose-400",[m
+     ring:  "ring-rose-200 dark:ring-rose-800",[m
+[31m-    types: ["photographer"],[m
+[31m-  },[m
+[31m-  {[m
+[31m-    id:    "videographer",[m
+[31m-    name:  "Videographers",[m
+[31m-    icon:  Video,[m
+[31m-    color: "bg-pink-50 dark:bg-pink-950/40",[m
+[31m-    text:  "text-pink-600 dark:text-pink-400",[m
+[31m-    ring:  "ring-pink-200 dark:ring-pink-800",[m
+[31m-    types: ["videographer","cinematographer"],[m
+[32m+[m[32m    types: ["photographer", "videographer", "cinematographer", "photography_videography"],[m
+   },[m
+   {[m
+     id:    "drone_operator",[m
+[36m@@ -196,7 +181,7 @@[m [mconst CATEGORIES: CategoryDef[] = [[m
+ interface CardProps { cat: CategoryDef; count: number; onClick: () => void; idx: number; }[m
+ [m
+ const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {[m
+[31m-  const isPhotographer = cat.id === 'photographer';[m
+[32m+[m[32m  const hasImage = ['photography-videography', 'catering_services', 'drone_operator', 'music_band', 'dj', 'makeup_artist', 'anchor', 'mehendi_artist', 'singer', 'wedding_decorator', 'dancer', 'banquet_hall', 'rentals', 'pandit', 'water_supplier'].includes(cat.id);[m
+ [m
+   return ([m
+   <motion.button[m
+[36m@@ -221,13 +206,9 @@[m [mconst CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {[m
+     <span className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 ${cat.color} blur-2xl scale-150 pointer-events-none`} />[m
+ [m
+     {/* Icon / Image */}[m
+[31m-    {isPhotographer ? ([m
+[31m-      <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">[m
+[31m-        <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photographers" className="w-full h-full object-cover" />[m
+[31m-      </div>[m
+[31m-    ) : cat.id === 'videographer' ? ([m
+[32m+[m[32m    {cat.id === 'photography-videography' ? ([m
+       <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">[m
+[31m-        <img src="/images/VIDEOGRAPHY MAIN.jpg" alt="Videographers" className="w-full h-full object-cover" />[m
+[32m+[m[32m        <img src="/images/PHOTOGRAPHER86.jpeg.jpg" alt="Photography & Videography" className="w-full h-full object-cover" />[m
+       </div>[m
+     ) : cat.id === 'catering_services' ? ([m
+       <div className="relative z-10 w-full aspect-[4/3] rounded-xl overflow-hidden border border-border/40 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">[m
+[1mdiff --git a/vowza-event-connections-main/src/data/categoryConfig.ts b/vowza-event-connections-main/src/data/categoryConfig.ts[m
+[1mindex 4302395..27ef4a7 100644[m
+[1m--- a/vowza-event-connections-main

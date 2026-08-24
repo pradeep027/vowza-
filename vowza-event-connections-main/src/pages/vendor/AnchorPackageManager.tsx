@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Pencil, Trash2, Eye, EyeOff, X, Check,
@@ -22,7 +23,7 @@ const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py
 /* ─── Types ─────────────────────────────────────────────────────────────────── */
 type Addon = { name: string; price: string; description: string };
 type Draft = {
-  id?: string; name: string; description: string; package_type: string[]; status: string;
+  id?: string; name: string; description: string; selectedPackageTypes: string[]; status: string;
   package_price: string; advance_percentage: string;
   design_styles: string[]; coverage: string[];
   inclusions: string[];
@@ -34,7 +35,7 @@ type Draft = {
 };
 
 const blank = (): Draft => ({
-  name: '', description: '', package_type: [], status: 'draft',
+  name: '', description: '', selectedPackageTypes: [], status: 'draft',
   package_price: '', advance_percentage: '20',
   design_styles: [], coverage: [],
   inclusions: [],
@@ -63,7 +64,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     let addons: Addon[] = []; let galleryUrls: { id: string; url: string; is_cover: boolean }[] = []; let videoUrls: { id: string; url: string }[] = []; let coverUrl = '';
     try { const r = await (supabase.from('anchor_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order')); if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price??''), description: a.description||'' })); } catch (_) {}
     try { const r = await (supabase.from('anchor_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data??[]).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url||''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch (_) {}
-    setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', package_type: Array.isArray(pkg.package_type) ? pkg.package_type : (pkg.package_type ? [pkg.package_type] : []), status: pkg.status||'draft',
+    setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', selectedPackageTypes: [], status: pkg.status||'draft',
       package_price: String(pkg.package_price??''), advance_percentage: String(pkg.advance_percentage??'20'),
       design_styles: pkg.hosting_style??[], coverage: pkg.services_included?.filter((s: string) => ALL_COVERAGE.includes(s))??[],
       inclusions: pkg.services_included?.filter((s: string) => !ALL_COVERAGE.includes(s))??[],
@@ -78,29 +79,118 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
     if (!draft || !draft.name.trim()) { toast.error('Package name is required.'); setStep(1); return; }
     if (!draft.package_price) { toast.error('Package price is required.'); setStep(2); return; }
     if (!draft.cover_file && !draft.cover_url) { toast.error('Cover photo is required.'); setStep(1); return; }
-    if (!draft.package_type || draft.package_type.length === 0) { toast.error('At least one package classification is required.'); setStep(1); return; }
+    if (!draft.selectedPackageTypes || draft.selectedPackageTypes.length === 0) { toast.error('At least one package type is required.'); setStep(1); return; }
+    
     setBusy(true);
     try {
-      const payload: any = { provider_id: provider.id, name: draft.name.trim(), package_type: draft.package_type, description: draft.description.trim()||null, status: draft.status, package_price: Number(draft.package_price), advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20, hosting_style: draft.design_styles, services_included: [...draft.coverage, ...draft.inclusions], deliverables: draft.deliverables, lead_anchor: Number(draft.lead_artist)||1, assistant: Number(draft.assistant_artists)||0 };
-      let packageId = draft.id;
-      if (draft.id) { const r = await (supabase.from('anchor_packages' as any).update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
-      else { const r = await (supabase.from('anchor_packages' as any).insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
-      if (packageId) {
-        // Addons
-        await (supabase.from('anchor_addons' as any).delete().eq('package_id', packageId));
-        const valid = draft.addons.filter(a => a.name.trim());
-        if (valid.length > 0) await (supabase.from('anchor_addons' as any).insert(valid.map((a, i) => ({ package_id: packageId, name: a.name.trim(), price: Number(a.price)||0, description: a.description||null, sort_order: i }))));
-        // Cover
-        if (draft.cover_file) { const ext = draft.cover_file.name.split('.').pop(); const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type }); if (!upErr) { const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; await (supabase.from('anchor_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); } }
-        // Gallery photos
-        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
-        // Videos
-        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
-        // Delete removed
-        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('anchor_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('anchor_gallery' as any).delete().in('id', del)); }
+      // BATCH CREATION: Create ONE independent package record for EACH selected type
+      // This means: if user selects Wedding + Reception + Sangeet, we create 3 separate records
+      // NOT one record with package_type = ["Wedding", "Reception", "Sangeet"]
+      
+      const basePayload: any = {
+        provider_id: provider.id,
+        name: draft.name.trim(),
+        description: draft.description.trim() || null,
+        status: draft.status,
+        package_price: Number(draft.package_price),
+        advance_percentage: draft.advance_percentage ? Number(draft.advance_percentage) : 20,
+        hosting_style: draft.design_styles,
+        services_included: [...draft.coverage, ...draft.inclusions],
+        deliverables: draft.deliverables,
+        lead_anchor: Number(draft.lead_artist) || 1,
+        assistant: Number(draft.assistant_artists) || 0
+      };
+
+      // If editing a single package, update it (for backward compatibility)
+      if (draft.id && draft.selectedPackageTypes.length === 1) {
+        const payload = { ...basePayload, package_type: draft.selectedPackageTypes[0] };
+        const r = await (supabase.from('anchor_packages' as any).update(payload).eq('id', draft.id).select('id').single());
+        if (r.error) throw r.error;
+        await processPictures(draft.id);
+      } 
+      // If creating new or modifying multiple types, use batch creation
+      else if (!draft.id) {
+        // Create ONE package per selected type
+        const createdPackageIds: string[] = [];
+        
+        for (const packageType of draft.selectedPackageTypes) {
+          const payload = { ...basePayload, package_type: packageType };
+          const r = await (supabase.from('anchor_packages' as any).insert(payload).select('id').single());
+          if (r.error) throw r.error;
+          createdPackageIds.push(r.data.id);
+        }
+
+        // Upload media to the FIRST created package (for simplicity)
+        if (createdPackageIds.length > 0) {
+          await processPictures(createdPackageIds[0]);
+        }
       }
-      toast.success('Anchor package saved!'); setDraft(null); setStep(1); refresh();
-    } catch (err: any) { toast.error(err.message || 'Could not save'); } finally { setBusy(false); }
+
+      toast.success(`${draft.selectedPackageTypes.length} anchor package(s) saved!`);
+      setDraft(null);
+      setStep(1);
+      refresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const processPictures = async (packageId: string) => {
+    if (!draft) return;
+    // Addons
+    await (supabase.from('anchor_addons' as any).delete().eq('package_id', packageId));
+    const valid = draft.addons.filter(a => a.name.trim());
+    if (valid.length > 0) await (supabase.from('anchor_addons' as any).insert(valid.map((a, i) => ({ package_id: packageId, name: a.name.trim(), price: Number(a.price)||0, description: a.description||null, sort_order: i }))));
+    
+    // Cover
+    if (draft.cover_file) { 
+      const ext = draft.cover_file.name.split('.').pop(); 
+      const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`; 
+      const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type }); 
+      if (!upErr) { 
+        const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
+        await (supabase.from('anchor_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); 
+        await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); 
+      } 
+    }
+    
+    // Gallery photos
+    if (draft.gallery_files.length > 0) { 
+      for (let i = 0; i < draft.gallery_files.length; i++) { 
+        const file = draft.gallery_files[i]; 
+        const ext = file.name.split('.').pop(); 
+        const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; 
+        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); 
+        if (!upErr) { 
+          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
+          await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); 
+        } 
+      } 
+    }
+    
+    // Videos
+    if (draft.video_files.length > 0) { 
+      for (let i = 0; i < draft.video_files.length; i++) { 
+        const file = draft.video_files[i]; 
+        const ext = file.name.split('.').pop(); 
+        const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; 
+        const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type }); 
+        if (!upErr) { 
+          const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl; 
+          await (supabase.from('anchor_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); 
+        } 
+      } 
+    }
+    
+    // Delete removed
+    if (draft.id) { 
+      const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); 
+      const { data: ex } = await (supabase.from('anchor_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); 
+      const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); 
+      if (del.length > 0) await (supabase.from('anchor_gallery' as any).delete().in('id', del)); 
+    }
   };
 
   const toggleStatus = async (pkg: any) => { await (supabase.from('anchor_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
@@ -149,21 +239,9 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
               {pkg.package_price && <p className="mt-1.5 text-lg font-bold text-cyan-700">₹{Number(pkg.package_price).toLocaleString('en-IN')}</p>}
               {pkg.package_type && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {Array.isArray(pkg.package_type) 
-                    ? pkg.package_type.slice(0, 2).map((type: string) => (
-                        <span key={type} className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 border border-cyan-200 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
-                          <Mic2 className="h-2.5 w-2.5" />{type}
-                        </span>
-                      ))
-                    : <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 border border-cyan-200 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
-                        <Mic2 className="h-2.5 w-2.5" />{pkg.package_type}
-                      </span>
-                  }
-                  {Array.isArray(pkg.package_type) && pkg.package_type.length > 2 && (
-                    <span className="inline-flex items-center rounded-full bg-cyan-50 border border-cyan-100 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
-                      +{pkg.package_type.length - 2}
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 border border-cyan-200 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
+                    <Mic2 className="h-2.5 w-2.5" />{pkg.package_type}
+                  </span>
                 </div>
               )}
               <div className="mt-4 flex gap-2">
@@ -194,17 +272,17 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
 }
 
 
-/* ─── Step 1: Package Type (REFACTORED) ──────────────────────────────────────── */
+/* ─── Step 1: Package Type (REFACTORED FOR BATCH CREATION) ──────────────────── */
 function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleSelect = (type: string) => {
-    const isSelected = draft.package_type.includes(type);
+    const isSelected = draft.selectedPackageTypes.includes(type);
     setDraft({
       ...draft,
-      package_type: isSelected
-        ? draft.package_type.filter(t => t !== type)
-        : [...draft.package_type, type]
+      selectedPackageTypes: isSelected
+        ? draft.selectedPackageTypes.filter(t => t !== type)
+        : [...draft.selectedPackageTypes, type]
     });
   };
 
@@ -218,65 +296,81 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
 
   const handleDropAfter = (index: number) => {
     if (draggedIndex === null || draggedIndex === index) return;
-    const newSelected = [...draft.package_type];
+    const newSelected = [...draft.selectedPackageTypes];
     const item = newSelected[draggedIndex];
     newSelected.splice(draggedIndex, 1);
     newSelected.splice(index + (draggedIndex < index ? 0 : 1), 0, item);
-    setDraft({ ...draft, package_type: newSelected });
+    setDraft({ ...draft, selectedPackageTypes: newSelected });
     setDraggedIndex(null);
   };
 
   const handleRemove = (type: string) => {
     setDraft({
       ...draft,
-      package_type: draft.package_type.filter(t => t !== type)
+      selectedPackageTypes: draft.selectedPackageTypes.filter(t => t !== type)
     });
   };
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
-        <h3 className="text-base font-bold text-cyan-800">Package Classifications <span className="text-red-500">*</span></h3>
-        <p className="text-xs text-stone-500">Select the types of events your anchoring package covers. Click to select, drag to reorder.</p>
+        <h3 className="text-base font-bold text-cyan-800">Package Types to Create <span className="text-red-500">*</span></h3>
+        <p className="text-xs text-stone-600">
+          <strong>Select the package types you want to create.</strong> Each selected type will create a <strong>separate, independent package</strong>. 
+          For example: selecting <span className="font-semibold">Wedding + Reception + Sangeet</span> creates <strong>3 separate packages</strong>.
+        </p>
         
-        {/* Selection Buttons */}
-        <div className="flex flex-wrap gap-2">
-          {PACKAGE_TYPES.map(type => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleSelect(type)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                draft.package_type.includes(type)
-                  ? 'border-cyan-700 bg-cyan-700/10 text-cyan-700'
-                  : 'border-[#e7d9c4] text-stone-600 hover:border-cyan-500'
-              }`}
-            >
-              {type}
-            </button>
-          ))}
+        {/* Available Types Selection */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-cyan-700">Available Package Types:</p>
+          <div className="flex flex-wrap gap-2">
+            {PACKAGE_TYPES.map(type => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleSelect(type)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  draft.selectedPackageTypes.includes(type)
+                    ? 'border-cyan-700 bg-cyan-700/10 text-cyan-700 font-semibold'
+                    : 'border-[#e7d9c4] text-stone-600 hover:border-cyan-500 hover:text-cyan-700'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Draggable Selected Items */}
-        {draft.package_type.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs font-semibold text-cyan-700 mb-2">Selected ({draft.package_type.length}) - Drag to reorder:</p>
-            <div className="space-y-1">
-              {draft.package_type.map((type, idx) => (
+        {/* Selected Package Queue */}
+        {draft.selectedPackageTypes.length > 0 && (
+          <div className="mt-6 space-y-2 border-t border-cyan-200 pt-4">
+            <p className="text-xs font-semibold text-cyan-700">
+              📦 Packages to Create: {draft.selectedPackageTypes.length}
+            </p>
+            <p className="text-[11px] text-stone-500">
+              Drag to reorder. Each item below will create a separate package when saved.
+            </p>
+            <div className="space-y-2">
+              {draft.selectedPackageTypes.map((type, idx) => (
                 <div
                   key={idx}
                   draggable
                   onDragStart={() => handleDragStart(idx)}
                   onDragOver={handleDragOver}
                   onDrop={() => handleDropAfter(idx)}
-                  className="flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50/60 p-2.5 cursor-move hover:shadow-sm transition"
+                  className="flex items-center gap-3 rounded-lg border border-cyan-300 bg-cyan-100/40 p-3 cursor-move hover:shadow-md transition hover:border-cyan-400"
                 >
-                  <span className="text-[10px] font-bold text-stone-400 w-4 text-center">{idx + 1}</span>
-                  <span className="flex-1 text-xs font-medium text-cyan-700">{type}</span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-cyan-800">{type}</p>
+                    <p className="text-[10px] text-cyan-600">Separate package record</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleRemove(type)}
-                    className="text-red-400 hover:text-red-600 transition"
+                    className="rounded-full p-1.5 text-red-500 hover:bg-red-100 transition"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -286,15 +380,17 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
           </div>
         )}
       </div>
+
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
         <h3 className="text-base font-bold text-cyan-800">Package Info</h3>
         <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Package Name <span className="text-red-500">*</span></span>
-          <input className={inputClass} value={draft.name} onChange={e => setDraft({...draft, name: e.target.value})} placeholder="e.g. Premium Wedding Anchor" /></label>
+          <input className={inputClass} value={draft.name} onChange={e => setDraft({...draft, name: e.target.value})} placeholder="e.g. Premium Anchor Package" /></label>
         <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Description</span>
           <textarea className={`${inputClass} min-h-[80px] resize-y`} value={draft.description} onChange={e => setDraft({...draft, description: e.target.value})} placeholder="Describe your anchoring package..." /></label>
         <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Status</span>
           <select className={inputClass} value={draft.status} onChange={e => setDraft({...draft, status: e.target.value})}><option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option></select></label>
       </div>
+
       {/* Cover Photo */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">Cover Photo <span className="text-red-500">*</span></span>
@@ -305,6 +401,7 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f&&f.size<=5*1024*1024) setDraft({...draft,cover_file:f}); else if(f) toast.error('Max 5MB'); }} /></label>
         )}
       </div>
+
       {/* Gallery */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">Gallery Photos (max 10)</span>
@@ -314,6 +411,7 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
           {(draft.gallery_urls.length+draft.gallery_files.length)<10 && (<label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-cyan-300 bg-cyan-50 aspect-square hover:border-cyan-600"><Plus className="h-5 w-5 text-cyan-700" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { const files=Array.from(e.target.files??[]).filter(f=>f.size<=5*1024*1024).slice(0,10-draft.gallery_urls.length-draft.gallery_files.length); if(files.length) setDraft({...draft,gallery_files:[...draft.gallery_files,...files]}); }} /></label>)}
         </div>
       </div>
+
       {/* Performance Videos */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
         <span className="text-sm font-semibold text-[#0e4d5c]">Performance Videos (max 5)</span>
@@ -396,38 +494,143 @@ function StepAddons({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =>
 function StepPreview({ draft }: { draft: Draft }) {
   const price = Number(draft.package_price||0); const advPct = Number(draft.advance_percentage||20);
   const advAmount = Math.round(price * advPct / 100); const remaining = price - advAmount;
+  
   return (
-    <div className="space-y-4"><div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-      <h3 className="mb-4 text-base font-bold text-cyan-800">Preview</h3>
-      <div className="overflow-hidden rounded-2xl border border-[#eadfcf] bg-white shadow-sm">
-        {draft.cover_file||draft.cover_url?(<div className="h-36 overflow-hidden"><img src={draft.cover_file?URL.createObjectURL(draft.cover_file):draft.cover_url} alt="Cover" className="w-full h-full object-cover" /></div>):(<div className="flex h-36 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50"><Mic2 className="h-8 w-8 text-cyan-700/40" /></div>)}
-        <div className="p-5">
-          <div className="flex items-start justify-between"><h4 className="text-lg font-bold text-[#0e4d5c]">{draft.name||'Package Name'}</h4><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draft.status==='active'?'bg-cyan-100 text-cyan-700':'bg-blue-50 text-blue-700'}`}>{draft.status}</span></div>
-          {draft.package_type && draft.package_type.length > 0 && (
-            <div className="mt-1">
-              <div className="flex flex-wrap gap-1">
-                {draft.package_type.slice(0, 3).map(pt => (
-                  <span key={pt} className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800"><Mic2 className="h-3 w-3" />{pt}</span>
-                ))}
-                {draft.package_type.length > 3 && <span className="text-[11px] text-muted-foreground">+{draft.package_type.length - 3} more</span>}
-              </div>
-            </div>
-          )}
-          {draft.description && <p className="mt-2 text-sm text-stone-500 line-clamp-2">{draft.description}</p>}
-          {price > 0 && (<div className="mt-3"><p className="text-2xl font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</p><p className="text-xs text-stone-500">Advance: {advPct}% (₹{advAmount.toLocaleString('en-IN')}) · Remaining: ₹{remaining.toLocaleString('en-IN')}</p></div>)}
-          {draft.package_type.length > 0 && (
-            <div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Package Classifications:</p><div className="flex flex-wrap gap-1">{draft.package_type.map(pt => <span key={pt} className="rounded-full bg-cyan-700/8 px-2 py-0.5 text-[11px] text-cyan-700">{pt}</span>)}</div></div>
-          )}
-          {draft.coverage.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Coverage:</p><div className="flex flex-wrap gap-1">{draft.coverage.map(c => <span key={c} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[11px] text-teal-800">{c}</span>)}</div></div>)}
-          {draft.inclusions.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Inclusions:</p><div className="flex flex-wrap gap-1">{draft.inclusions.map(i => <span key={i} className="rounded-full border border-cyan-200 px-2 py-0.5 text-[11px] text-cyan-800">{i}</span>)}</div></div>)}
-          {draft.deliverables.length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Deliverables:</p><div className="flex flex-wrap gap-1">{draft.deliverables.map(d => <span key={d} className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-800">{d}</span>)}</div></div>)}
-          <div className="mt-3 border-t border-stone-100 pt-3 flex gap-4 text-[11px] text-stone-500">
-            {Number(draft.lead_artist)>0 && <span>Lead: {draft.lead_artist}</span>}
-            {Number(draft.assistant_artists)>0 && <span>Assistants: {draft.assistant_artists}</span>}
-          </div>
-          {draft.addons.filter(a=>a.name.trim()).length>0 && (<div className="mt-3 border-t border-stone-100 pt-3"><p className="text-xs font-semibold text-stone-600 mb-1.5">Add-ons:</p>{draft.addons.filter(a=>a.name.trim()).map((a,i) => (<div key={i} className="flex justify-between text-xs mt-1"><span className="text-stone-700">{a.name}</span>{a.price&&<span className="font-semibold text-cyan-800">+₹{Number(a.price).toLocaleString('en-IN')}</span>}</div>))}</div>)}
-        </div>
+    <div className="space-y-6">
+      {/* BATCH CREATION PREVIEW */}
+      <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
+        <h3 className="mb-3 text-base font-bold text-cyan-800">📦 Packages to Create: {draft.selectedPackageTypes.length}</h3>
+        <p className="text-xs text-stone-600 mb-4">
+          When saved, the wizard will create <span className="font-semibold text-cyan-700">{draft.selectedPackageTypes.length} separate, independent package record(s)</span>. 
+          Each will have its own database ID and exactly one Package Type.
+        </p>
       </div>
-    </div></div>
+
+      {/* INDIVIDUAL PACKAGE PREVIEWS */}
+      {draft.selectedPackageTypes.map((packageType, pkgIndex) => (
+        <div key={packageType} className="rounded-2xl border border-[#eadfcf] bg-white shadow-md overflow-hidden">
+          <div className="overflow-hidden">
+            {draft.cover_file || draft.cover_url ? (
+              <div className="h-36 overflow-hidden">
+                <img src={draft.cover_file ? URL.createObjectURL(draft.cover_file) : draft.cover_url} alt="Cover" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="flex h-36 items-center justify-center bg-gradient-to-br from-cyan-50 to-teal-50">
+                <Mic2 className="h-8 w-8 text-cyan-700/40" />
+              </div>
+            )}
+          </div>
+
+          <div className="p-5 space-y-3">
+            {/* Package Header */}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cyan-700 text-xs font-bold text-white">
+                    {pkgIndex + 1}
+                  </span>
+                  <h4 className="text-lg font-bold text-[#0e4d5c]">{draft.name || 'Package Name'}</h4>
+                </div>
+                <p className="text-xs text-cyan-600 font-semibold mt-1">Type: {packageType}</p>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draft.status === 'active' ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-50 text-blue-700'}`}>
+                {draft.status}
+              </span>
+            </div>
+
+            {/* Package Type Badge */}
+            <div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 border border-cyan-200 px-2.5 py-0.5 text-[11px] font-medium text-cyan-800">
+                <Mic2 className="h-3 w-3" />
+                {packageType}
+              </span>
+            </div>
+
+            {/* Description */}
+            {draft.description && <p className="text-sm text-stone-600 line-clamp-2">{draft.description}</p>}
+
+            {/* Pricing */}
+            {price > 0 && (
+              <div className="border-t border-stone-100 pt-3">
+                <p className="text-2xl font-bold text-cyan-700">₹{price.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-stone-500">Advance: {advPct}% (₹{advAmount.toLocaleString('en-IN')}) · Remaining: ₹{remaining.toLocaleString('en-IN')}</p>
+              </div>
+            )}
+
+            {/* Coverage */}
+            {draft.coverage.length > 0 && (
+              <div className="border-t border-stone-100 pt-3">
+                <p className="text-xs font-semibold text-stone-600 mb-1.5">Coverage:</p>
+                <div className="flex flex-wrap gap-1">
+                  {draft.coverage.map(c => (
+                    <span key={c} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[11px] text-teal-800">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Inclusions */}
+            {draft.inclusions.length > 0 && (
+              <div className="border-t border-stone-100 pt-3">
+                <p className="text-xs font-semibold text-stone-600 mb-1.5">Inclusions:</p>
+                <div className="flex flex-wrap gap-1">
+                  {draft.inclusions.map(i => (
+                    <span key={i} className="rounded-full border border-cyan-200 px-2 py-0.5 text-[11px] text-cyan-800">
+                      {i}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Deliverables */}
+            {draft.deliverables.length > 0 && (
+              <div className="border-t border-stone-100 pt-3">
+                <p className="text-xs font-semibold text-stone-600 mb-1.5">Deliverables:</p>
+                <div className="flex flex-wrap gap-1">
+                  {draft.deliverables.map(d => (
+                    <span key={d} className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-800">
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Team */}
+            <div className="border-t border-stone-100 pt-3 flex gap-4 text-[11px] text-stone-600">
+              {Number(draft.lead_artist) > 0 && <span>👤 Lead: {draft.lead_artist}</span>}
+              {Number(draft.assistant_artists) > 0 && <span>👥 Assistants: {draft.assistant_artists}</span>}
+            </div>
+
+            {/* Add-ons */}
+            {draft.addons.filter(a => a.name.trim()).length > 0 && (
+              <div className="border-t border-stone-100 pt-3">
+                <p className="text-xs font-semibold text-stone-600 mb-1.5">Add-ons:</p>
+                {draft.addons.filter(a => a.name.trim()).map((a, i) => (
+                  <div key={i} className="flex justify-between text-xs mt-1">
+                    <span className="text-stone-700">{a.name}</span>
+                    {a.price && <span className="font-semibold text-cyan-800">+₹{Number(a.price).toLocaleString('en-IN')}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* Summary */}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold mb-1">✓ Ready to Create</p>
+        <ul className="text-xs space-y-0.5 ml-4">
+          <li>• {draft.selectedPackageTypes.length} independent package record(s) will be created</li>
+          <li>• Each gets its own Package Type: {draft.selectedPackageTypes.join(', ')}</li>
+          <li>• All share the same name, pricing, and media</li>
+          <li>• Each will have a unique database ID</li>
+        </ul>
+      </div>
+    </div>
   );
 }

@@ -1,0 +1,145 @@
+═══════════════════════════════════════════════════════════════════════════════
+  HOUSEWARMING BUG RUNTIME TRACE - STATUS REPORT
+═══════════════════════════════════════════════════════════════════════════════
+
+PROJECT: Vowza Event Planner
+BUG: User inputs "Plan a housewarming for 30 people" → Planner asks "What type of event?"
+STATUS: ✅ RUNTIME INSTRUMENTATION COMPLETE
+
+═══════════════════════════════════════════════════════════════════════════════
+  WHAT WAS DONE
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Added 10 comprehensive trace points:
+   - TRACE 0A: Event type regex extraction
+   - TRACE 0A-DETAIL: Detailed extraction matching
+   - TRACE 0A-FINAL: All extracted fields
+   - TRACE 0B-BEFORE: Pre-merge state
+   - TRACE 0B-MERGE: Individual merge operations
+   - TRACE 0B-AFTER: Post-merge state
+   - TRACE 0C: Orchestration decision
+   - TRACE 1: Context after orchestration
+   - TRACE 2: Readiness check summary
+   - TRACE 2-DETAIL: Missing fields calculation
+   - TRACE 3: Question generation (if asked)
+
+✅ Files modified:
+   - src/lib/llm.ts (2 locations)
+   - src/lib/aiOrchestrator.ts (3 locations)
+   - src/lib/eventContextCapturer.ts (1 location)
+
+✅ Build status: SUCCESSFUL (no errors)
+✅ Dev server: RUNNING (http://localhost:5173)
+✅ Changes: FULLY REVERSIBLE (only console.log added)
+
+═══════════════════════════════════════════════════════════════════════════════
+  WHAT YOU NEED TO DO
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Open browser console (F12)
+2. In Planner, type: "Plan a housewarming for 30 people"
+3. Take screenshot of console showing all [TRACE ...] messages
+4. Take screenshot of Planner response
+5. Send both screenshots to me
+
+═══════════════════════════════════════════════════════════════════════════════
+  EXPECTED TRACES (in order)
+═══════════════════════════════════════════════════════════════════════════════
+
+[TRACE 0A-DETAIL - Event Type Extraction]
+  ├─ matchedRegex: "/house.warm/i"
+  ├─ extractedEventType: "housewarming"
+  
+[TRACE 0A-FINAL - Extracted Updates]
+  ├─ eventType: "housewarming"
+  ├─ guestCount: 30
+
+[TRACE 0B-DETAIL-BEFORE - Pre-Merge State]
+  ├─ extractedUpdatesEventType: "housewarming"
+
+[TRACE 0B-DETAIL-MERGE - Merging eventType]
+  ├─ value: "housewarming"
+  ├─ mergedEventType: "housewarming"
+
+[TRACE 0B-DETAIL-AFTER - Post-Merge State]
+  ├─ mergedEventType: "housewarming"
+  ├─ mergedGuestCount: 30
+
+[TRACE 0C - Orchestration Decision]
+  ├─ mergedEventType: "housewarming"
+
+[TRACE 1 - After Orchestration]
+  ├─ contextToUseEventType: "housewarming"
+
+[TRACE 2 - Readiness Check]
+  ├─ contextEventType: ???
+  ├─ readinessScore: ???
+  ├─ isSufficient: ???
+
+[TRACE 2-DETAIL - getMissingEssentialFields]
+  ├─ contextEventType: ???
+  ├─ missingFields: ???
+
+[TRACE 3 - Question Being Asked] (only if question shown)
+  ├─ nextQuestion: ???
+
+═══════════════════════════════════════════════════════════════════════════════
+  ROOT CAUSE DETECTION LOGIC
+═══════════════════════════════════════════════════════════════════════════════
+
+If at ANY trace point eventType = undefined:
+  → Bug is UPSTREAM from that point
+  → Look at traces BEFORE that point
+
+If ALL traces show eventType = "housewarming":
+  → But question still asked
+  → Bug is in READINESS CALCULATION or QUESTION GENERATION
+  → Check getMissingEssentialFields() or formatContextQuestion()
+
+If eventType = "housewarming" at TRACE 1 but undefined at TRACE 2:
+  → Bug is in PARAMETER PASSING between functions
+  → Check if context is being modified or reset
+
+═══════════════════════════════════════════════════════════════════════════════
+  AFTER YOU PROVIDE LOGS
+═══════════════════════════════════════════════════════════════════════════════
+
+I will:
+1. Analyze exact values at each trace point
+2. Identify WHERE eventType is lost or mishandled
+3. Identify WHICH FUNCTION has the bug
+4. Create MINIMAL FIX (1 file, 1-3 lines)
+5. Remove all trace logging
+6. Rebuild and test fix
+7. Verify fix works for other event types
+8. Ready for production deployment
+
+═══════════════════════════════════════════════════════════════════════════════
+  KEY CONSTRAINT
+═══════════════════════════════════════════════════════════════════════════════
+
+NO CODE CHANGES UNTIL ROOT CAUSE IS IDENTIFIED.
+NO DEPLOYMENT UNTIL FIX IS TESTED.
+NO GUESSING ABOUT THE CAUSE.
+
+The runtime trace will give us EXACT FACTS about where the bug is.
+
+═══════════════════════════════════════════════════════════════════════════════
+  DOCUMENTATION FILES
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ READY_FOR_TESTING.md - START HERE
+✅ TEST_INSTRUCTIONS_HOUSEWARMING.md - Step-by-step guide
+✅ HOUSEWARMING_BUG_ROOT_CAUSE_TRACE.md - Detailed trace flow
+✅ TRACE_IMPLEMENTATION_SUMMARY.md - Technical details
+✅ RUNTIME_TRACE_INSTRUMENTATION.md - Trace point documentation
+
+═══════════════════════════════════════════════════════════════════════════════
+  NEXT ACTION
+═══════════════════════════════════════════════════════════════════════════════
+
+Read: READY_FOR_TESTING.md
+Then: Execute test using TEST_INSTRUCTIONS_HOUSEWARMING.md
+Finally: Send me the console screenshots
+
+═══════════════════════════════════════════════════════════════════════════════

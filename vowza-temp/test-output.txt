@@ -1,0 +1,2043 @@
+﻿
+> vite_react_shadcn_ts@0.0.0 test
+> vitest run src/lib/plannerRecommendation.test.ts src/lib/promotionMediaPlaylist.test.ts src/lib/vendorTrust.test.ts plan-event-runtime.test.ts
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/PRADEEP/OneDrive/Desktop/vo 1/vowza-event-connections-main[39m
+
+ [32mΓ£ô[39m src/lib/promotionMediaPlaylist.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32mΓ£ô[39m src/lib/vendorTrust.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+[90mstdout[2m | src/lib/plannerRecommendation.test.ts[2m > [22m[2mplanner marketplace request routing[2m > [22m[2mroutes I have Γé╣8 lakh for my wedding. Show me decorators. to live marketplace retrieval
+[22m[39m[E2E-TEST] Event extracted: {
+  message: [32m'I have Γé╣8 lakh for my wedding. Show me decorators.'[39m,
+  regex: [32m'\\bwedding\\b'[39m,
+  extractedEventType: [32m'wedding'[39m
+}
+
+[90mstdout[2m | src/lib/plannerRecommendation.test.ts[2m > [22m[2mplanner marketplace request routing[2m > [22m[2mkeeps an explicit budget request in budget planning rather than vendor discovery
+[22m[39m[E2E-TEST] Event extracted: {
+  message: [32m'Plan my wedding budget.'[39m,
+  regex: [32m'\\bwedding\\b'[39m,
+  extractedEventType: [32m'wedding'[39m
+}
+
+ [32mΓ£ô[39m src/lib/plannerRecommendation.test.ts [2m([22m[2m17 tests[22m[2m)[22m[90m 24[2mms[22m[39m
+[90mstdout[2m | src/lib/__tests__/plan-event-runtime.test.ts[2m > [22m[2mplan_event runtime - Housewarming for 30 people[2m > [22m[2mSTEP 2: Captures actual runtime response structure for housewarming
+[22m[39m[E2E-TEST] Event extracted: {
+  message: [32m'Plan a housewarming for 30 people'[39m,
+  regex: [32m'\\bhouse\\s*[-]?\\s*warming\\b'[39m,
+  extractedEventType: [32m'housewarming'[39m
+}
+
+=== ORCHESTRATION OUTPUT ===
+orchestrated.eventType: [90mundefined[39m
+orchestrated.guestCount: [90mundefined[39m
+orchestrated.durationDays: [90mundefined[39m
+orchestrated.budget: [90mundefined[39m
+[E2E-TEST] Event extracted: {
+  message: [32m'Plan a housewarming for 30 people'[39m,
+  regex: [32m'\\bhouse\\s*[-]?\\s*warming\\b'[39m,
+  extractedEventType: [32m'housewarming'[39m
+}
+
+=== PROCESSME SSAGE RESPONSE ===
+plannerResponse: {
+  response: {
+    type: [32m'wedding_plan'[39m,
+    text: [32m"Here's your complete **housewarming plan** for **30 guests** in **your city** ΓÇö budget **Γé╣8.0 lakh**.\n"[39m +
+      [32m'\n'[39m +
+      [32m'## ≡ƒôï Housewarming Overview ΓÇö your city, 30 guests\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒÄ¿ Decoration Ideas\n'[39m +
+      [32m'- Traditional torans and rangoli at the entrance\n'[39m +
+      [32m'- Diya and flower decor around the puja area\n'[39m +
+      [32m'- Fresh flower garlands on doors and windows\n'[39m +
+      [32m'- Simple elegant table settings for guests\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒô╕ Photography Plan\n'[39m +
+      [32m'- Candid coverage of key moments throughout the event\n'[39m +
+      [32m'- Formal group photos with family/guests\n'[39m +
+      [32m'- Detail shots of decor and setup\n'[39m +
+      [32m'- Golden hour outdoor shots if the venue allows\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒÄñ Entertainment Plan\n'[39m +
+      [32m'- Curated music playlist or DJ matched to the event mood\n'[39m +
+      [32m'- An anchor/emcee if the event has a formal programme\n'[39m +
+      [32m'- A dedicated moment for key highlights (e.g. speeches, cake, awards)\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒæÑ Guest Management\n'[39m +
+      [32m'- Send invitations (digital or print) at least 4-6 weeks in advance\n'[39m +
+      [32m'- Use an RSVP tracker (spreadsheet or app) to finalise headcount 1-2 weeks before\n'[39m +
+      [32m'- Assign a welcome desk/coordinator for guest check-in on the day\n'[39m +
+      [32m'- Plan seating charts in advance for formal sit-down events\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒÜù Parking Plan\n'[39m +
+      [32m'- Confirm venue parking capacity matches your expected guest count\n'[39m +
+      [32m'- Arrange valet service for venues with limited on-site parking\n'[39m +
+      [32m'- Put up clear parking signage/volunteers to direct guests smoothly\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒÜ¿ Emergency Planning\n'[39m +
+      [32m'- Keep a basic first-aid kit on-site and know the nearest hospital\n'[39m +
+      [32m'- Have a backup power/generator plan in case of outages\n'[39m +
+      [32m'- Assign one point-of-contact coordinator for vendor issues on the day\n'[39m +
+      [32m'\n'[39m +
+      [32m'### ≡ƒÆ░ Money Saving Tips\n'[39m +
+      [32m'- Book vendors 4-6 months ahead for early-bird discounts\n'[39m +
+      [32m'- Choose weekday dates ΓÇö venues are typically 25-35% cheaper\n'[39m +
+      [32m'- Use seasonal local flowers instead of imported blooms\n'[39m +
+      [32m'\n'[39m +
+      [32m'Would you like **Veg**, **Non-Veg**, or **Both** for the food?'[39m,
+    data: { weddingPlan: [36m[Object][39m }
+  },
+  updatedContext: {
+    intent: [32m'plan_event'[39m,
+    needsRetrieval: [33mfalse[39m,
+    rewrittenQuery: [32m'Plan a housewarming for 30 people'[39m,
+    professions: [],
+    city: [1mnull[22m,
+    priceMax: [1mnull[22m,
+    minRating: [33m0[39m,
+    responseStrategy: [32m'stream_veda'[39m,
+    contextSummary: [32m'\n[CURRENT EVENT CONTEXT: Event: housewarming | Guests: 30]\n'[39m,
+    shouldAskNext: [1mnull[22m,
+    updatedContext: {
+      eventType: [32m'housewarming'[39m,
+      guestCount: [33m30[39m,
+      budget: [90mundefined[39m,
+      city: [90mundefined[39m,
+      durationDays: [90mundefined[39m,
+      luxuryLevel: [90mundefined[39m,
+      theme: [90mundefined[39m,
+      venueType: [90mundefined[39m,
+      hasVenue: [90mundefined[39m,
+      confirmedFields: [36m[Array][39m
+    },
+    ambiguousChange: [33mfalse[39m,
+    guestCount: [33m30[39m,
+    confirmedFields: [ [32m'guestCount'[39m, [32m'eventType'[39m ],
+    eventType: [32m'housewarming'[39m
+  }
+}
+plannerResponse === undefined: [33mfalse[39m
+plannerResponse === null: [33mfalse[39m
+typeof plannerResponse: object
+plannerResponse keys: [ [32m'response'[39m, [32m'updatedContext'[39m ]
+plannerResponse.response: {
+  type: [32m'wedding_plan'[39m,
+  text: [32m"Here's your complete **housewarming plan** for **30 guests** in **your city** ΓÇö budget **Γé╣8.0 lakh**.\n"[39m +
+    [32m'\n'[39m +
+    [32m'## ≡ƒôï Housewarming Overview ΓÇö your city, 30 guests\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒÄ¿ Decoration Ideas\n'[39m +
+    [32m'- Traditional torans and rangoli at the entrance\n'[39m +
+    [32m'- Diya and flower decor around the puja area\n'[39m +
+    [32m'- Fresh flower garlands on doors and windows\n'[39m +
+    [32m'- Simple elegant table settings for guests\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒô╕ Photography Plan\n'[39m +
+    [32m'- Candid coverage of key moments throughout the event\n'[39m +
+    [32m'- Formal group photos with family/guests\n'[39m +
+    [32m'- Detail shots of decor and setup\n'[39m +
+    [32m'- Golden hour outdoor shots if the venue allows\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒÄñ Entertainment Plan\n'[39m +
+    [32m'- Curated music playlist or DJ matched to the event mood\n'[39m +
+    [32m'- An anchor/emcee if the event has a formal programme\n'[39m +
+    [32m'- A dedicated moment for key highlights (e.g. speeches, cake, awards)\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒæÑ Guest Management\n'[39m +
+    [32m'- Send invitations (digital or print) at least 4-6 weeks in advance\n'[39m +
+    [32m'- Use an RSVP tracker (spreadsheet or app) to finalise headcount 1-2 weeks before\n'[39m +
+    [32m'- Assign a welcome desk/coordinator for guest check-in on the day\n'[39m +
+    [32m'- Plan seating charts in advance for formal sit-down events\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒÜù Parking Plan\n'[39m +
+    [32m'- Confirm venue parking capacity matches your expected guest count\n'[39m +
+    [32m'- Arrange valet service for venues with limited on-site parking\n'[39m +
+    [32m'- Put up clear parking signage/volunteers to direct guests smoothly\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒÜ¿ Emergency Planning\n'[39m +
+    [32m'- Keep a basic first-aid kit on-site and know the nearest hospital\n'[39m +
+    [32m'- Have a backup power/generator plan in case of outages\n'[39m +
+    [32m'- Assign one point-of-contact coordinator for vendor issues on the day\n'[39m +
+    [32m'\n'[39m +
+    [32m'### ≡ƒÆ░ Money Saving Tips\n'[39m +
+    [32m'- Book vendors 4-6 months ahead for early-bird discounts\n'[39m +
+    [32m'- Choose weekday dates ΓÇö venues are typically 25-35% cheaper\n'[39m +
+    [32m'- Use seasonal local flowers instead of imported blooms\n'[39m +
+    [32m'\n'[39m +
+    [32m'Would you like **Veg**, **Non-Veg**, or **Both** for the food?'[39m,
+  data: {
+    weddingPlan: {
+      overview: [36m[Object][39m,
+      days: [36m[Array][39m,
+      totalSpend: [33m500001[39m,
+      remaining: [33m299999[39m,
+      globalTips: [36m[Array][39m,
+      successScore: [33m46[39m,
+      confidence: [33m64[39m
+    }
+  }
+}
+plannerResponse.response type: wedding_plan
+response.data keys: [ [32m'weddingPlan'[39m ]
+response.data: {
+  "weddingPlan": {
+    "overview": {
+      "days": 3,
+      "totalBudget": 800000,
+      "guestCount": 30,
+      "location": null,
+      "style": "Traditional & Elegant",
+      "season": "Winter (NovΓÇôFeb)",
+      "budgetPerDay": 266667,
+      "feasibility": "excellent",
+      "feasibilityNote": "Γé╣8.0 lakh is excellent for a 3-day housewarming with 30 guests in null. You have room for premium vendors."
+    },
+    "days": [
+      {
+        "day": 1,
+        "label": "Day 1 ΓÇô Preparation",
+        "theme": "Practical & Organized ΓÇö Clean & Fresh",
+        "description": "Planning and setting up to ensure everything is ready for the main event.",
+        "slots": [
+          {
+            "time": "05:30 AM",
+            "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+            "who": "Decorator",
+            "period": "morning",
+            "note": "CRITICAL ΓÇö must complete before guests arrive"
+          },
+          {
+            "time": "06:00 AM",
+            "activity": "Florist arrives ΓÇö fresh flower arrangements",
+            "who": "Florist",
+            "period": "morning"
+          },
+          {
+            "time": "06:30 AM",
+            "activity": "Electricians finalize lighting rigs",
+            "who": "Electrician",
+            "period": "morning"
+          },
+          {
+            "time": "07:00 AM",
+            "activity": "Bridal makeup & hair begins",
+            "who": "Bride",
+            "period": "morning",
+            "note": "Allow 2-3 hours for bridal makeup"
+          },
+          {
+            "time": "08:00 AM",
+            "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+            "who": "Caterer",
+            "period": "morning"
+          },
+          {
+            "time": "08:30 AM",
+            "activity": "Photography team arrives ΓÇö venue detail shots",
+            "who": "Photographer",
+            "period": "morning"
+          },
+          {
+            "time": "09:00 AM",
+            "activity": "Groom gets ready with family",
+            "who": "Groom",
+            "period": "morning"
+          },
+          {
+            "time": "10:00 AM",
+            "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+            "who": "Bride, Groom",
+            "period": "morning"
+          },
+          {
+            "time": "11:00 AM",
+            "activity": "Family portraits ΓÇö both sides",
+            "who": "Family",
+            "period": "morning"
+          },
+          {
+            "time": "11:30 AM",
+            "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+            "who": "Groom, Band/DJ",
+            "period": "morning",
+            "note": "Coordinate baraat route with venue in advance"
+          },
+          {
+            "time": "12:30 PM",
+            "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+            "who": "All",
+            "period": "afternoon"
+          },
+          {
+            "time": "01:00 PM",
+            "activity": "Lunch served for guests (buffet opens)",
+            "who": "All Guests",
+            "period": "afternoon"
+          },
+          {
+            "time": "02:00 PM",
+            "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+            "who": "Bride, Groom, Pandit",
+            "period": "afternoon",
+            "note": "Confirm auspicious muhurat with Pandit"
+          },
+          {
+            "time": "04:30 PM",
+            "activity": "Ceremony concludes ΓÇö couple portraits",
+            "who": "Bride, Groom",
+            "period": "afternoon"
+          },
+          {
+            "time": "05:30 PM",
+            "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+            "who": "Bride, Groom, Photographer",
+            "period": "evening",
+            "note": "BEST natural light of the day ΓÇö do not skip this"
+          },
+          {
+            "time": "06:30 PM",
+            "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+            "who": "All Guests",
+            "period": "evening"
+          },
+          {
+            "time": "07:30 PM",
+            "activity": "Dinner service opens ΓÇö live food counters",
+            "who": "All Guests",
+            "period": "night"
+          },
+          {
+            "time": "08:30 PM",
+            "activity": "DJ / Live Band performance begins",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "09:30 PM",
+            "activity": "First dance ΓÇö couple takes the floor",
+            "who": "Bride, Groom",
+            "period": "night"
+          },
+          {
+            "time": "10:30 PM",
+            "activity": "Event winds down ΓÇö family farewells",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "11:00 PM",
+            "activity": "Vendor wrap-up & final payments",
+            "who": "Coordinator",
+            "period": "night"
+          }
+        ],
+        "budget": {
+          "total": 166667,
+          "breakdown": [
+            {
+              "category": "Cleaning",
+              "amount": 86667,
+              "note": "Professional cleaning"
+            },
+            {
+              "category": "Decoration",
+              "amount": 75833,
+              "note": "Setup & arrangement"
+            },
+            {
+              "category": "Supplies",
+              "amount": 32500,
+              "note": "Linens, flowers"
+            },
+            {
+              "category": "Buffer",
+              "amount": 21667,
+              "note": "Contingency"
+            }
+          ]
+        },
+        "checklist": [
+          {
+            "task": "Confirm muhurat timings with Pandit",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Baraat route confirmed with venue",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Final headcount sent to caterer",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Golden hour location scouted",
+            "priority": "must",
+            "owner": "Photographer"
+          },
+          {
+            "task": "Emergency kit ready (medicines, pins, tape)",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Groom outfit finalised & pressed",
+            "priority": "must",
+            "owner": "Groom"
+          }
+        ],
+        "vendors": [
+          {
+            "role": "Photographer",
+            "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+            "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+            "searchUrl": "/artists?city=null&category=photographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Videographer",
+            "description": "Cinematic wedding film",
+            "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+            "searchUrl": "/artists?city=null&category=videographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Decorator",
+            "description": "Mandap, stage & full venue decoration",
+            "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+            "searchUrl": "/artists?city=null&category=decorators",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Caterer",
+            "description": "Full-day catering ΓÇö all meals",
+            "budgetRange": "Γé╣780/plate",
+            "searchUrl": "/artists?city=null&category=catering",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Makeup Artist",
+            "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+            "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+            "searchUrl": "/artists?city=null&category=makeup",
+            "urgency": "book_now"
+          }
+        ],
+        "aiTips": [
+          "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+          "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+          "Book your baraat DJ/band separately from the main evening entertainment",
+          "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+          "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+          "First dance song ΓÇö practice it at least once before the wedding day"
+        ],
+        "sunrise": "06:15 AM",
+        "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+      },
+      {
+        "day": 2,
+        "label": "Day 2 ΓÇô Housewarming Ceremony",
+        "theme": "Traditional & Sacred ΓÇö Gold & Flowers",
+        "description": "An important ritual or formal gathering marking a significant occasion.",
+        "slots": [
+          {
+            "time": "05:30 AM",
+            "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+            "who": "Decorator",
+            "period": "morning",
+            "note": "CRITICAL ΓÇö must complete before guests arrive"
+          },
+          {
+            "time": "06:00 AM",
+            "activity": "Florist arrives ΓÇö fresh flower arrangements",
+            "who": "Florist",
+            "period": "morning"
+          },
+          {
+            "time": "06:30 AM",
+            "activity": "Electricians finalize lighting rigs",
+            "who": "Electrician",
+            "period": "morning"
+          },
+          {
+            "time": "07:00 AM",
+            "activity": "Bridal makeup & hair begins",
+            "who": "Bride",
+            "period": "morning",
+            "note": "Allow 2-3 hours for bridal makeup"
+          },
+          {
+            "time": "08:00 AM",
+            "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+            "who": "Caterer",
+            "period": "morning"
+          },
+          {
+            "time": "08:30 AM",
+            "activity": "Photography team arrives ΓÇö venue detail shots",
+            "who": "Photographer",
+            "period": "morning"
+          },
+          {
+            "time": "09:00 AM",
+            "activity": "Groom gets ready with family",
+            "who": "Groom",
+            "period": "morning"
+          },
+          {
+            "time": "10:00 AM",
+            "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+            "who": "Bride, Groom",
+            "period": "morning"
+          },
+          {
+            "time": "11:00 AM",
+            "activity": "Family portraits ΓÇö both sides",
+            "who": "Family",
+            "period": "morning"
+          },
+          {
+            "time": "11:30 AM",
+            "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+            "who": "Groom, Band/DJ",
+            "period": "morning",
+            "note": "Coordinate baraat route with venue in advance"
+          },
+          {
+            "time": "12:30 PM",
+            "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+            "who": "All",
+            "period": "afternoon"
+          },
+          {
+            "time": "01:00 PM",
+            "activity": "Lunch served for guests (buffet opens)",
+            "who": "All Guests",
+            "period": "afternoon"
+          },
+          {
+            "time": "02:00 PM",
+            "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+            "who": "Bride, Groom, Pandit",
+            "period": "afternoon",
+            "note": "Confirm auspicious muhurat with Pandit"
+          },
+          {
+            "time": "04:30 PM",
+            "activity": "Ceremony concludes ΓÇö couple portraits",
+            "who": "Bride, Groom",
+            "period": "afternoon"
+          },
+          {
+            "time": "05:30 PM",
+            "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+            "who": "Bride, Groom, Photographer",
+            "period": "evening",
+            "note": "BEST natural light of the day ΓÇö do not skip this"
+          },
+          {
+            "time": "06:30 PM",
+            "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+            "who": "All Guests",
+            "period": "evening"
+          },
+          {
+            "time": "07:30 PM",
+            "activity": "Dinner service opens ΓÇö live food counters",
+            "who": "All Guests",
+            "period": "night"
+          },
+          {
+            "time": "08:30 PM",
+            "activity": "DJ / Live Band performance begins",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "09:30 PM",
+            "activity": "First dance ΓÇö couple takes the floor",
+            "who": "Bride, Groom",
+            "period": "night"
+          },
+          {
+            "time": "10:30 PM",
+            "activity": "Event winds down ΓÇö family farewells",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "11:00 PM",
+            "activity": "Vendor wrap-up & final payments",
+            "who": "Coordinator",
+            "period": "night"
+          }
+        ],
+        "budget": {
+          "total": 166667,
+          "breakdown": [
+            {
+              "category": "Catering",
+              "amount": 65000,
+              "note": "Refreshments & snacks"
+            },
+            {
+              "category": "Decoration",
+              "amount": 54167,
+              "note": "Ceremonial d├⌐cor"
+            },
+            {
+              "category": "Photography",
+              "amount": 43333,
+              "note": "Event coverage"
+            },
+            {
+              "category": "Miscellaneous",
+              "amount": 32500,
+              "note": "Ritual supplies"
+            },
+            {
+              "category": "Buffer",
+              "amount": 21667,
+              "note": "Contingency"
+            }
+          ]
+        },
+        "checklist": [
+          {
+            "task": "Confirm muhurat timings with Pandit",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Baraat route confirmed with venue",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Final headcount sent to caterer",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Golden hour location scouted",
+            "priority": "must",
+            "owner": "Photographer"
+          },
+          {
+            "task": "Emergency kit ready (medicines, pins, tape)",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Groom outfit finalised & pressed",
+            "priority": "must",
+            "owner": "Groom"
+          }
+        ],
+        "vendors": [
+          {
+            "role": "Photographer",
+            "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+            "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+            "searchUrl": "/artists?city=null&category=photographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Videographer",
+            "description": "Cinematic wedding film",
+            "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+            "searchUrl": "/artists?city=null&category=videographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Decorator",
+            "description": "Mandap, stage & full venue decoration",
+            "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+            "searchUrl": "/artists?city=null&category=decorators",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Caterer",
+            "description": "Full-day catering ΓÇö all meals",
+            "budgetRange": "Γé╣780/plate",
+            "searchUrl": "/artists?city=null&category=catering",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Makeup Artist",
+            "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+            "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+            "searchUrl": "/artists?city=null&category=makeup",
+            "urgency": "book_now"
+          }
+        ],
+        "aiTips": [
+          "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+          "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+          "Book your baraat DJ/band separately from the main evening entertainment",
+          "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+          "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+          "First dance song ΓÇö practice it at least once before the wedding day"
+        ],
+        "sunrise": "06:15 AM",
+        "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+      },
+      {
+        "day": 3,
+        "label": "Day 3 ΓÇô Gathering",
+        "theme": "Casual & Warm ΓÇö Soft Colours",
+        "description": "A time for people to come together, connect, and share experiences.",
+        "slots": [
+          {
+            "time": "05:30 AM",
+            "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+            "who": "Decorator",
+            "period": "morning",
+            "note": "CRITICAL ΓÇö must complete before guests arrive"
+          },
+          {
+            "time": "06:00 AM",
+            "activity": "Florist arrives ΓÇö fresh flower arrangements",
+            "who": "Florist",
+            "period": "morning"
+          },
+          {
+            "time": "06:30 AM",
+            "activity": "Electricians finalize lighting rigs",
+            "who": "Electrician",
+            "period": "morning"
+          },
+          {
+            "time": "07:00 AM",
+            "activity": "Bridal makeup & hair begins",
+            "who": "Bride",
+            "period": "morning",
+            "note": "Allow 2-3 hours for bridal makeup"
+          },
+          {
+            "time": "08:00 AM",
+            "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+            "who": "Caterer",
+            "period": "morning"
+          },
+          {
+            "time": "08:30 AM",
+            "activity": "Photography team arrives ΓÇö venue detail shots",
+            "who": "Photographer",
+            "period": "morning"
+          },
+          {
+            "time": "09:00 AM",
+            "activity": "Groom gets ready with family",
+            "who": "Groom",
+            "period": "morning"
+          },
+          {
+            "time": "10:00 AM",
+            "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+            "who": "Bride, Groom",
+            "period": "morning"
+          },
+          {
+            "time": "11:00 AM",
+            "activity": "Family portraits ΓÇö both sides",
+            "who": "Family",
+            "period": "morning"
+          },
+          {
+            "time": "11:30 AM",
+            "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+            "who": "Groom, Band/DJ",
+            "period": "morning",
+            "note": "Coordinate baraat route with venue in advance"
+          },
+          {
+            "time": "12:30 PM",
+            "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+            "who": "All",
+            "period": "afternoon"
+          },
+          {
+            "time": "01:00 PM",
+            "activity": "Lunch served for guests (buffet opens)",
+            "who": "All Guests",
+            "period": "afternoon"
+          },
+          {
+            "time": "02:00 PM",
+            "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+            "who": "Bride, Groom, Pandit",
+            "period": "afternoon",
+            "note": "Confirm auspicious muhurat with Pandit"
+          },
+          {
+            "time": "04:30 PM",
+            "activity": "Ceremony concludes ΓÇö couple portraits",
+            "who": "Bride, Groom",
+            "period": "afternoon"
+          },
+          {
+            "time": "05:30 PM",
+            "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+            "who": "Bride, Groom, Photographer",
+            "period": "evening",
+            "note": "BEST natural light of the day ΓÇö do not skip this"
+          },
+          {
+            "time": "06:30 PM",
+            "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+            "who": "All Guests",
+            "period": "evening"
+          },
+          {
+            "time": "07:30 PM",
+            "activity": "Dinner service opens ΓÇö live food counters",
+            "who": "All Guests",
+            "period": "night"
+          },
+          {
+            "time": "08:30 PM",
+            "activity": "DJ / Live Band performance begins",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "09:30 PM",
+            "activity": "First dance ΓÇö couple takes the floor",
+            "who": "Bride, Groom",
+            "period": "night"
+          },
+          {
+            "time": "10:30 PM",
+            "activity": "Event winds down ΓÇö family farewells",
+            "who": "All",
+            "period": "night"
+          },
+          {
+            "time": "11:00 PM",
+            "activity": "Vendor wrap-up & final payments",
+            "who": "Coordinator",
+            "period": "night"
+          }
+        ],
+        "budget": {
+          "total": 166667,
+          "breakdown": [
+            {
+              "category": "Catering",
+              "amount": 86667,
+              "note": "Meals & beverages"
+            },
+            {
+              "category": "Decoration",
+              "amount": 43333,
+              "note": "Ambiance"
+            },
+            {
+              "category": "Photography",
+              "amount": 32500,
+              "note": "Candid moments"
+            },
+            {
+              "category": "Entertainment",
+              "amount": 32500,
+              "note": "Optional activities"
+            },
+            {
+              "category": "Buffer",
+              "amount": 21667,
+              "note": "Contingency"
+            }
+          ]
+        },
+        "checklist": [
+          {
+            "task": "Confirm muhurat timings with Pandit",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Baraat route confirmed with venue",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Final headcount sent to caterer",
+            "priority": "must",
+            "owner": "Family"
+          },
+          {
+            "task": "Golden hour location scouted",
+            "priority": "must",
+            "owner": "Photographer"
+          },
+          {
+            "task": "Emergency kit ready (medicines, pins, tape)",
+            "priority": "must",
+            "owner": "Coordinator"
+          },
+          {
+            "task": "Groom outfit finalised & pressed",
+            "priority": "must",
+            "owner": "Groom"
+          }
+        ],
+        "vendors": [
+          {
+            "role": "Photographer",
+            "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+            "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+            "searchUrl": "/artists?city=null&category=photographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Videographer",
+            "description": "Cinematic wedding film",
+            "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+            "searchUrl": "/artists?city=null&category=videographers",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Decorator",
+            "description": "Mandap, stage & full venue decoration",
+            "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+            "searchUrl": "/artists?city=null&category=decorators",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Caterer",
+            "description": "Full-day catering ΓÇö all meals",
+            "budgetRange": "Γé╣780/plate",
+            "searchUrl": "/artists?city=null&category=catering",
+            "urgency": "book_now"
+          },
+          {
+            "role": "Makeup Artist",
+            "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+            "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+            "searchUrl": "/artists?city=null&category=makeup",
+            "urgency": "book_now"
+          }
+        ],
+        "aiTips": [
+          "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+          "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+          "Book your baraat DJ/band separately from the main evening entertainment",
+          "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+          "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+          "First dance song ΓÇö practice it at least once before the wedding day"
+        ],
+        "sunrise": "06:15 AM",
+        "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+      }
+    ],
+    "totalSpend": 500001,
+    "remaining": 299999,
+    "globalTips": [
+      "Book ALL key vendors at least 4-6 months in advance ΓÇö peak season book out fast",
+      "Always get written contracts with cancellation clauses for every vendor",
+      "Assign one dedicated coordinator ΓÇö not a family member, to reduce stress",
+      "Keep 10% of total budget as emergency buffer ΓÇö unexpected costs always arise",
+      "Peak season pricing applies ΓÇö expect 20-30% premium on all vendors",
+      "Photography/videography is investment-level ΓÇö never cut this budget for important moments"
+    ],
+    "successScore": 46,
+    "confidence": 64
+  }
+}
+
+=== EXTRACTED PLAN OBJECT ===
+plan exists: [33mtrue[39m
+plan === undefined: [33mfalse[39m
+plan === null: [33mfalse[39m
+typeof plan: object
+
+=== PLAN PROPERTIES ===
+plan.overview: [33mtrue[39m
+plan.days: [33mtrue[39m
+plan.days === undefined: [33mfalse[39m
+plan.days === null: [33mfalse[39m
+typeof plan.days: object
+Array.isArray(plan.days): [33mtrue[39m
+plan.days?.length: [33m3[39m
+plan.totalSpend: [33m500001[39m
+plan.remaining: [33m299999[39m
+plan.globalTips: [33mtrue[39m
+Array.isArray(plan.globalTips): [33mtrue[39m
+plan.successScore: [33m46[39m
+plan.confidence: [33m64[39m
+
+=== PLAN KEYS ===
+Object.keys(plan): [
+  [32m'overview'[39m,
+  [32m'days'[39m,
+  [32m'totalSpend'[39m,
+  [32m'remaining'[39m,
+  [32m'globalTips'[39m,
+  [32m'successScore'[39m,
+  [32m'confidence'[39m
+]
+
+=== COMPLETE PLAN OBJECT ===
+{
+  "overview": {
+    "days": 3,
+    "totalBudget": 800000,
+    "guestCount": 30,
+    "location": null,
+    "style": "Traditional & Elegant",
+    "season": "Winter (NovΓÇôFeb)",
+    "budgetPerDay": 266667,
+    "feasibility": "excellent",
+    "feasibilityNote": "Γé╣8.0 lakh is excellent for a 3-day housewarming with 30 guests in null. You have room for premium vendors."
+  },
+  "days": [
+    {
+      "day": 1,
+      "label": "Day 1 ΓÇô Preparation",
+      "theme": "Practical & Organized ΓÇö Clean & Fresh",
+      "description": "Planning and setting up to ensure everything is ready for the main event.",
+      "slots": [
+        {
+          "time": "05:30 AM",
+          "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+          "who": "Decorator",
+          "period": "morning",
+          "note": "CRITICAL ΓÇö must complete before guests arrive"
+        },
+        {
+          "time": "06:00 AM",
+          "activity": "Florist arrives ΓÇö fresh flower arrangements",
+          "who": "Florist",
+          "period": "morning"
+        },
+        {
+          "time": "06:30 AM",
+          "activity": "Electricians finalize lighting rigs",
+          "who": "Electrician",
+          "period": "morning"
+        },
+        {
+          "time": "07:00 AM",
+          "activity": "Bridal makeup & hair begins",
+          "who": "Bride",
+          "period": "morning",
+          "note": "Allow 2-3 hours for bridal makeup"
+        },
+        {
+          "time": "08:00 AM",
+          "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+          "who": "Caterer",
+          "period": "morning"
+        },
+        {
+          "time": "08:30 AM",
+          "activity": "Photography team arrives ΓÇö venue detail shots",
+          "who": "Photographer",
+          "period": "morning"
+        },
+        {
+          "time": "09:00 AM",
+          "activity": "Groom gets ready with family",
+          "who": "Groom",
+          "period": "morning"
+        },
+        {
+          "time": "10:00 AM",
+          "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+          "who": "Bride, Groom",
+          "period": "morning"
+        },
+        {
+          "time": "11:00 AM",
+          "activity": "Family portraits ΓÇö both sides",
+          "who": "Family",
+          "period": "morning"
+        },
+        {
+          "time": "11:30 AM",
+          "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+          "who": "Groom, Band/DJ",
+          "period": "morning",
+          "note": "Coordinate baraat route with venue in advance"
+        },
+        {
+          "time": "12:30 PM",
+          "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+          "who": "All",
+          "period": "afternoon"
+        },
+        {
+          "time": "01:00 PM",
+          "activity": "Lunch served for guests (buffet opens)",
+          "who": "All Guests",
+          "period": "afternoon"
+        },
+        {
+          "time": "02:00 PM",
+          "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+          "who": "Bride, Groom, Pandit",
+          "period": "afternoon",
+          "note": "Confirm auspicious muhurat with Pandit"
+        },
+        {
+          "time": "04:30 PM",
+          "activity": "Ceremony concludes ΓÇö couple portraits",
+          "who": "Bride, Groom",
+          "period": "afternoon"
+        },
+        {
+          "time": "05:30 PM",
+          "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+          "who": "Bride, Groom, Photographer",
+          "period": "evening",
+          "note": "BEST natural light of the day ΓÇö do not skip this"
+        },
+        {
+          "time": "06:30 PM",
+          "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+          "who": "All Guests",
+          "period": "evening"
+        },
+        {
+          "time": "07:30 PM",
+          "activity": "Dinner service opens ΓÇö live food counters",
+          "who": "All Guests",
+          "period": "night"
+        },
+        {
+          "time": "08:30 PM",
+          "activity": "DJ / Live Band performance begins",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "09:30 PM",
+          "activity": "First dance ΓÇö couple takes the floor",
+          "who": "Bride, Groom",
+          "period": "night"
+        },
+        {
+          "time": "10:30 PM",
+          "activity": "Event winds down ΓÇö family farewells",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "11:00 PM",
+          "activity": "Vendor wrap-up & final payments",
+          "who": "Coordinator",
+          "period": "night"
+        }
+      ],
+      "budget": {
+        "total": 166667,
+        "breakdown": [
+          {
+            "category": "Cleaning",
+            "amount": 86667,
+            "note": "Professional cleaning"
+          },
+          {
+            "category": "Decoration",
+            "amount": 75833,
+            "note": "Setup & arrangement"
+          },
+          {
+            "category": "Supplies",
+            "amount": 32500,
+            "note": "Linens, flowers"
+          },
+          {
+            "category": "Buffer",
+            "amount": 21667,
+            "note": "Contingency"
+          }
+        ]
+      },
+      "checklist": [
+        {
+          "task": "Confirm muhurat timings with Pandit",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Baraat route confirmed with venue",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Final headcount sent to caterer",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Golden hour location scouted",
+          "priority": "must",
+          "owner": "Photographer"
+        },
+        {
+          "task": "Emergency kit ready (medicines, pins, tape)",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Groom outfit finalised & pressed",
+          "priority": "must",
+          "owner": "Groom"
+        }
+      ],
+      "vendors": [
+        {
+          "role": "Photographer",
+          "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+          "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+          "searchUrl": "/artists?city=null&category=photographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Videographer",
+          "description": "Cinematic wedding film",
+          "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+          "searchUrl": "/artists?city=null&category=videographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Decorator",
+          "description": "Mandap, stage & full venue decoration",
+          "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+          "searchUrl": "/artists?city=null&category=decorators",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Caterer",
+          "description": "Full-day catering ΓÇö all meals",
+          "budgetRange": "Γé╣780/plate",
+          "searchUrl": "/artists?city=null&category=catering",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Makeup Artist",
+          "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+          "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+          "searchUrl": "/artists?city=null&category=makeup",
+          "urgency": "book_now"
+        }
+      ],
+      "aiTips": [
+        "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+        "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+        "Book your baraat DJ/band separately from the main evening entertainment",
+        "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+        "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+        "First dance song ΓÇö practice it at least once before the wedding day"
+      ],
+      "sunrise": "06:15 AM",
+      "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+    },
+    {
+      "day": 2,
+      "label": "Day 2 ΓÇô Housewarming Ceremony",
+      "theme": "Traditional & Sacred ΓÇö Gold & Flowers",
+      "description": "An important ritual or formal gathering marking a significant occasion.",
+      "slots": [
+        {
+          "time": "05:30 AM",
+          "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+          "who": "Decorator",
+          "period": "morning",
+          "note": "CRITICAL ΓÇö must complete before guests arrive"
+        },
+        {
+          "time": "06:00 AM",
+          "activity": "Florist arrives ΓÇö fresh flower arrangements",
+          "who": "Florist",
+          "period": "morning"
+        },
+        {
+          "time": "06:30 AM",
+          "activity": "Electricians finalize lighting rigs",
+          "who": "Electrician",
+          "period": "morning"
+        },
+        {
+          "time": "07:00 AM",
+          "activity": "Bridal makeup & hair begins",
+          "who": "Bride",
+          "period": "morning",
+          "note": "Allow 2-3 hours for bridal makeup"
+        },
+        {
+          "time": "08:00 AM",
+          "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+          "who": "Caterer",
+          "period": "morning"
+        },
+        {
+          "time": "08:30 AM",
+          "activity": "Photography team arrives ΓÇö venue detail shots",
+          "who": "Photographer",
+          "period": "morning"
+        },
+        {
+          "time": "09:00 AM",
+          "activity": "Groom gets ready with family",
+          "who": "Groom",
+          "period": "morning"
+        },
+        {
+          "time": "10:00 AM",
+          "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+          "who": "Bride, Groom",
+          "period": "morning"
+        },
+        {
+          "time": "11:00 AM",
+          "activity": "Family portraits ΓÇö both sides",
+          "who": "Family",
+          "period": "morning"
+        },
+        {
+          "time": "11:30 AM",
+          "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+          "who": "Groom, Band/DJ",
+          "period": "morning",
+          "note": "Coordinate baraat route with venue in advance"
+        },
+        {
+          "time": "12:30 PM",
+          "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+          "who": "All",
+          "period": "afternoon"
+        },
+        {
+          "time": "01:00 PM",
+          "activity": "Lunch served for guests (buffet opens)",
+          "who": "All Guests",
+          "period": "afternoon"
+        },
+        {
+          "time": "02:00 PM",
+          "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+          "who": "Bride, Groom, Pandit",
+          "period": "afternoon",
+          "note": "Confirm auspicious muhurat with Pandit"
+        },
+        {
+          "time": "04:30 PM",
+          "activity": "Ceremony concludes ΓÇö couple portraits",
+          "who": "Bride, Groom",
+          "period": "afternoon"
+        },
+        {
+          "time": "05:30 PM",
+          "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+          "who": "Bride, Groom, Photographer",
+          "period": "evening",
+          "note": "BEST natural light of the day ΓÇö do not skip this"
+        },
+        {
+          "time": "06:30 PM",
+          "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+          "who": "All Guests",
+          "period": "evening"
+        },
+        {
+          "time": "07:30 PM",
+          "activity": "Dinner service opens ΓÇö live food counters",
+          "who": "All Guests",
+          "period": "night"
+        },
+        {
+          "time": "08:30 PM",
+          "activity": "DJ / Live Band performance begins",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "09:30 PM",
+          "activity": "First dance ΓÇö couple takes the floor",
+          "who": "Bride, Groom",
+          "period": "night"
+        },
+        {
+          "time": "10:30 PM",
+          "activity": "Event winds down ΓÇö family farewells",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "11:00 PM",
+          "activity": "Vendor wrap-up & final payments",
+          "who": "Coordinator",
+          "period": "night"
+        }
+      ],
+      "budget": {
+        "total": 166667,
+        "breakdown": [
+          {
+            "category": "Catering",
+            "amount": 65000,
+            "note": "Refreshments & snacks"
+          },
+          {
+            "category": "Decoration",
+            "amount": 54167,
+            "note": "Ceremonial d├⌐cor"
+          },
+          {
+            "category": "Photography",
+            "amount": 43333,
+            "note": "Event coverage"
+          },
+          {
+            "category": "Miscellaneous",
+            "amount": 32500,
+            "note": "Ritual supplies"
+          },
+          {
+            "category": "Buffer",
+            "amount": 21667,
+            "note": "Contingency"
+          }
+        ]
+      },
+      "checklist": [
+        {
+          "task": "Confirm muhurat timings with Pandit",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Baraat route confirmed with venue",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Final headcount sent to caterer",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Golden hour location scouted",
+          "priority": "must",
+          "owner": "Photographer"
+        },
+        {
+          "task": "Emergency kit ready (medicines, pins, tape)",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Groom outfit finalised & pressed",
+          "priority": "must",
+          "owner": "Groom"
+        }
+      ],
+      "vendors": [
+        {
+          "role": "Photographer",
+          "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+          "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+          "searchUrl": "/artists?city=null&category=photographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Videographer",
+          "description": "Cinematic wedding film",
+          "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+          "searchUrl": "/artists?city=null&category=videographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Decorator",
+          "description": "Mandap, stage & full venue decoration",
+          "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+          "searchUrl": "/artists?city=null&category=decorators",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Caterer",
+          "description": "Full-day catering ΓÇö all meals",
+          "budgetRange": "Γé╣780/plate",
+          "searchUrl": "/artists?city=null&category=catering",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Makeup Artist",
+          "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+          "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+          "searchUrl": "/artists?city=null&category=makeup",
+          "urgency": "book_now"
+        }
+      ],
+      "aiTips": [
+        "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+        "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+        "Book your baraat DJ/band separately from the main evening entertainment",
+        "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+        "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+        "First dance song ΓÇö practice it at least once before the wedding day"
+      ],
+      "sunrise": "06:15 AM",
+      "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+    },
+    {
+      "day": 3,
+      "label": "Day 3 ΓÇô Gathering",
+      "theme": "Casual & Warm ΓÇö Soft Colours",
+      "description": "A time for people to come together, connect, and share experiences.",
+      "slots": [
+        {
+          "time": "05:30 AM",
+          "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+          "who": "Decorator",
+          "period": "morning",
+          "note": "CRITICAL ΓÇö must complete before guests arrive"
+        },
+        {
+          "time": "06:00 AM",
+          "activity": "Florist arrives ΓÇö fresh flower arrangements",
+          "who": "Florist",
+          "period": "morning"
+        },
+        {
+          "time": "06:30 AM",
+          "activity": "Electricians finalize lighting rigs",
+          "who": "Electrician",
+          "period": "morning"
+        },
+        {
+          "time": "07:00 AM",
+          "activity": "Bridal makeup & hair begins",
+          "who": "Bride",
+          "period": "morning",
+          "note": "Allow 2-3 hours for bridal makeup"
+        },
+        {
+          "time": "08:00 AM",
+          "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+          "who": "Caterer",
+          "period": "morning"
+        },
+        {
+          "time": "08:30 AM",
+          "activity": "Photography team arrives ΓÇö venue detail shots",
+          "who": "Photographer",
+          "period": "morning"
+        },
+        {
+          "time": "09:00 AM",
+          "activity": "Groom gets ready with family",
+          "who": "Groom",
+          "period": "morning"
+        },
+        {
+          "time": "10:00 AM",
+          "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+          "who": "Bride, Groom",
+          "period": "morning"
+        },
+        {
+          "time": "11:00 AM",
+          "activity": "Family portraits ΓÇö both sides",
+          "who": "Family",
+          "period": "morning"
+        },
+        {
+          "time": "11:30 AM",
+          "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+          "who": "Groom, Band/DJ",
+          "period": "morning",
+          "note": "Coordinate baraat route with venue in advance"
+        },
+        {
+          "time": "12:30 PM",
+          "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+          "who": "All",
+          "period": "afternoon"
+        },
+        {
+          "time": "01:00 PM",
+          "activity": "Lunch served for guests (buffet opens)",
+          "who": "All Guests",
+          "period": "afternoon"
+        },
+        {
+          "time": "02:00 PM",
+          "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+          "who": "Bride, Groom, Pandit",
+          "period": "afternoon",
+          "note": "Confirm auspicious muhurat with Pandit"
+        },
+        {
+          "time": "04:30 PM",
+          "activity": "Ceremony concludes ΓÇö couple portraits",
+          "who": "Bride, Groom",
+          "period": "afternoon"
+        },
+        {
+          "time": "05:30 PM",
+          "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+          "who": "Bride, Groom, Photographer",
+          "period": "evening",
+          "note": "BEST natural light of the day ΓÇö do not skip this"
+        },
+        {
+          "time": "06:30 PM",
+          "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+          "who": "All Guests",
+          "period": "evening"
+        },
+        {
+          "time": "07:30 PM",
+          "activity": "Dinner service opens ΓÇö live food counters",
+          "who": "All Guests",
+          "period": "night"
+        },
+        {
+          "time": "08:30 PM",
+          "activity": "DJ / Live Band performance begins",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "09:30 PM",
+          "activity": "First dance ΓÇö couple takes the floor",
+          "who": "Bride, Groom",
+          "period": "night"
+        },
+        {
+          "time": "10:30 PM",
+          "activity": "Event winds down ΓÇö family farewells",
+          "who": "All",
+          "period": "night"
+        },
+        {
+          "time": "11:00 PM",
+          "activity": "Vendor wrap-up & final payments",
+          "who": "Coordinator",
+          "period": "night"
+        }
+      ],
+      "budget": {
+        "total": 166667,
+        "breakdown": [
+          {
+            "category": "Catering",
+            "amount": 86667,
+            "note": "Meals & beverages"
+          },
+          {
+            "category": "Decoration",
+            "amount": 43333,
+            "note": "Ambiance"
+          },
+          {
+            "category": "Photography",
+            "amount": 32500,
+            "note": "Candid moments"
+          },
+          {
+            "category": "Entertainment",
+            "amount": 32500,
+            "note": "Optional activities"
+          },
+          {
+            "category": "Buffer",
+            "amount": 21667,
+            "note": "Contingency"
+          }
+        ]
+      },
+      "checklist": [
+        {
+          "task": "Confirm muhurat timings with Pandit",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Baraat route confirmed with venue",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Final headcount sent to caterer",
+          "priority": "must",
+          "owner": "Family"
+        },
+        {
+          "task": "Golden hour location scouted",
+          "priority": "must",
+          "owner": "Photographer"
+        },
+        {
+          "task": "Emergency kit ready (medicines, pins, tape)",
+          "priority": "must",
+          "owner": "Coordinator"
+        },
+        {
+          "task": "Groom outfit finalised & pressed",
+          "priority": "must",
+          "owner": "Groom"
+        }
+      ],
+      "vendors": [
+        {
+          "role": "Photographer",
+          "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+          "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+          "searchUrl": "/artists?city=null&category=photographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Videographer",
+          "description": "Cinematic wedding film",
+          "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+          "searchUrl": "/artists?city=null&category=videographers",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Decorator",
+          "description": "Mandap, stage & full venue decoration",
+          "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+          "searchUrl": "/artists?city=null&category=decorators",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Caterer",
+          "description": "Full-day catering ΓÇö all meals",
+          "budgetRange": "Γé╣780/plate",
+          "searchUrl": "/artists?city=null&category=catering",
+          "urgency": "book_now"
+        },
+        {
+          "role": "Makeup Artist",
+          "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+          "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+          "searchUrl": "/artists?city=null&category=makeup",
+          "urgency": "book_now"
+        }
+      ],
+      "aiTips": [
+        "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+        "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+        "Book your baraat DJ/band separately from the main evening entertainment",
+        "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+        "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+        "First dance song ΓÇö practice it at least once before the wedding day"
+      ],
+      "sunrise": "06:15 AM",
+      "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+    }
+  ],
+  "totalSpend": 500001,
+  "remaining": 299999,
+  "globalTips": [
+    "Book ALL key vendors at least 4-6 months in advance ΓÇö peak season book out fast",
+    "Always get written contracts with cancellation clauses for every vendor",
+    "Assign one dedicated coordinator ΓÇö not a family member, to reduce stress",
+    "Keep 10% of total budget as emergency buffer ΓÇö unexpected costs always arise",
+    "Peak season pricing applies ΓÇö expect 20-30% premium on all vendors",
+    "Photography/videography is investment-level ΓÇö never cut this budget for important moments"
+  ],
+  "successScore": 46,
+  "confidence": 64
+}
+
+=== DAYS ARRAY (if exists) ===
+Days count: [33m3[39m
+First day: {
+  "day": 1,
+  "label": "Day 1 ΓÇô Preparation",
+  "theme": "Practical & Organized ΓÇö Clean & Fresh",
+  "description": "Planning and setting up to ensure everything is ready for the main event.",
+  "slots": [
+    {
+      "time": "05:30 AM",
+      "activity": "Decoration team arrives ΓÇö mandap & stage setup begins",
+      "who": "Decorator",
+      "period": "morning",
+      "note": "CRITICAL ΓÇö must complete before guests arrive"
+    },
+    {
+      "time": "06:00 AM",
+      "activity": "Florist arrives ΓÇö fresh flower arrangements",
+      "who": "Florist",
+      "period": "morning"
+    },
+    {
+      "time": "06:30 AM",
+      "activity": "Electricians finalize lighting rigs",
+      "who": "Electrician",
+      "period": "morning"
+    },
+    {
+      "time": "07:00 AM",
+      "activity": "Bridal makeup & hair begins",
+      "who": "Bride",
+      "period": "morning",
+      "note": "Allow 2-3 hours for bridal makeup"
+    },
+    {
+      "time": "08:00 AM",
+      "activity": "Catering team arrives ΓÇö kitchen & buffet setup",
+      "who": "Caterer",
+      "period": "morning"
+    },
+    {
+      "time": "08:30 AM",
+      "activity": "Photography team arrives ΓÇö venue detail shots",
+      "who": "Photographer",
+      "period": "morning"
+    },
+    {
+      "time": "09:00 AM",
+      "activity": "Groom gets ready with family",
+      "who": "Groom",
+      "period": "morning"
+    },
+    {
+      "time": "10:00 AM",
+      "activity": "Pre-wedding photos ΓÇö bride & groom separately",
+      "who": "Bride, Groom",
+      "period": "morning"
+    },
+    {
+      "time": "11:00 AM",
+      "activity": "Family portraits ΓÇö both sides",
+      "who": "Family",
+      "period": "morning"
+    },
+    {
+      "time": "11:30 AM",
+      "activity": "Baraat / Groom's procession begins ΓÇö band leads",
+      "who": "Groom, Band/DJ",
+      "period": "morning",
+      "note": "Coordinate baraat route with venue in advance"
+    },
+    {
+      "time": "12:30 PM",
+      "activity": "Welcome ceremony ΓÇö exchange of garlands (Varmala)",
+      "who": "All",
+      "period": "afternoon"
+    },
+    {
+      "time": "01:00 PM",
+      "activity": "Lunch served for guests (buffet opens)",
+      "who": "All Guests",
+      "period": "afternoon"
+    },
+    {
+      "time": "02:00 PM",
+      "activity": "Main ceremony ΓÇö Pheras / Rituals begin",
+      "who": "Bride, Groom, Pandit",
+      "period": "afternoon",
+      "note": "Confirm auspicious muhurat with Pandit"
+    },
+    {
+      "time": "04:30 PM",
+      "activity": "Ceremony concludes ΓÇö couple portraits",
+      "who": "Bride, Groom",
+      "period": "afternoon"
+    },
+    {
+      "time": "05:30 PM",
+      "activity": "Golden Hour photography ΓÇö outdoor / rooftop",
+      "who": "Bride, Groom, Photographer",
+      "period": "evening",
+      "note": "BEST natural light of the day ΓÇö do not skip this"
+    },
+    {
+      "time": "06:30 PM",
+      "activity": "Cocktail hour ΓÇö welcome drinks, mingling",
+      "who": "All Guests",
+      "period": "evening"
+    },
+    {
+      "time": "07:30 PM",
+      "activity": "Dinner service opens ΓÇö live food counters",
+      "who": "All Guests",
+      "period": "night"
+    },
+    {
+      "time": "08:30 PM",
+      "activity": "DJ / Live Band performance begins",
+      "who": "All",
+      "period": "night"
+    },
+    {
+      "time": "09:30 PM",
+      "activity": "First dance ΓÇö couple takes the floor",
+      "who": "Bride, Groom",
+      "period": "night"
+    },
+    {
+      "time": "10:30 PM",
+      "activity": "Event winds down ΓÇö family farewells",
+      "who": "All",
+      "period": "night"
+    },
+    {
+      "time": "11:00 PM",
+      "activity": "Vendor wrap-up & final payments",
+      "who": "Coordinator",
+      "period": "night"
+    }
+  ],
+  "budget": {
+    "total": 166667,
+    "breakdown": [
+      {
+        "category": "Cleaning",
+        "amount": 86667,
+        "note": "Professional cleaning"
+      },
+      {
+        "category": "Decoration",
+        "amount": 75833,
+        "note": "Setup & arrangement"
+      },
+      {
+        "category": "Supplies",
+        "amount": 32500,
+        "note": "Linens, flowers"
+      },
+      {
+        "category": "Buffer",
+        "amount": 21667,
+        "note": "Contingency"
+      }
+    ]
+  },
+  "checklist": [
+    {
+      "task": "Confirm muhurat timings with Pandit",
+      "priority": "must",
+      "owner": "Family"
+    },
+    {
+      "task": "Baraat route confirmed with venue",
+      "priority": "must",
+      "owner": "Coordinator"
+    },
+    {
+      "task": "All vendor arrival times confirmed ΓÇö 1 week before",
+      "priority": "must",
+      "owner": "Coordinator"
+    },
+    {
+      "task": "Final headcount sent to caterer",
+      "priority": "must",
+      "owner": "Family"
+    },
+    {
+      "task": "Golden hour location scouted",
+      "priority": "must",
+      "owner": "Photographer"
+    },
+    {
+      "task": "Emergency kit ready (medicines, pins, tape)",
+      "priority": "must",
+      "owner": "Coordinator"
+    },
+    {
+      "task": "Groom outfit finalised & pressed",
+      "priority": "must",
+      "owner": "Groom"
+    }
+  ],
+  "vendors": [
+    {
+      "role": "Photographer",
+      "description": "Full-day wedding coverage ΓÇö must book 5 months ahead",
+      "budgetRange": "Γé╣39KΓÇôΓé╣1.0 lakh",
+      "searchUrl": "/artists?city=null&category=photographers",
+      "urgency": "book_now"
+    },
+    {
+      "role": "Videographer",
+      "description": "Cinematic wedding film",
+      "budgetRange": "Γé╣33KΓÇôΓé╣91K",
+      "searchUrl": "/artists?city=null&category=videographers",
+      "urgency": "book_now"
+    },
+    {
+      "role": "Decorator",
+      "description": "Mandap, stage & full venue decoration",
+      "budgetRange": "Γé╣78KΓÇôΓé╣2.6 lakh",
+      "searchUrl": "/artists?city=null&category=decorators",
+      "urgency": "book_now"
+    },
+    {
+      "role": "Caterer",
+      "description": "Full-day catering ΓÇö all meals",
+      "budgetRange": "Γé╣780/plate",
+      "searchUrl": "/artists?city=null&category=catering",
+      "urgency": "book_now"
+    },
+    {
+      "role": "Makeup Artist",
+      "description": "Bridal makeup ΓÇö book trial 2 weeks before",
+      "budgetRange": "Γé╣13KΓÇôΓé╣52K",
+      "searchUrl": "/artists?city=null&category=makeup",
+      "urgency": "book_now"
+    }
+  ],
+  "aiTips": [
+    "The ceremony timing (muhurat) is sacred ΓÇö confirm with your Pandit at least 2 months before",
+    "Golden Hour (5:30ΓÇô6:30 PM) is the single most important photography window ΓÇö protect it",
+    "Book your baraat DJ/band separately from the main evening entertainment",
+    "Have a coordinator whose only job is to manage vendor timings ΓÇö not a family member",
+    "winter weddings in India are beautiful ΓÇö but have a generator backup confirmed",
+    "First dance song ΓÇö practice it at least once before the wedding day"
+  ],
+  "sunrise": "06:15 AM",
+  "goldenHour": "05:30 PM ΓÇô 06:30 PM"
+}
+
+=== CAN days.map() BE CALLED? ===
+YES: plan.days.map is callable
+
+ [32mΓ£ô[39m src/lib/__tests__/plan-event-runtime.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 33[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+[2m   Start at [22m 11:31:15
+[2m   Duration [22m 1.47s[2m (transform 299ms, setup 0ms, collect 922ms, tests 73ms, environment 1ms, prepare 925ms)[22m
+

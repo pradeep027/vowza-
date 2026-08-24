@@ -1,0 +1,237 @@
+PHASE 2A BLOCKER FIXES - FILES MODIFIED
+
+================================================================================
+SUMMARY
+================================================================================
+
+Total Files Modified: 4
+Total Lines Changed: ~40 net (additions + removals)
+Build Status: ✅ SUCCESS (Exit Code 0)
+All Blockers: ✅ FIXED
+
+================================================================================
+FILE 1: src/lib/aiPlannerTypes.ts
+================================================================================
+
+Status: MODIFIED (Type Definition Extension)
+Lines Added: 3
+Lines Removed: 0
+Net Change: +3
+
+Change Type: Interface Extension
+
+Location: Lines 38-40 (end of PlannerContext interface)
+
+Addition:
+  askedQuestions?:      string[];  // Questions already asked in this conversation
+  confirmedFields?:     string[];  // Fields explicitly provided by user
+
+Reason: Blockers 3 & 4 - Persistent tracking of asked questions and confirmed fields
+
+Impact: 
+  - Backward compatible (optional fields)
+  - No database schema change needed
+  - Stored in existing ai_conversations.context_summary JSONB
+
+================================================================================
+FILE 2: src/lib/llm.ts
+================================================================================
+
+Status: MODIFIED (Bug Fix + Dead Code Removal)
+Lines Added: 1
+Lines Removed: 4
+Net Change: -3
+
+Changes:
+
+CHANGE 2A (Lines 345-357):
+Type: Dead Code Removal
+Old Code (4 lines):
+  // ─── PHASE 2A: Use intelligent context merging ───────────────────────────
+  const extractedContext = extractContextFromMessage(message, context);
+  const contextWithExtraction = { ...context, ...extractedContext };
+  
+New Code (1 line):
+  // ─── Get orchestration result which includes updated context ─────────────
+  // Extraction happens inside orchestrate() via extractContextUpdates()
+
+Reason: Blocker 1 - extractContextFromMessage() was undefined, would crash at runtime
+
+CHANGE 2B (Line 370):
+Type: Variable Update
+Old Code:
+  const contextToUse = orch.updatedContext || contextWithExtraction;
+New Code:
+  const contextToUse = orch.updatedContext || context;
+
+Reason: Blocker 2 - No longer need contextWithExtraction variable
+
+Total Changes: 2 locations
+
+Impact:
+  - Eliminates runtime crash risk
+  - Consolidates extraction to single point (orchestrate)
+  - Cleaner code path
+
+================================================================================
+FILE 3: src/lib/aiOrchestrator.ts
+================================================================================
+
+Status: MODIFIED (Multiple - Interface, Helpers, Integration)
+Lines Added: 43
+Lines Removed: 0
+Net Change: +43
+
+Changes:
+
+CHANGE 3A (Lines 40-49):
+Type: Interface Extension
+Addition: Updated OrchestrationResult interface
+  updatedContext:   PlannerContext; // PHASE 2A: merged and validated context
+  ambiguousChange:  boolean;        // PHASE 2A: whether change was ambiguous
+
+Reason: Blocker 2 - Return merged context from orchestrate()
+
+CHANGE 3B (Lines 96-130):
+Type: New Helper Functions
+Addition: 4 exported functions
+  1. recordAskedQuestion(context, question): PlannerContext
+  2. markFieldConfirmed(context, fieldName): PlannerContext
+  3. hasAskedQuestion(context, question): boolean
+  4. isFieldConfirmed(context, fieldName): boolean
+
+Reason: Blockers 3 & 4 - Implement question and field tracking
+
+CHANGE 3C (Lines 503-506):
+Type: Logic Update in mergeContextIntelligently()
+Addition: 1 line in loop
+  merged = markFieldConfirmed(merged, key);
+
+Reason: Blocker 4 - Mark fields as confirmed when merged
+
+CHANGE 3D (Lines 673-679):
+Type: Question Recording Integration in orchestrate()
+Addition: Question recording before determining response strategy
+  if (nextQuestion && ['plan_event',...].includes(intent)) {
+    if (!hasAskedQuestion(merged, nextQuestion)) {
+      merged = recordAskedQuestion(merged, nextQuestion);
+    }
+  }
+
+Reason: Blocker 3 - Record questions when about to ask them
+
+Total Changes: 4 locations
+
+Impact:
+  - Single extraction/merge point in orchestrate()
+  - Persistent question tracking
+  - Persistent field confirmation tracking
+  - Efficient computation (no duplicate extraction)
+
+================================================================================
+FILE 4: src/lib/aiPlanner.ts
+================================================================================
+
+Status: MODIFIED (Duplicate Logic Removal)
+Lines Added: 0
+Lines Removed: 7
+Net Change: -7
+
+Change Type: Simplification
+
+Location: Lines 707-723 (processMessage function)
+
+Removed Code (7 lines):
+  const { orchestrate, extractContextUpdates, mergeContextIntelligently } = await import('./aiOrchestrator');
+  // ─── PHASE 2A: Use orchestrate's intelligent merging ──────────────────────
+  const updates = extractContextUpdates(message, context);
+  const { merged, ambiguous } = mergeContextIntelligently(context, updates, message);
+  const ctx: PlannerContext = merged;
+  const result = orchestrate(message, ctx, history ?? []);
+
+New Code (2 lines):
+  const { orchestrate } = await import('./aiOrchestrator');
+  // ─── PHASE 2A: Orchestrate handles extraction and merging (single merge point) ──
+  const result = orchestrate(message, context, history ?? []);
+
+Additional Changes (Lines 717-718):
+  Old: const finalContext = result.updatedContext || ctx;
+  New: const finalContext = result.updatedContext || context;
+       const ambiguous = (result as any).ambiguousChange ?? false;
+
+Reason: Blocker 2 - Remove duplicate extraction/merge, use orchestrate result
+
+Impact:
+  - Eliminates duplicate extraction (was called twice per message)
+  - Eliminates duplicate merging (was called twice per message)
+  - Uses result from orchestrate() directly (single source of truth)
+  - Cleaner, simpler code
+
+================================================================================
+SUMMARY OF CHANGES
+================================================================================
+
+File                          Type          Adds  Removes  Net    Blockers
+────────────────────────────────────────────────────────────────────────────
+aiPlannerTypes.ts             Type Ext      3     0        +3     3,4
+llm.ts                        Bug Fix       1     4        -3     1,2
+aiOrchestrator.ts             Feature       43    0        +43    2,3,4
+aiPlanner.ts                  Simplify      0     7        -7     2
+────────────────────────────────────────────────────────────────────────────
+TOTAL                                       47    11       +36    All
+
+================================================================================
+VERIFICATION
+================================================================================
+
+✅ TypeScript: 0 errors
+✅ Build: Exit Code 0
+✅ Compilation: 0 errors
+✅ Warnings: Only CSS utility warnings (unrelated)
+
+✅ Blocker 1 Fixed: No undefined function references
+✅ Blocker 2 Fixed: Single merge point in orchestrate()
+✅ Blocker 3 Fixed: askedQuestions tracking implemented
+✅ Blocker 4 Fixed: confirmedFields tracking implemented
+
+✅ Backward Compatible: New fields are optional
+✅ No Schema Changes: Uses existing context_summary JSONB
+✅ Phase 1 Preserved: No changes to vendor search logic
+✅ No Unrelated Changes: Only fixing the 4 blockers
+
+================================================================================
+NO CHANGES TO
+================================================================================
+
+✅ eventContextCapturer.ts (Phase 1 event classification)
+✅ ragRetriever.ts (Phase 1 vendor search)
+✅ Database migrations (no schema changes needed)
+✅ Rating extraction logic (Phase 1)
+✅ Area/locality filtering (Phase 1)
+✅ Conversation table schema
+✅ Message table schema
+✅ Authentication logic
+✅ Other features
+
+================================================================================
+READY FOR
+================================================================================
+
+✅ Manual UI Testing
+✅ User Review
+✅ Code Review
+⏳ GitHub Merge (awaiting approval)
+⏳ Vercel Deployment (awaiting approval)
+
+================================================================================
+DO NOT YET
+================================================================================
+
+❌ Push to GitHub (awaiting review)
+❌ Deploy to Vercel (awaiting review)
+❌ Modify Supabase (not needed - uses existing schema)
+❌ Create migrations (not needed)
+
+================================================================================
+END OF FILE
+================================================================================

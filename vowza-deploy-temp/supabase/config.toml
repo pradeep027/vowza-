@@ -1,0 +1,20 @@
+project_id = "vavfeataqwwbpjonknne"
+
+[auth]
+site_url = "https://vowza-chi.vercel.app"
+additional_redirect_urls = ["https://vowza-chi.vercel.app/**", "https://vowza-chi.vercel.app/auth?mode=reset", "http://localhost:5173/**", "http://localhost:5173/auth?mode=reset", "http://localhost:8080/**", "http://localhost:8080/auth?mode=reset"]
+
+[auth.email]
+otp_length = 6
+enable_confirmations = true
+max_frequency = "1m0s"
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.send-booking-otp]
+verify_jwt = false

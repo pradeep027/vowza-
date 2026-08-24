@@ -1,0 +1,16 @@
+{
+  "name": "Vowza",
+  "short_name": "Vowza",
+  "description": "India's Premium Event Marketplace",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1B4FE8",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
