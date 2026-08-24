@@ -26,3 +26,4 @@ dist-ssr
 .vercel
 .env
 .env.*
+supabase/baseline/baseline_data.sql
