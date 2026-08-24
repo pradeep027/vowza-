@@ -272,128 +272,223 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
 }
 
 
-/* ─── Step 1: Package Type (REFACTORED FOR BATCH CREATION) ──────────────────── */
+/* ─── Step 1: Package Type (DRAG-AND-DROP FOR BATCH CREATION) ──────────────── */
 function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [draggedType, setDraggedType] = useState<string | null>(null);
+  const [dropZoneActive, setDropZoneActive] = useState(false);
 
-  const handleSelect = (type: string) => {
-    const isSelected = draft.selectedPackageTypes.includes(type);
-    setDraft({
-      ...draft,
-      selectedPackageTypes: isSelected
-        ? draft.selectedPackageTypes.filter(t => t !== type)
-        : [...draft.selectedPackageTypes, type]
-    });
+  // Handle drag start from available types
+  const handleDragStart = (type: string, e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedType(type);
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('packageType', type);
   };
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
+  // Handle drag over drop zone
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDropZoneActive(true);
   };
 
-  const handleDropAfter = (index: number) => {
-    if (draggedIndex === null || draggedIndex === index) return;
-    const newSelected = [...draft.selectedPackageTypes];
-    const item = newSelected[draggedIndex];
-    newSelected.splice(draggedIndex, 1);
-    newSelected.splice(index + (draggedIndex < index ? 0 : 1), 0, item);
-    setDraft({ ...draft, selectedPackageTypes: newSelected });
-    setDraggedIndex(null);
+  // Handle drag leave drop zone
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only deactivate if leaving the actual drop zone, not child elements
+    if (e.currentTarget === e.target) {
+      setDropZoneActive(false);
+    }
   };
 
+  // Handle drop to create package
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const type = e.dataTransfer.getData('packageType');
+    
+    if (type && !draft.selectedPackageTypes.includes(type)) {
+      setDraft({
+        ...draft,
+        selectedPackageTypes: [...draft.selectedPackageTypes, type]
+      });
+      toast.success(`Added ${type} package`);
+    } else if (type && draft.selectedPackageTypes.includes(type)) {
+      toast.info(`${type} is already added. Duplicates not allowed.`);
+    }
+    
+    setDropZoneActive(false);
+    setDraggedType(null);
+  };
+
+  // Handle removal of package
   const handleRemove = (type: string) => {
     setDraft({
       ...draft,
       selectedPackageTypes: draft.selectedPackageTypes.filter(t => t !== type)
     });
+    toast.success(`Removed ${type} package`);
   };
 
+  // Available types (not yet added)
+  const availableTypes = PACKAGE_TYPES.filter(type => !draft.selectedPackageTypes.includes(type));
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
-        <h3 className="text-base font-bold text-cyan-800">Package Types to Create <span className="text-red-500">*</span></h3>
+    <div className="space-y-6">
+      {/* SOURCE AREA: Draggable Package Types */}
+      <div className="rounded-2xl border border-[#eadfcf] bg-gradient-to-br from-[#f0fdfa] to-[#ecfdf5] p-5 space-y-3">
+        <h3 className="text-base font-bold text-cyan-800">📦 Available Package Types</h3>
         <p className="text-xs text-stone-600">
-          <strong>Select the package types you want to create.</strong> Each selected type will create a <strong>separate, independent package</strong>. 
-          For example: selecting <span className="font-semibold">Wedding + Reception + Sangeet</span> creates <strong>3 separate packages</strong>.
+          Drag any package type below to the drop zone to create an independent package.
         </p>
         
-        {/* Available Types Selection */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-cyan-700">Available Package Types:</p>
-          <div className="flex flex-wrap gap-2">
-            {PACKAGE_TYPES.map(type => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => handleSelect(type)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  draft.selectedPackageTypes.includes(type)
-                    ? 'border-cyan-700 bg-cyan-700/10 text-cyan-700 font-semibold'
-                    : 'border-[#e7d9c4] text-stone-600 hover:border-cyan-500 hover:text-cyan-700'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
+        {/* Draggable Types Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+          {availableTypes.map(type => (
+            <div
+              key={type}
+              draggable
+              onDragStart={(e) => handleDragStart(type, e)}
+              onDragEnd={() => setDraggedType(null)}
+              className={`flex items-center justify-center rounded-xl border-2 border-dashed border-cyan-400 bg-white p-3 text-center cursor-move transition-all hover:shadow-lg hover:border-cyan-600 hover:bg-cyan-50 ${
+                draggedType === type ? 'opacity-50 ring-2 ring-cyan-500' : ''
+              }`}
+            >
+              <div className="select-none">
+                <p className="text-xs font-bold text-cyan-700">{type}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Selected Package Queue */}
-        {draft.selectedPackageTypes.length > 0 && (
-          <div className="mt-6 space-y-2 border-t border-cyan-200 pt-4">
-            <p className="text-xs font-semibold text-cyan-700">
-              📦 Packages to Create: {draft.selectedPackageTypes.length}
-            </p>
-            <p className="text-[11px] text-stone-500">
-              Drag to reorder. Each item below will create a separate package when saved.
-            </p>
-            <div className="space-y-2">
-              {draft.selectedPackageTypes.map((type, idx) => (
-                <div
-                  key={idx}
-                  draggable
-                  onDragStart={() => handleDragStart(idx)}
-                  onDragOver={handleDragOver}
-                  onDrop={() => handleDropAfter(idx)}
-                  className="flex items-center gap-3 rounded-lg border border-cyan-300 bg-cyan-100/40 p-3 cursor-move hover:shadow-md transition hover:border-cyan-400"
-                >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-cyan-800">{type}</p>
-                    <p className="text-[10px] text-cyan-600">Separate package record</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(type)}
-                    className="rounded-full p-1.5 text-red-500 hover:bg-red-100 transition"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+        {availableTypes.length === 0 && (
+          <p className="text-center text-sm text-stone-400 py-4">
+            All available package types have been added! 🎉
+          </p>
         )}
       </div>
 
+      {/* DROP ZONE: Where packages are created */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`rounded-2xl border-2 border-dashed p-6 transition-all ${
+          dropZoneActive
+            ? 'border-cyan-600 bg-cyan-50 shadow-lg ring-2 ring-cyan-200'
+            : 'border-cyan-300 bg-[#f0fdfa]'
+        }`}
+      >
+        <div className="flex flex-col items-center justify-center space-y-2 py-4">
+          <div className={`rounded-full p-3 ${dropZoneActive ? 'bg-cyan-200' : 'bg-cyan-100'}`}>
+            <Mic2 className={`h-6 w-6 ${dropZoneActive ? 'text-cyan-700' : 'text-cyan-600'}`} />
+          </div>
+          <h3 className="text-base font-bold text-cyan-800">
+            {dropZoneActive ? '✨ Drop here to create' : '🎯 Drag packages here'}
+          </h3>
+          <p className="text-sm text-stone-600 text-center max-w-xs">
+            Drag a package type above to create an independent package configuration
+          </p>
+        </div>
+      </div>
+
+      {/* CREATED PACKAGES: Independent cards */}
+      {draft.selectedPackageTypes.length > 0 && (
+        <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-cyan-800">
+              📋 Created Packages ({draft.selectedPackageTypes.length})
+            </h3>
+            <span className="text-xs font-semibold text-cyan-700 bg-cyan-100 px-2.5 py-1 rounded-full">
+              {draft.selectedPackageTypes.length} package{draft.selectedPackageTypes.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <p className="text-xs text-stone-600">
+            Each card below represents an independent package that will be created with its own database record.
+          </p>
+
+          {/* Package Cards */}
+          <div className="grid gap-3 mt-4">
+            {draft.selectedPackageTypes.map((type, idx) => (
+              <div
+                key={`${type}-${idx}`}
+                className="flex items-center gap-3 rounded-xl border border-cyan-300 bg-white shadow-sm hover:shadow-md transition p-4"
+              >
+                {/* Package Number Badge */}
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-700 text-sm font-bold text-white">
+                  {idx + 1}
+                </div>
+
+                {/* Package Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-cyan-800">{type} Package</p>
+                  <p className="text-xs text-stone-500">Independent record • Unique database ID</p>
+                </div>
+
+                {/* Status Badge */}
+                <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 border border-cyan-200 px-2.5 py-1 text-[11px] font-semibold text-cyan-700 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-600 animate-pulse"></span>
+                  Ready
+                </span>
+
+                {/* Remove Button */}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(type)}
+                  className="rounded-lg p-2 text-red-500 hover:bg-red-50 transition"
+                  title="Remove this package"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PACKAGE INFO SECTION */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5 space-y-4">
-        <h3 className="text-base font-bold text-cyan-800">Package Info</h3>
-        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Package Name <span className="text-red-500">*</span></span>
-          <input className={inputClass} value={draft.name} onChange={e => setDraft({...draft, name: e.target.value})} placeholder="e.g. Premium Anchor Package" /></label>
-        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Description</span>
-          <textarea className={`${inputClass} min-h-[80px] resize-y`} value={draft.description} onChange={e => setDraft({...draft, description: e.target.value})} placeholder="Describe your anchoring package..." /></label>
-        <label className="block"><span className="text-sm font-semibold text-[#0e4d5c]">Status</span>
-          <select className={inputClass} value={draft.status} onChange={e => setDraft({...draft, status: e.target.value})}><option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option></select></label>
+        <h3 className="text-base font-bold text-cyan-800">ℹ️ Package Information</h3>
+        <p className="text-xs text-stone-600">
+          <strong>Note:</strong> The name, description, pricing, photos, and other details below will be applied to <strong>all {draft.selectedPackageTypes.length || 'selected'} packages</strong>. 
+          However, each will have its own independent database record with the package type you selected.
+        </p>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-[#0e4d5c]">Package Name <span className="text-red-500">*</span></span>
+          <input
+            className={inputClass}
+            value={draft.name}
+            onChange={e => setDraft({ ...draft, name: e.target.value })}
+            placeholder="e.g. Professional Anchor Package"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-[#0e4d5c]">Description</span>
+          <textarea
+            className={`${inputClass} min-h-[80px] resize-y`}
+            value={draft.description}
+            onChange={e => setDraft({ ...draft, description: e.target.value })}
+            placeholder="Describe your anchoring package..."
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-[#0e4d5c]">Status</span>
+          <select
+            className={inputClass}
+            value={draft.status}
+            onChange={e => setDraft({ ...draft, status: e.target.value })}
+          >
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+          </select>
+        </label>
       </div>
 
       {/* Cover Photo */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-        <span className="text-sm font-semibold text-[#0e4d5c]">Cover Photo <span className="text-red-500">*</span></span>
+        <span className="text-sm font-semibold text-[#0e4d5c]">🖼️ Cover Photo <span className="text-red-500">*</span></span>
         {(draft.cover_file||draft.cover_url) ? (
           <div className="relative rounded-xl overflow-hidden border border-[#eadfcf] bg-stone-50 mt-2"><img src={draft.cover_file?URL.createObjectURL(draft.cover_file):draft.cover_url} alt="Cover" className="w-full h-40 object-cover" /><button type="button" onClick={() => setDraft({...draft, cover_file: null, cover_url: ''})} className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><X className="h-3.5 w-3.5" /></button></div>
         ) : (
@@ -404,7 +499,7 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
 
       {/* Gallery */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-        <span className="text-sm font-semibold text-[#0e4d5c]">Gallery Photos (max 10)</span>
+        <span className="text-sm font-semibold text-[#0e4d5c]">🖼️ Gallery Photos (max 10)</span>
         <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
           {draft.gallery_urls.map((img,i) => (<div key={img.id||i} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={img.url} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => setDraft({...draft,gallery_urls:draft.gallery_urls.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
           {draft.gallery_files.map((f,i) => (<div key={`new-${i}`} className="relative rounded-xl overflow-hidden border border-[#eadfcf] aspect-square bg-stone-50"><img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => setDraft({...draft,gallery_files:draft.gallery_files.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"><X className="h-3 w-3" /></button></div>))}
@@ -414,7 +509,7 @@ function StepPackageType({ draft, setDraft }: { draft: Draft; setDraft: (d: Draf
 
       {/* Performance Videos */}
       <div className="rounded-2xl border border-[#eadfcf] bg-[#f0fdfa] p-5">
-        <span className="text-sm font-semibold text-[#0e4d5c]">Performance Videos (max 5)</span>
+        <span className="text-sm font-semibold text-[#0e4d5c]">🎥 Performance Videos (max 5)</span>
         <p className="text-xs text-stone-500 mb-2">Upload hosting/anchoring videos (MP4/MOV/WEBM, max 100MB)</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {draft.video_urls.map((vid,i) => (<div key={vid.id||i} className="relative rounded-xl overflow-hidden border border-cyan-200 bg-cyan-50 aspect-video"><video src={vid.url} className="w-full h-full object-cover rounded-xl" muted preload="metadata" /><span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] text-white font-bold">VIDEO</span><button type="button" onClick={() => setDraft({...draft,video_urls:draft.video_urls.filter((_,idx)=>idx!==i)})} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"><X className="h-3 w-3" /></button></div>))}
