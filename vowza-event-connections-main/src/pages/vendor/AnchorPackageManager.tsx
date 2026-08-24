@@ -401,8 +401,9 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
       <div className="flex items-start justify-between gap-3">
         <div><h1 className="text-xl font-bold text-[#0e4d5c]">Anchor Packages</h1><p className="text-sm text-muted-foreground">Create and manage your hosting & anchoring packages.</p></div>
         <button onClick={() => {
-          setPackages([]);
-          setActivePackageId(null);
+          const newPkg = createBlankPackage('Wedding');
+          setPackages([newPkg]);
+          setActivePackageId(newPkg.tempId);
           setStep(1);
           setShowWizard(true);
         }} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
@@ -413,8 +414,9 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#eadfcf] py-16 text-center">
           <Mic2 className="h-12 w-12 text-cyan-700/30" /><p className="mt-3 font-semibold text-[#0e4d5c]">No packages yet</p>
           <button onClick={() => {
-            setPackages([]);
-            setActivePackageId(null);
+            const newPkg = createBlankPackage('Wedding');
+            setPackages([newPkg]);
+            setActivePackageId(newPkg.tempId);
             setStep(1);
             setShowWizard(true);
           }} className="mt-4 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Add Package</button>
