@@ -190,7 +190,7 @@ const Navbar = () => {
     if (e.key === "Enter") handleSearch(searchQuery);
   };
 
-  const navH = isScrolled ? "h-12" : "h-14 md:h-16";
+  const navH = isScrolled ? "h-12" : "h-13 md:h-16";
 
   return (
     <>

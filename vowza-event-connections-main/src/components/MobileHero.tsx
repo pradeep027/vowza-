@@ -44,7 +44,7 @@ const MobileHero = () => {
       <div className="mx-auto flex w-full max-w-[600px] flex-col">
         {/* ── Heading block ── */}
         <div className="flex w-full flex-col text-center">
-          <div className="mb-3 inline-flex self-center items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+          <div className="mb-4 inline-flex self-center items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <VowzaIcon className="h-3 w-3 text-gold" />
             <span className="text-[10.5px] font-semibold tracking-wide text-white/70">India&apos;s Premium Event Marketplace</span>
           </div>
