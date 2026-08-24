@@ -206,7 +206,7 @@ class NotificationService {
       //       to: [{ email: payload.to }],
       //       subject: subject
       //     }],
-      //     from: { email: 'noreply@vowza.com' },
+      //     from: { email: 'noreply@vowza.co.in' },
       //     content: [{
       //       type: 'text/html',
       //       value: html || payload.text

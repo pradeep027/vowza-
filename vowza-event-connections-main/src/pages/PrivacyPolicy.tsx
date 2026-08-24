@@ -31,7 +31,7 @@ const sections = [
   {
     title: "6. Your Rights",
     content:
-      "You have the right to access, correct, or delete your personal data at any time. To exercise these rights, contact us at privacy@vowza.com.",
+      "You have the right to access, correct, or delete your personal data at any time. To exercise these rights, contact us at privacy@vowza.co.in.",
   },
   {
     title: "7. Contact Us",
