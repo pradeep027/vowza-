@@ -43,7 +43,7 @@ const PillarCard = memo(({ p, i }: { p: typeof pillars[number]; i: number }) => 
 PillarCard.displayName = "PillarCard";
 
 const WhyVowza = () => (
-  <section className="py-16 md:py-24 bg-surface-3">
+  <section className="py-12 md:py-20 bg-surface-3">
     <div className="container px-4">
 
       <motion.div
@@ -51,7 +51,7 @@ const WhyVowza = () => (
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-60px" }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="text-center mb-10 md:mb-14"
+        className="text-center mb-8 md:mb-10"
       >
         <div className="section-label bg-maroon/8 text-maroon mb-4 mx-auto inline-flex">Why Choose Us</div>
         <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-3">
@@ -62,7 +62,7 @@ const WhyVowza = () => (
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {pillars.map((p, i) => <PillarCard key={p.title} p={p} i={i} />)}
       </div>
     </div>

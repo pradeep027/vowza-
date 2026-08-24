@@ -84,10 +84,9 @@ const CategoryCard = memo(({ cat, count, onClick, idx }: CardProps) => {
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.45, delay: Math.min(idx, 15) * 0.035, ease: [0.22, 1, 0.36, 1] }}
     whileHover={{ y: -6, scale: 1.035 }}
-    whileTap={{ scale: 0.97 }}
-    className={`
-      group relative flex flex-col items-center gap-3
-      p-4 md:p-5 rounded-2xl overflow-hidden
+    whileTap={{ scale: 0.97 }}      className={`
+      group relative flex flex-col items-center gap-2.5
+      p-3.5 md:p-4 rounded-2xl overflow-hidden
       bg-surface-1/70 backdrop-blur-sm border border-border/60
       ring-2 ring-transparent hover:${cat.ring}
       hover:border-transparent hover:shadow-xl
@@ -205,7 +204,7 @@ const TrendingCategories = () => {
     cat.types.reduce((sum, t) => sum + (countMap.get(t) ?? 0), 0);
 
   return (
-    <section className="py-14 md:py-24 bg-background">
+    <section className="py-10 md:py-20 bg-background">
       <div className="container px-4">
 
         {/* ── Section header ── */}
@@ -213,7 +212,7 @@ const TrendingCategories = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10 md:mb-12"
+          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8 md:mb-10"
         >
           <div>
             <div className="section-label bg-maroon/8 text-maroon mb-4 inline-flex">
@@ -238,11 +237,11 @@ const TrendingCategories = () => {
 
         {/* ── Grid ── */}
         {isLoading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 md:gap-3">
             {Array.from({ length: 15 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 md:gap-3">
             {CATEGORIES.map((cat, i) => (
               <CategoryCard
                 key={cat.id}
@@ -256,7 +255,7 @@ const TrendingCategories = () => {
         )}
 
         {/* ── Mobile CTA ── */}
-        <div className="mt-8 text-center md:hidden">
+        <div className="mt-6 text-center md:hidden">
           <button
             onClick={() => navigate("/artists")}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-maroon"

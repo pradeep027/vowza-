@@ -33,9 +33,9 @@ function KPICard({ label, value, change, icon: Icon, color, bgColor, loading }: 
   icon: React.ElementType; color: string; bgColor: string; loading?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-border/60 p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center', bgColor)}>
+    <div className="bg-white rounded-2xl border border-border/60 p-4 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+      <div className="flex items-start justify-between mb-3">
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', bgColor)}>
           <Icon className={cn('w-5 h-5', color)} />
         </div>
         {change !== null && change !== undefined && change !== 0 && !loading && (
@@ -56,7 +56,7 @@ function KPICard({ label, value, change, icon: Icon, color, bgColor, loading }: 
 // ── Quick Action ──────────────────────────────────────────────────────────────
 function QuickAction({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-border/60 bg-white hover:border-[#8B1538]/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
+    <button onClick={onClick} className="flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border border-border/60 bg-white hover:border-[#8B1538]/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
       <div className="w-10 h-10 rounded-xl bg-[#8B1538]/5 group-hover:bg-[#8B1538]/10 flex items-center justify-center transition-colors">
         <Icon className="w-5 h-5 text-[#8B1538]" />
       </div>
@@ -71,9 +71,9 @@ function ProfileCompletion({ percent, checklist, onComplete }: {
 }) {
   const r = 45, c = 2 * Math.PI * r, offset = c - (percent / 100) * c;
   return (
-    <div className="bg-white rounded-2xl border border-border/60 p-6">
-      <h3 className="text-sm font-semibold text-foreground mb-4">Profile Completion</h3>
-      <div className="flex items-center gap-6">
+    <div className="bg-white rounded-2xl border border-border/60 p-5">
+      <h3 className="text-sm font-semibold text-foreground mb-3">Profile Completion</h3>
+      <div className="flex items-center gap-5">
         <div className="relative w-24 h-24 flex-shrink-0">
           <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r={r} fill="none" stroke="#f1f1f1" strokeWidth="8" />
@@ -123,8 +123,8 @@ function AvailabilityCalendar({ booked, tentative, blocked }: {
     `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   return (
-    <div className="bg-white rounded-2xl border border-border/60 p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-border/60 p-4">
+      <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">
           {month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
@@ -172,8 +172,8 @@ function BankDetailsCard({ bank, loading, onManage }: {
   bank?: BankDetails; loading: boolean; onManage: () => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-border/60 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-border/60 p-5">
+      <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-foreground">Bank Details</h3>
         {!loading && bank?.hasBank && (
           <span className={cn('flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border',
@@ -292,7 +292,7 @@ export default function VendorDashboardHome() {
   const hasBookings = bookingsData.some(d => d.completed + d.pending + d.cancelled + d.confirmed > 0);
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-5 max-w-[1400px]">
       {/* Verification banner */}
       {provider && provider.verification_status !== 'approved' && (
         <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
@@ -304,7 +304,7 @@ export default function VendorDashboardHome() {
       )}
 
       {/* ── ROW 1: KPI Cards (all real) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard label="Total Earnings"   value={inr(kpis?.totalEarnings ?? 0)}  change={analytics?.revenueGrowth} icon={IndianRupee} color="text-emerald-600" bgColor="bg-emerald-50" loading={kpisLoading} />
         <KPICard label="Monthly Revenue"  value={inr(kpis?.monthlyRevenue ?? 0)} change={analytics?.revenueGrowth} icon={TrendingUp}  color="text-blue-600"    bgColor="bg-blue-50"    loading={kpisLoading} />
         <KPICard label="Total Bookings"   value={String(kpis?.totalBookings ?? 0)} change={analytics?.bookingGrowth} icon={CalendarDays} color="text-purple-600" bgColor="bg-purple-50" loading={kpisLoading} />
@@ -316,10 +316,10 @@ export default function VendorDashboardHome() {
       </div>
 
       {/* ── ROW 2: Charts (real data) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Revenue */}
-        <div className="bg-white rounded-2xl border border-border/60 p-6">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+        <div className="bg-white rounded-2xl border border-border/60 p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h3 className="text-sm font-semibold text-foreground">Revenue Trend</h3>
             <div className="flex gap-0.5 p-0.5 bg-secondary rounded-lg">
               {PERIODS.map(p => (
@@ -358,8 +358,8 @@ export default function VendorDashboardHome() {
         </div>
 
         {/* Bookings */}
-        <div className="bg-white rounded-2xl border border-border/60 p-6">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+        <div className="bg-white rounded-2xl border border-border/60 p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h3 className="text-sm font-semibold text-foreground">Bookings Overview</h3>
             <div className="flex gap-0.5 p-0.5 bg-secondary rounded-lg">
               {PERIODS.map(p => (
@@ -397,8 +397,8 @@ export default function VendorDashboardHome() {
 
       {/* ── ROW 3: Analytics metrics (real) ── */}
       {analytics && (kpis?.totalBookings ?? 0) > 0 && (
-        <div className="bg-white rounded-2xl border border-border/60 p-6">
-          <h3 className="text-sm font-semibold text-foreground mb-5">Business Analytics</h3>
+        <div className="bg-white rounded-2xl border border-border/60 p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Business Analytics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {[
               { label: 'Acceptance Rate',   value: `${analytics.acceptanceRate}%` },
@@ -422,15 +422,15 @@ export default function VendorDashboardHome() {
       )}
 
       {/* ── ROW 4: Profile + Quick Actions + Calendar ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <ProfileCompletion
           percent={completion.percent}
           checklist={completion.checklist}
           onComplete={() => navigate('/vendor/settings')}
         />
 
-        <div className="bg-white rounded-2xl border border-border/60 p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
+        <div className="bg-white rounded-2xl border border-border/60 p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
           <div className="grid grid-cols-3 gap-3">
             <QuickAction icon={ImageIcon}    label="Add Portfolio"    onClick={() => navigate('/vendor/portfolio')} />
             <QuickAction icon={Package}      label="Add Package"      onClick={() => navigate('/vendor/packages')} />
@@ -453,7 +453,7 @@ export default function VendorDashboardHome() {
       </div>
 
       {/* ── ROW 5: Bank Details ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <BankDetailsCard
           bank={bank}
           loading={bankLoading}
@@ -462,8 +462,8 @@ export default function VendorDashboardHome() {
       </div>
 
       {/* ── ROW 5: AI Insights (generated from real data only) ── */}
-      <div className="bg-gradient-to-r from-[#8B1538]/5 to-[#D4AF37]/5 rounded-2xl border border-[#8B1538]/10 p-6">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="bg-gradient-to-r from-[#8B1538]/5 to-[#D4AF37]/5 rounded-2xl border border-[#8B1538]/10 p-5">
+        <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8B1538] to-[#D4AF37] flex items-center justify-center">
             <VowzaIcon className="w-4 h-4 text-white" />
           </div>

@@ -2,7 +2,7 @@
 import { Smartphone, ArrowRight } from "lucide-react";
 
 const DownloadApp = () => (
-  <section className="py-14 md:py-24 bg-[#09090f] overflow-hidden">
+  <section className="py-10 md:py-20 bg-[#09090f] overflow-hidden">
     <div className="container px-4">
       <div className="relative max-w-4xl mx-auto text-center">
         {/* Glow */}
@@ -10,22 +10,22 @@ const DownloadApp = () => (
           style={{ background: "radial-gradient(circle, hsl(345 72% 36%), transparent 70%)" }} />
 
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 mb-6">
             <Smartphone className="w-4 h-4 text-gold" />
             <span className="text-sm font-medium text-white/70">Coming Soon to iOS & Android</span>
           </div>
 
-          <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-5 leading-tight">
+          <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-4 leading-tight">
             Vowza in Your Pocket.<br />
             <span className="text-gradient-gold">Book Anywhere, Anytime.</span>
           </h2>
 
-          <p className="text-white/50 max-w-xl mx-auto mb-10 text-base">
+          <p className="text-white/50 max-w-xl mx-auto mb-8 text-base">
             The full Vowza marketplace, Vowza AI Planner, real-time chat, and booking management — all in a beautiful mobile app.
           </p>
 
           {/* App store buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             {["App Store", "Google Play"].map(store => (
               <div
                 key={store}

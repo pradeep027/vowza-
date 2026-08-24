@@ -74,13 +74,13 @@ export default function DashboardHome() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Welcome section */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8B1538] via-[#8B1538] to-[#5c0e26] p-8 md:p-10 text-white"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8B1538] via-[#8B1538] to-[#5c0e26] p-6 md:p-8 text-white"
       >
         <div className="absolute -top-10 -right-10 w-56 h-56 rounded-full bg-[#D4AF37]/20 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
@@ -99,7 +99,7 @@ export default function DashboardHome() {
       </motion.div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card, i) => (
           <motion.button
             key={card.label}
@@ -110,12 +110,12 @@ export default function DashboardHome() {
             onClick={card.onClick}
             whileHover={{ y: -4 }}
             className={cn(
-              'group text-left relative overflow-hidden rounded-2xl p-5 bg-white/70 backdrop-blur-xl border border-white/60',
+              'group text-left relative overflow-hidden rounded-2xl p-4 bg-white/70 backdrop-blur-xl border border-white/60',
               'shadow-[0_4px_24px_-8px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.14)]',
               'transition-shadow duration-300'
             )}
           >
-            <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br mb-4 shadow-sm transition-transform duration-300 group-hover:scale-110', card.gradient)}>
+            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br mb-3 shadow-sm transition-transform duration-300 group-hover:scale-110', card.gradient)}>
               <card.icon className="w-5 h-5 text-white" />
             </div>
             <div className="flex items-end justify-between">

@@ -292,7 +292,7 @@ const DesktopHero = () => {
     <section className="relative overflow-hidden" style={{ background:"#0c0b14" }}>
       <HeroBg />
 
-      <div className="relative z-10" style={{ paddingTop:"clamp(4.5rem,9vw,7rem)", paddingBottom:"clamp(3.5rem,7vw,5.5rem)" }}>
+      <div className="relative z-10" style={{ paddingTop:"clamp(3.5rem,7vw,5.5rem)", paddingBottom:"clamp(2.5rem,5vw,4rem)" }}>
         <div className="container px-4">
 
           <div className="grid lg:grid-cols-[1.08fr,0.92fr] gap-8 lg:gap-4 items-center">
@@ -304,7 +304,7 @@ const DesktopHero = () => {
                 {/* Eyebrow badge */}
                 <motion.div
                   initial="hidden" animate="show" variants={fadeUp} custom={0}
-                  className="inline-flex items-center gap-1.5 mb-5 px-3.5 py-1.5 rounded-full glass-premium"
+                  className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-1.5 rounded-full glass-premium"
                 >
                   <VowzaIcon className="w-3 h-3 text-gold" />
                   <span className="text-[11px] font-semibold text-white/80 tracking-wide">India's Premium Event Marketplace</span>
@@ -314,7 +314,7 @@ const DesktopHero = () => {
                 <motion.h1
                   initial="hidden" animate="show" variants={fadeUp} custom={0.08}
                   className="font-display font-bold text-white"
-                  style={{ fontSize:"clamp(2.6rem,6.2vw,4.75rem)", lineHeight:1.05, letterSpacing:"-0.03em", marginBottom:"clamp(1.1rem,2.4vw,1.5rem)" }}
+                  style={{ fontSize:"clamp(2.4rem,5.8vw,4.5rem)", lineHeight:1.05, letterSpacing:"-0.03em", marginBottom:"clamp(0.8rem,1.8vw,1.1rem)" }}
                 >
                   Where{" "}
                   <span style={{ background:"linear-gradient(135deg,hsl(40 95% 68%) 0%,hsl(40 90% 52%) 55%,hsl(36 85% 44%) 100%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>Talent</span>
@@ -325,7 +325,7 @@ const DesktopHero = () => {
                 {/* Description */}
                 <motion.p
                   initial="hidden" animate="show" variants={fadeUp} custom={0.16}
-                  style={{ fontSize:"clamp(1.05rem,1.8vw,1.25rem)", lineHeight:2, fontWeight:600, color:"hsl(0 0% 100% / 0.72)", marginBottom:"clamp(1.5rem,3vw,2.2rem)" }}
+                  style={{ fontSize:"clamp(1.0rem,1.6vw,1.15rem)", lineHeight:1.75, fontWeight:600, color:"hsl(0 0% 100% / 0.72)", marginBottom:"clamp(1rem,2vw,1.5rem)" }}
                   className="mx-auto lg:mx-0 max-w-[520px]"
                 >
                   <span style={{ display:"inline-flex", alignItems:"center", gap:"8px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(40 90% 56%)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>One Platform.</span><br />

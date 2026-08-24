@@ -615,7 +615,7 @@
 
   /* Section header pattern */
   .section-header {
-    @apply text-center mb-12 md:mb-16;
+    @apply text-center mb-8 md:mb-12;
   }
   .section-header h2 {
     @apply text-3xl md:text-5xl font-display font-bold text-foreground mb-4 text-balance;

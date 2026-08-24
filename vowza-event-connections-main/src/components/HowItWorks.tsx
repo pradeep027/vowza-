@@ -49,16 +49,16 @@ const HowItWorks = () => {
   const steps = tab === "customer" ? customerSteps : artistSteps;
 
   return (
-    <section id="how-it-works" className="py-16 md:py-24 bg-background">
+    <section id="how-it-works" className="py-12 md:py-20 bg-background">
       <div className="container px-4">
 
         {/* Header */}
-        <div className="text-center mb-10 md:mb-14">
+        <div className="text-center mb-8 md:mb-10">
           <div className="section-label bg-royal/10 text-royal mb-4 mx-auto inline-flex">Simple Process</div>
           <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-3">
             How Vowza Works
           </h2>
-          <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed mb-7">
+          <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed mb-5">
             Whether you're planning an event or performing at one, every step is seamless.
           </p>
 
@@ -143,7 +143,7 @@ const HowItWorks = () => {
         </div>
 
         {/* CTA — stacked on mobile */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mt-10 md:mt-14">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mt-8 md:mt-10">
           {tab === "customer" ? (
             <>
               <a href="/artists" className="btn-primary justify-center text-sm py-3">

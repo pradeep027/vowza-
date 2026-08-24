@@ -25,13 +25,13 @@ function StatCard({ icon: Icon, label, value, sub, color, trend, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        'bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5 text-left',
+        'bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-4 text-left',
         'hover:shadow-md hover:border-border transition-all duration-200',
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+      <div className="flex items-start justify-between mb-2.5">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
           <Icon className="w-5 h-5 text-white" />
         </div>
         {trend !== undefined && (
@@ -136,8 +136,8 @@ export default function AdminDashboardHome() {
   const isBlocked = s.error && s.totalArtists === 0 && s.totalUsers === 0;
 
   if (s.loading && !chartsLoaded) return (
-    <div className="p-6 space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="p-5 space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {Array.from({ length: 16 }).map((_, i) => <Sk key={i} />)}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -147,7 +147,7 @@ export default function AdminDashboardHome() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-5 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -198,8 +198,8 @@ export default function AdminDashboardHome() {
 
       {/* Stat cards — Row 1: Artists */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Artists</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Artists</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={UserCheck}   label="Total Artists"          value={s.totalArtists}             color="bg-violet-500" onClick={() => navigate('/admin/artists')} />
           <StatCard icon={Clock}       label="Pending Verification"   value={s.pendingVerifications}     color="bg-amber-500"  onClick={() => navigate('/admin/artists')} />
           <StatCard icon={CheckCircle} label="Approved Artists"       value={s.approvedArtists}          color="bg-emerald-500" />
@@ -209,8 +209,8 @@ export default function AdminDashboardHome() {
 
       {/* Row 2: Users + Bookings */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Users & Bookings</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Users & Bookings</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={Users}     label="Total Users"         value={s.totalUsers}          color="bg-blue-500"   onClick={() => navigate('/admin/customers')} />
           <StatCard icon={BookOpen}  label="Total Bookings"      value={s.totalBookings}       color="bg-indigo-500" onClick={() => navigate('/admin/bookings')} />
           <StatCard icon={Clock}     label="Today's Bookings"    value={s.todayBookings}       color="bg-sky-500" />
@@ -220,8 +220,8 @@ export default function AdminDashboardHome() {
 
       {/* Row 3: Revenue */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Revenue</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Revenue</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={IndianRupee} label="Total Revenue"     value={fmtCurrency(s.totalRevenue)}   color="bg-emerald-500" onClick={() => navigate('/admin/payments')} />
           <StatCard icon={TrendingUp}  label="Today's Revenue"   value={fmtCurrency(s.todayRevenue)}   color="bg-maroon bg-[hsl(345_72%_32%)]" />
           <StatCard icon={IndianRupee} label="Monthly Revenue"   value={fmtCurrency(s.monthlyRevenue)} color="bg-green-600" />
@@ -231,8 +231,8 @@ export default function AdminDashboardHome() {
 
       {/* Row 4: Misc */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Platform</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Platform</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={Tag}       label="Categories"         value={s.totalCategories}     color="bg-lime-600"   onClick={() => navigate('/admin/categories')} />
           <StatCard icon={Star}      label="Total Reviews"      value={s.totalReviews}        color="bg-orange-500" onClick={() => navigate('/admin/reviews')} />
           <StatCard icon={BookOpen}  label="Pending Bookings"   value={s.pendingBookings}     color="bg-amber-600"  onClick={() => navigate('/admin/bookings')} />
@@ -242,9 +242,9 @@ export default function AdminDashboardHome() {
 
       {/* Charts */}
       {chartsLoaded && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Monthly trend */}
-          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5">
+          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-4">
             <h3 className="text-sm font-semibold text-foreground mb-4">Revenue & Bookings — Last 6 Months</h3>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={monthlyData}>
@@ -270,8 +270,8 @@ export default function AdminDashboardHome() {
           </div>
 
           {/* Category distribution */}
-          <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Artist Categories</h3>
+          <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Artist Categories</h3>
             {catData.length === 0 ? (
               <div className="h-52 flex items-center justify-center text-sm text-muted-foreground">No artists yet</div>
             ) : (
@@ -303,7 +303,7 @@ export default function AdminDashboardHome() {
 
       {/* Recent registrations */}
       {chartsLoaded && (
-        <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-5">
+        <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">Recent Artist Registrations</h3>
             <button onClick={() => navigate('/admin/artists')} className="text-xs font-semibold text-maroon hover:opacity-75 flex items-center gap-1">

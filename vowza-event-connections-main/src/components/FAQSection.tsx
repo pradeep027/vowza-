@@ -18,10 +18,10 @@ const FAQSection = () => {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section className="py-16 md:py-24 bg-surface-2">
+    <section className="py-12 md:py-20 bg-surface-2">
       <div className="container px-4">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <div className="section-label bg-royal/10 text-royal mb-4 mx-auto inline-flex">FAQ</div>
             <h2 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-3">
               Frequently Asked Questions

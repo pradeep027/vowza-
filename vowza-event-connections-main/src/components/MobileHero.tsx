@@ -40,7 +40,7 @@ const MobileHero = () => {
   };
 
   return (
-    <section className="flex w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-8 pt-[72px]">
+    <section className="flex w-full flex-col overflow-x-hidden bg-[#07060d] px-4 pb-6 pt-[60px]">
       <div className="mx-auto flex w-full max-w-[600px] flex-col">
         {/* ── Heading block ── */}
         <div className="flex w-full flex-col text-center">
@@ -54,7 +54,7 @@ const MobileHero = () => {
             Meets <span className="text-gradient-maroon">Celebration</span>
           </h1>
 
-          <p className="mt-3 w-full max-w-[480px] text-[clamp(15px,4.2vw,18px)] font-semibold leading-[2.1] text-white/60">
+          <p className="mt-2 w-full max-w-[480px] text-[clamp(14px,3.8vw,17px)] font-semibold leading-[1.8] text-white/60">
             One Platform.<br />
             Trusted Professionals.<br />
             Unforgettable Celebrations.
@@ -62,7 +62,7 @@ const MobileHero = () => {
         </div>
 
         {/* ── Quick Search / AI Planner toggle ── */}
-        <div className="mt-5 flex w-full gap-2">
+        <div className="mt-4 flex w-full gap-2">
           <button
             type="button"
             onClick={() => setMode("search")}
@@ -83,7 +83,7 @@ const MobileHero = () => {
         {/* ── Search card ── */}
         {mode === "search" ? (
           <div className="mt-3 flex w-full flex-col rounded-2xl bg-white p-2 shadow-2xl">
-            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+            <label className="mb-1.5 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 text-left">
               <VowzaIcon className="h-[14px] w-[14px] shrink-0 text-maroon" />
               <span className="min-w-0 flex-1">
                 <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Event Type</span>
@@ -97,7 +97,7 @@ const MobileHero = () => {
               <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
             </label>
 
-            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+            <label className="mb-1.5 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 text-left">
               <MapPin className="h-[14px] w-[14px] shrink-0 text-maroon" />
               <span className="min-w-0 flex-1">
                 <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Location</span>
@@ -112,7 +112,7 @@ const MobileHero = () => {
           </div>
         ) : (
           <div className="mt-3 flex w-full flex-col rounded-2xl bg-white p-2 shadow-2xl">
-            <label className="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-left">
+            <label className="mb-1.5 flex w-full items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 text-left">
               <VowzaIcon className="h-[14px] w-[14px] shrink-0 text-gold-dark" />
               <span className="min-w-0 flex-1">
                 <span className="mb-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.09em] text-gray-400">Tell us about your event</span>
