@@ -128,7 +128,8 @@ export function getNextContextQuestion(context: PlannerContext): ContextQuestion
 
 // ─── Format a question for display ─────────────────────────────────────────
 export function formatContextQuestion(question: ContextQuestion, context: PlannerContext): string {
-  const filled = Object.keys(context).filter(k => context[k as keyof PlannerContext]).length;
+  const essentialFields = ['eventType', 'city', 'budget', 'guestCount'];
+  const filledEssentials = essentialFields.filter(f => context[f as keyof PlannerContext]).length;
   const total = getEssentialQuestions().length;
   
   let response = `**${question.question}**\n\n`;
@@ -144,8 +145,8 @@ export function formatContextQuestion(question: ContextQuestion, context: Planne
     response += `**Current plan:** ${captured.join(' · ')}\n\n`;
   }
   
-  // Show progress
-  response += `**Progress:** ${filled}/${total} essentials\n\n`;
+  // Show progress (count only essential fields)
+  response += `**Progress:** ${filledEssentials}/${total} essentials\n\n`;
   
   // Show examples
   if (question.examples && question.examples.length > 0) {

@@ -337,6 +337,15 @@ function buildDeterministicResponse(
     return `Got it — updated. Current: ${known.join(' · ')}. What would you like next?`;
   }
 
+  // Clarification (answering a question the AI asked)
+  if (orch.intent === 'clarification') {
+    const known = [ctx.eventType, ctx.city && `in ${ctx.city}`, ctx.budget && `₹${(ctx.budget / 100000).toFixed(1)}L`, ctx.guestCount && `${ctx.guestCount} guests`].filter(Boolean);
+    if (known.length >= 3) {
+      return `Got it — ${known.join(' · ')}. I'll put together your complete event plan!`;
+    }
+    return `Thanks! ${known.length > 0 ? `Currently I have: ${known.join(' · ')}. ` : ''}What else would you like to share?`;
+  }
+
   // Default greeting
   return `Welcome to **Vowza Planner**! 🎉\n\nI can help you:\n- **Plan any event**\n- **Find verified vendors**\n- **Create budgets and timelines**\n\nWhat event are you planning?`;
 }
@@ -390,7 +399,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     intent: orch.intent,
   });
 
-  if (readiness.isSufficient && ['plan_event', 'budget_breakdown', 'context_update'].includes(orch.intent)) {
+  if (readiness.isSufficient && ['plan_event', 'budget_breakdown', 'context_update', 'clarification'].includes(orch.intent)) {
     generatedPlan = EventBudgetPlanner.allocate(updatedContext);
     console.log('[Vowza AI Phase 2A] Generated plan:', {
       eventType: generatedPlan.eventType,
