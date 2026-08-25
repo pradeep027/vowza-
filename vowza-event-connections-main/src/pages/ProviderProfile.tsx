@@ -167,16 +167,16 @@ const ProviderProfile = () => {
 
   const fetchAll = async () => {
     try {
-      const { data: p, error } = await supabase.from("provider_profiles").select("*").eq("id", id).single();
+      const { data: p, error } = await supabase.from("provider_profiles").select("id, user_id, profession, experience_years, price_min, price_max, bio, is_verified, is_available, average_rating, total_reviews, total_bookings, specialties, stage_name, cover_image_url, languages, instagram, facebook, youtube, website, is_featured, featured_until, instant_booking, subcategory, social_links, is_published").eq("id", id).single();
       if (error) throw error;
       setProvider(p);
 
-      const { data: prof } = await supabase.from("profiles").select("full_name,avatar_url,city,area,phone,state,email").eq("id", p.user_id).single();
+      const { data: prof } = await supabase.from("profiles").select("id,full_name,avatar_url,city,area,state").eq("id", p.user_id).single();
       if (prof) setProfile(prof);
 
       const [portRes, revRes, pkgRes, faqRes, menuRes, rentalRes, poojaRes] = await Promise.allSettled([
         supabase.from("portfolio_items").select("*").eq("provider_id", id).eq("is_published", true).order("created_at", { ascending: false }),
-        supabase.from("reviews").select("id,rating,review_text,created_at,customer_id").eq("provider_id", id).order("created_at", { ascending: false }).limit(15),
+        supabase.from("reviews").select("id,rating,review_text,created_at").eq("provider_id", id).order("created_at", { ascending: false }).limit(15),
         supabase.from("pricing_packages" as any).select("*").eq("provider_id", id).order("sort_order"),
         supabase.from("provider_faqs" as any).select("*").eq("provider_id", id).order("sort_order"),
         supabase.from("menu_items" as any).select("*").eq("provider_id", id).order("sort_order"),
@@ -193,10 +193,7 @@ const ProviderProfile = () => {
 
       if (revRes.status === "fulfilled" && revRes.value.data) {
         const revData = revRes.value.data;
-        const ids = revData.map((r: any) => r.customer_id);
-        const { data: cust } = await supabase.from("profiles").select("id,full_name").in("id", ids);
-        const cm = new Map((cust ?? []).map((c: any) => [c.id, c.full_name]));
-        setReviews(revData.map((r: any) => ({ ...r, customer_name: cm.get(r.customer_id) || "Anonymous" })));
+        setReviews(revData.map((r: any) => ({ ...r, customer_name: "Anonymous" })));
       }
     } catch (e: any) { toast.error("Failed to load profile"); navigate("/artists"); }
     finally { setIsLoading(false); }
@@ -266,7 +263,6 @@ const ProviderProfile = () => {
 
   const langs = Array.isArray(provider.languages) ? provider.languages : (provider.languages || "").split(",").filter(Boolean);
   const specs  = Array.isArray(provider.specialties) ? provider.specialties : (provider.specialties || "").split(",").filter(Boolean);
-  const details = provider.vendor_details || provider.category_details || {};
   const catDef = getCategoryByProfession(provider.profession);
   const socialLinks = provider.social_links || {};
 

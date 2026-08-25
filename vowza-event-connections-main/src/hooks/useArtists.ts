@@ -51,11 +51,7 @@ export interface Artist {
   is_available:       boolean;
   is_featured:        boolean;
   instant_booking:    boolean;
-  verification_status: string;
-  whatsapp:           string;
-  service_radius:     number;
   subcategory:        string;
-  vendor_details:     Record<string, any>;
 }
 
 // ─── Category label/icon from local definition (no extra DB call) ──────────────
@@ -146,13 +142,9 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       // Step 1 — Fetch provider_profiles (no nested join)
       let query = supabase
         .from('provider_profiles')
-        .select('*')
-        .in('verification_status', ['approved', 'verified']);
-
-      // Only add is_published filter if not filtering by categories (event mode fetches all then filters)
-      if (!filters.categories || filters.categories.length === 0) {
-        query = query.eq('is_published' as any, true);
-      }
+        .select('id, user_id, profession, experience_years, price_min, price_max, bio, is_verified, is_available, average_rating, total_reviews, total_bookings, specialties, stage_name, cover_image_url, languages, instagram, facebook, youtube, website, is_featured, featured_until, instant_booking, subcategory, social_links, is_published')
+        .eq('is_published', true)
+        .eq('is_available', true);
 
       // Normalize category filter to match actual database enum values
       if (filters.category) {
@@ -226,11 +218,7 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
           is_available:       p.is_available    !== false,
           is_featured:        (p as any).is_featured    ?? false,
           instant_booking:    (p as any).instant_booking ?? false,
-          verification_status: p.verification_status ?? 'pending',
-          whatsapp:           (p as any).whatsapp ?? '',
-          service_radius:     (p as any).service_radius ?? 50,
-          subcategory:        (p as any).subcategory ?? '',
-          vendor_details:     (p as any).vendor_details ?? (p as any).category_details ?? {},
+          subcategory:        p.subcategory ?? '',
         };
       });
 
@@ -280,7 +268,9 @@ export function useArtist(id: string) {
       // Use array query + [0] — never .single() which throws on 0 rows
       const { data: rows, error } = await supabase
         .from('provider_profiles')
-        .select('*')
+        .select('id, user_id, profession, experience_years, price_min, price_max, bio, is_verified, is_available, average_rating, total_reviews, total_bookings, specialties, stage_name, cover_image_url, languages, instagram, facebook, youtube, website, is_featured, featured_until, instant_booking, subcategory, social_links, is_published')
+        .eq('is_published', true)
+        .eq('is_available', true)
         .eq('id', id)
         .limit(1);
 
@@ -290,7 +280,7 @@ export function useArtist(id: string) {
 
       const { data: profileRows } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, city, state, area, phone')
+        .select('id, full_name, avatar_url, city, state, area')
         .eq('id', p.user_id)
         .limit(1);
 

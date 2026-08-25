@@ -132,8 +132,8 @@ const Navbar = () => {
         const { data: providers } = await supabase
           .from('provider_profiles')
           .select('id, user_id, profession, stage_name, average_rating, is_verified, bio')
-          .in('verification_status', ['approved', 'verified'])
           .eq('is_published', true)
+          .eq('is_available', true)
           .limit(8);
 
         if (!providers || providers.length === 0) {
