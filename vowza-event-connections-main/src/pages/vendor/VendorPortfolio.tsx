@@ -38,15 +38,15 @@ export default function VendorPortfolio() {
 
     for (const file of Array.from(files)) {
       const ext  = file.name.split('.').pop() ?? 'jpg';
-      const path = `portfolio/${vendorId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const path = `${provider?.user_id}/${vendorId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
-        .from('provider-media')
-        .upload(path, file, { cacheControl: '3600', upsert: false });
+        .from('provider-portfolio')
+        .upload(path, file, { cacheControl: '3600', contentType: file.type, upsert: false });
 
       if (upErr) { toast.error(`${file.name}: ${upErr.message}`); continue; }
 
-      const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
+      const { data: pub } = supabase.storage.from('provider-portfolio').getPublicUrl(path);
 
       const { error: insErr } = await supabase.from('portfolio_items').insert({
         provider_id: vendorId,
@@ -91,10 +91,10 @@ export default function VendorPortfolio() {
     // 2. Delete from Supabase Storage (extract path from public URL)
     if (item.media_url) {
       try {
-        const urlParts = item.media_url.split('/provider-media/');
+        const urlParts = item.media_url.split('/provider-portfolio/');
         if (urlParts.length === 2) {
           const storagePath = decodeURIComponent(urlParts[1]);
-          await supabase.storage.from('provider-media').remove([storagePath]);
+          await supabase.storage.from('provider-portfolio').remove([storagePath]);
         }
       } catch {
         // Storage deletion is best-effort — DB record is already gone

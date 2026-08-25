@@ -176,12 +176,16 @@ export const useChat = (bookingId: string) => {
       const path = `${user.id}/${bookingId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage.from('chat-media').upload(path, file, {
         cacheControl: '3600',
+        contentType: file.type,
         upsert: false,
       });
       if (error) throw error;
+      const { data: signed, error: signError } = await supabase.storage
+        .from('chat-media')
+        .createSignedUrl(path, 300);
+      if (signError || !signed?.signedUrl) throw signError || new Error('Unable to create chat attachment URL');
       setUploadProgress(100);
-      const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
-      return { url: urlData.publicUrl, path };
+      return { url: signed.signedUrl, path };
     } finally {
       setIsUploading(false);
       setUploadProgress(0);

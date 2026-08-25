@@ -103,7 +103,7 @@ async function processImage(
 export default function ImageUpload({
   value,
   onUploaded,
-  bucket = 'provider-media',
+  bucket = 'provider-portfolio',
   folder = 'avatars',
   filePrefix = 'img',
   userId,

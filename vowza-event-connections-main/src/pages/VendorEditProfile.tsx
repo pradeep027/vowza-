@@ -98,10 +98,10 @@ export default function VendorEditProfile() {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop();
-      const path = `portfolio/${provider.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("provider-media").upload(path, file, { upsert: true });
+      const path = `${user!.id}/${provider.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("provider-portfolio").upload(path, file, { contentType: file.type, upsert: true });
       if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("provider-media").getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from("provider-portfolio").getPublicUrl(path);
       const mediaType = file.type.startsWith("video/") ? "video" : "image";
       await supabase.from("portfolio_items").insert({ provider_id: provider.id, media_url: urlData.publicUrl, media_type: mediaType, title: file.name.split(".")[0] });
       toast.success("Uploaded!"); loadAll();
