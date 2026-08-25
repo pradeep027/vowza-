@@ -12,6 +12,9 @@ SET check_function_bodies = false;
 SET row_security = off;
 
 CREATE SCHEMA IF NOT EXISTS public;
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 COMMENT ON SCHEMA public IS 'standard public schema';
 
 -- Name: app_role; Type: TYPE; Schema: public; Owner: -
