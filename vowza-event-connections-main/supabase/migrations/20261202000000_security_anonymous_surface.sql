@@ -58,7 +58,7 @@ AS $$
       AND pp.user_id = auth.uid()
   );
 $$;
-REVOKE ALL ON FUNCTION public.owns_provider(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.owns_provider(uuid) FROM PUBLIC, service_role;
 GRANT EXECUTE ON FUNCTION public.owns_provider(uuid) TO authenticated;
 
 -- §2.1 Enable RLS on the eleven production RLS-off tables.
