@@ -1,0 +1,80 @@
+proname,args,proconfig,anon_exec,auth_exec
+add_artist_to_event,"p_event_id uuid, p_provider_id uuid, p_provider_name text, p_category text, p_price integer",,t,t
+add_photography_cart_item,"p_package_id uuid, p_addon_ids uuid[], p_album_id uuid",{search_path=public},t,t
+anchor_guard,,{search_path=public},t,t
+approve_artist,"p_provider_id uuid, p_admin_user_id uuid",{search_path=public},t,t
+banquet_guard,,{search_path=public},t,t
+catering_guard,,{search_path=public},t,t
+check_artist_availability,"p_provider_id uuid, p_event_date date, p_event_time time without time zone, p_duration_hours integer",{search_path=public},t,t
+checkout_photography_cart,"p_cart_id uuid, p_event_date date, p_event_time text, p_venue text, p_notes text",{search_path=public},t,t
+create_event_booking,"p_customer_id uuid, p_event_name text, p_event_type text, p_event_date date, p_location text, p_guest_count integer, p_total_budget integer, p_notes text",,t,t
+create_notification_settings,,{search_path=public},t,t
+create_photography_package_booking,"p_package_id uuid, p_event_date date, p_event_time text, p_venue text, p_notes text, p_addon_ids uuid[]",{search_path=public},t,t
+create_water_product_order,"p_provider_id uuid, p_items jsonb, p_delivery_address text, p_delivery_lat numeric, p_delivery_lng numeric, p_delivery_date date, p_delivery_time_slot text, p_special_instructions text",{search_path=public},t,t
+create_water_product_order,"p_provider_id uuid, p_items jsonb, p_delivery_address text, p_delivery_lat numeric, p_delivery_lng numeric, p_delivery_date date, p_delivery_time_slot text",{search_path=public},t,t
+decorator_guard,,{search_path=public},t,t
+dj_guard,,{search_path=public},t,t
+drone_guard,,{search_path=public},t,t
+enforce_water_supplier_owner,,{search_path=public},t,t
+expire_featured_artists,,{search_path=public},t,t
+generate_invoice_number,,{search_path=public},t,t
+get_active_promotion_video,p_user_id uuid,,t,t
+get_nearest_available_dates,"p_provider_id uuid, p_after_date date, p_count integer",{search_path=public},t,t
+get_random_eligible_promotion_video,p_user_id uuid,,t,t
+get_user_roles,p_user_id uuid,{search_path=public},t,t
+get_water_variant_availability,p_provider_id uuid,{search_path=public},t,t
+handle_new_user,,{search_path=public},t,t
+has_role,"_user_id uuid, _role app_role",{search_path=public},t,t
+is_anchor,p_provider_id uuid,{search_path=public},t,t
+is_banquet_hall,p_provider_id uuid,{search_path=public},t,t
+is_caterer,p_provider_id uuid,{search_path=public},t,t
+is_chat_eligible,p_booking_id uuid,,t,t
+is_chat_participant,"p_booking_id uuid, p_user_id uuid",,t,t
+is_decorator,p_provider_id uuid,{search_path=public},t,t
+is_dj,p_provider_id uuid,{search_path=public},t,t
+is_drone_operator,p_provider_id uuid,{search_path=public},t,t
+is_makeup_artist,p_provider_id uuid,{search_path=public},t,t
+is_mehendi_artist,p_provider_id uuid,{search_path=public},t,t
+is_photographer,p_provider_id uuid,{search_path=public},t,t
+is_priest,p_provider_id uuid,{search_path=public},t,t
+is_rental_service,p_provider_id uuid,{search_path=public},t,t
+is_videographer,p_provider_id uuid,{search_path=public},t,t
+is_water_supplier,p_provider_id uuid,{search_path=public},t,t
+log_audit_changes,,{search_path=public},t,t
+make_admin,p_user_id uuid,{search_path=public},t,t
+make_provider,p_user_id uuid,{search_path=public},t,t
+makeup_guard,,{search_path=public},t,t
+mehendi_guard,,{search_path=public},t,t
+owns_anchor,p_provider_id uuid,{search_path=public},t,t
+owns_banquet_hall,p_provider_id uuid,{search_path=public},t,t
+owns_caterer,p_provider_id uuid,{search_path=public},t,t
+owns_decorator,p_provider_id uuid,{search_path=public},t,t
+owns_dj,p_provider_id uuid,{search_path=public},t,t
+owns_drone_operator,p_provider_id uuid,{search_path=public},t,t
+owns_makeup_artist,p_provider_id uuid,{search_path=public},t,t
+owns_mehendi_artist,p_provider_id uuid,{search_path=public},t,t
+owns_photographer,p_provider_id uuid,{search_path=public},t,t
+owns_priest,p_provider_id uuid,{search_path=public},t,t
+owns_rental_service,p_provider_id uuid,{search_path=public},t,t
+owns_videographer,p_provider_id uuid,{search_path=public},t,t
+owns_water_supplier,p_provider_id uuid,{search_path=public},t,t
+photography_cart_guard,,{search_path=public},t,t
+photography_guard,,{search_path=public},t,t
+priest_guard,,{search_path=public},t,t
+quote_water_delivery,"p_provider_id uuid, p_delivery_lat numeric, p_delivery_lng numeric",{search_path=public},t,t
+record_promotion_view,"p_video_id uuid, p_user_id uuid",,t,t
+reject_artist,"p_provider_id uuid, p_admin_user_id uuid, p_reason text",{search_path=public},t,t
+rental_guard,,{search_path=public},t,t
+rental_inventory_update,,{search_path=public},t,t
+update_artist_booking_status,"p_booking_id uuid, p_status text, p_negotiation_message text",,t,t
+update_daily_analytics,,{search_path=public},t,t
+update_provider_rating,,{search_path=public},t,t
+update_updated_at_column,,{search_path=public},t,t
+user_has_role,"p_user_id uuid, p_role text",{search_path=public},t,t
+videography_guard,,{search_path=public},t,t
+assert_service_start_is_due,"p_booking_table text, p_booking_id uuid","{""search_path=public, extensions""}",f,f
+create_service_start_otp,"p_booking_table text, p_booking_id uuid, p_vendor_user_id uuid, p_is_resend boolean","{""search_path=public, extensions""}",f,f
+is_current_service_start_otp,p_otp_id uuid,"{""search_path=public, extensions""}",f,f
+record_service_start_otp_delivery,"p_otp_id uuid, p_delivered boolean, p_error text","{""search_path=public, extensions""}",f,f
+service_start_booking_context,"p_booking_table text, p_booking_id uuid","{""search_path=public, extensions""}",f,f
+verify_service_start_otp,"p_booking_table text, p_booking_id uuid, p_vendor_user_id uuid, p_otp text","{""search_path=public, extensions""}",f,f
