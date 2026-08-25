@@ -39,10 +39,10 @@ const ArtistOnboarding = () => {
   const { user, loading, refreshAuthState } = useAuth();
   const navigate = useNavigate();
   
-  const { uploadImage, isUploading: isUploadingAvatar } = useImageUpload({ bucket: 'provider-media', folder: 'avatars' });
-  const { uploadImage: uploadCover, isUploading: isUploadingCover } = useImageUpload({ bucket: 'provider-media', folder: 'covers' });
-  const { uploadMultiple, isUploading: isUploadingPortfolio } = useImageUpload({ bucket: 'provider-media', folder: 'portfolio' });
-  const { uploadMultiple: uploadGallery, isUploading: isUploadingGallery } = useImageUpload({ bucket: 'provider-media', folder: 'gallery' });
+  const { uploadImage, isUploading: isUploadingAvatar } = useImageUpload({ bucket: 'provider-portfolio', folder: 'avatars' });
+  const { uploadImage: uploadCover, isUploading: isUploadingCover } = useImageUpload({ bucket: 'provider-portfolio', folder: 'covers' });
+  const { uploadMultiple, isUploading: isUploadingPortfolio } = useImageUpload({ bucket: 'provider-portfolio', folder: 'portfolio' });
+  const { uploadMultiple: uploadGallery, isUploading: isUploadingGallery } = useImageUpload({ bucket: 'provider-portfolio', folder: 'gallery' });
 
   // Form state
   const [basicInfo, setBasicInfo] = useState({
