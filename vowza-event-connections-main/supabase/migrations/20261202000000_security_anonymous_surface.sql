@@ -67,7 +67,6 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pooja_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pricing_packages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_faqs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rental_items ENABLE ROW LEVEL SECURITY;
@@ -186,7 +185,6 @@ ALTER TABLE public.priest_gallery FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.priest_packages FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.product_order_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.product_orders FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_availability FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_calendar FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_faqs FORCE ROW LEVEL SECURITY;
@@ -302,40 +300,15 @@ DROP POLICY IF EXISTS "providers_public_read" ON public.provider_profiles;
 CREATE POLICY provider_profiles_public_catalog_read
   ON public.provider_profiles
   FOR SELECT
-  TO anon
+  TO anon, authenticated
   USING (is_published = true AND is_available = true);
 COMMENT ON POLICY provider_profiles_public_catalog_read ON public.provider_profiles IS
   'Anonymous catalog/detail/recommendation reads for /artists, /category/:slug, /provider/:id, and /artist/:id; column grants exclude payout, KYC, identity, and sensitive JSONB fields.';
 
-DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
-DROP POLICY IF EXISTS profiles_public_catalog_read ON public.profiles;
-CREATE POLICY profiles_public_catalog_read
-  ON public.profiles
-  FOR SELECT
-  TO anon
-  USING (EXISTS (
-    SELECT 1
-    FROM public.provider_profiles AS pp
-    WHERE pp.user_id = public.profiles.id
-      AND pp.is_published = true
-      AND pp.is_available = true
-  ));
-COMMENT ON POLICY profiles_public_catalog_read ON public.profiles IS
-  'Temporary §2-A display projection for public provider catalog/detail routes; provider_public view replaces this table join in §2-B.';
-DROP POLICY IF EXISTS profiles_owner_read ON public.profiles;
-CREATE POLICY profiles_owner_read
-  ON public.profiles
-  FOR SELECT
-  TO authenticated
-  USING (id = auth.uid());
-
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY profiles_owner_update
-  ON public.profiles
-  FOR UPDATE
-  TO authenticated
-  USING (id = auth.uid())
-  WITH CHECK (id = auth.uid());
+-- profiles RLS and its complete policy set are owned by the feature-group
+-- migration 20261204000000_profiles_rls_and_counterparty.sql. Keeping the
+-- enablement and policy creation together prevents authenticated cross-row
+-- reads from silently returning zero rows.
 
 -- Re-scope dormant USING(true) catalog policies away from public. These tables
 -- are intentionally readable by anonymous and authenticated catalog callers;
