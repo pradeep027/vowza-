@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.migrate-provider-media]
 verify_jwt = true
+
+[functions.migrate-provider-portfolio]
+verify_jwt = true

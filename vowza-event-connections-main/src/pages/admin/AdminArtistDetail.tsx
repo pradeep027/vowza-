@@ -56,19 +56,20 @@ async function resolveVerificationUrls(details: Record<string, any>) {
           const { data, error } = await supabase.storage
             .from(LEGACY_VERIFICATION_BUCKET)
             .createSignedUrl(legacyPath, 300);
-          if (!error && data?.signedUrl) resolved[outputKey] = data.signedUrl;
+          if (error || !data?.signedUrl) throw new Error(`Unable to sign legacy ${outputKey}`);
+          resolved[outputKey] = data.signedUrl;
           return;
         }
       } catch {
-        // Fall through to preserve a non-Supabase legacy URL for the admin.
+        throw new Error(`Unsupported legacy verification reference for ${outputKey}`);
       }
-      resolved[outputKey] = stored;
-      return;
+      throw new Error(`Unsupported legacy verification reference for ${outputKey}`);
     }
     const { data, error } = await supabase.storage
       .from(VERIFICATION_BUCKET)
       .createSignedUrl(stored, 300);
-    if (!error && data?.signedUrl) resolved[outputKey] = data.signedUrl;
+    if (error || !data?.signedUrl) throw new Error(`Unable to sign verification ${outputKey}`);
+    resolved[outputKey] = data.signedUrl;
   }));
   return resolved;
 }
