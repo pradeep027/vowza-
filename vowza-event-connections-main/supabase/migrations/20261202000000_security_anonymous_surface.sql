@@ -308,6 +308,7 @@ COMMENT ON POLICY provider_profiles_public_catalog_read ON public.provider_profi
   'Anonymous catalog/detail/recommendation reads for /artists, /category/:slug, /provider/:id, and /artist/:id; column grants exclude payout, KYC, identity, and sensitive JSONB fields.';
 
 DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
+DROP POLICY IF EXISTS profiles_public_catalog_read ON public.profiles;
 CREATE POLICY profiles_public_catalog_read
   ON public.profiles
   FOR SELECT
@@ -321,11 +322,74 @@ CREATE POLICY profiles_public_catalog_read
   ));
 COMMENT ON POLICY profiles_public_catalog_read ON public.profiles IS
   'Temporary §2-A display projection for public provider catalog/detail routes; provider_public view replaces this table join in §2-B.';
+DROP POLICY IF EXISTS profiles_owner_read ON public.profiles;
 CREATE POLICY profiles_owner_read
   ON public.profiles
   FOR SELECT
   TO authenticated
   USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY profiles_owner_update
+  ON public.profiles
+  FOR UPDATE
+  TO authenticated
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
+
+-- Re-scope dormant USING(true) catalog policies away from public. These tables
+-- are intentionally readable by anonymous and authenticated catalog callers;
+-- no write privilege is granted to anon by this migration.
+DROP POLICY IF EXISTS "Everyone can view categories" ON public.artist_categories;
+DROP POLICY IF EXISTS artist_categories_public_read ON public.artist_categories;
+CREATE POLICY artist_categories_public_read
+  ON public.artist_categories
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS menu_public_read ON public.menu_items;
+CREATE POLICY menu_public_read
+  ON public.menu_items
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS pooja_public_read ON public.pooja_services;
+CREATE POLICY pooja_public_read
+  ON public.pooja_services
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Everyone can view pricing packages" ON public.pricing_packages;
+DROP POLICY IF EXISTS packages_public_read ON public.pricing_packages;
+CREATE POLICY packages_public_read
+  ON public.pricing_packages
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS faqs_public_read ON public.provider_faqs;
+CREATE POLICY faqs_public_read
+  ON public.provider_faqs
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS rentals_public_read ON public.rental_items;
+CREATE POLICY rentals_public_read
+  ON public.rental_items
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Reviews are viewable by everyone" ON public.reviews;
+CREATE POLICY reviews_public_read
+  ON public.reviews
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
 
 -- subcategories is intentionally deny-all for now: no canonical source call
 -- site was found, and the brief requires preservation rather than dropping it.
@@ -403,9 +467,25 @@ COMMIT;
 -- DROP POLICY IF EXISTS provider_profiles_public_catalog_read ON public.provider_profiles;
 -- DROP POLICY IF EXISTS profiles_public_catalog_read ON public.profiles;
 -- DROP POLICY IF EXISTS profiles_owner_read ON public.profiles;
+-- DROP POLICY IF EXISTS profiles_owner_update ON public.profiles;
+-- DROP POLICY IF EXISTS artist_categories_public_read ON public.artist_categories;
+-- DROP POLICY IF EXISTS menu_public_read ON public.menu_items;
+-- DROP POLICY IF EXISTS pooja_public_read ON public.pooja_services;
+-- DROP POLICY IF EXISTS packages_public_read ON public.pricing_packages;
+-- DROP POLICY IF EXISTS faqs_public_read ON public.provider_faqs;
+-- DROP POLICY IF EXISTS rentals_public_read ON public.rental_items;
+-- DROP POLICY IF EXISTS reviews_public_read ON public.reviews;
 -- DROP POLICY IF EXISTS subcategories_public_read ON public.subcategories;
 -- CREATE POLICY "providers_public_read" ON public.provider_profiles FOR SELECT USING ((verification_status = ANY (ARRAY['approved'::text, 'verified'::text])) OR (user_id = auth.uid()) OR (EXISTS (SELECT 1 FROM public.user_roles WHERE user_roles.user_id = auth.uid() AND user_roles.role = 'admin'::app_role)));
 -- CREATE POLICY "Profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
+-- CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+-- CREATE POLICY "Everyone can view categories" ON public.artist_categories FOR SELECT USING (true);
+-- CREATE POLICY menu_public_read ON public.menu_items FOR SELECT USING (true);
+-- CREATE POLICY pooja_public_read ON public.pooja_services FOR SELECT USING (true);
+-- CREATE POLICY "Everyone can view pricing packages" ON public.pricing_packages FOR SELECT USING (true);
+-- CREATE POLICY faqs_public_read ON public.provider_faqs FOR SELECT USING (true);
+-- CREATE POLICY rentals_public_read ON public.rental_items FOR SELECT USING (true);
+-- CREATE POLICY "Reviews are viewable by everyone" ON public.reviews FOR SELECT USING (true);
 -- CREATE POLICY "subcategories_public_read" ON public.subcategories FOR SELECT USING (true);
 -- GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
 -- GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon;
