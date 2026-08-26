@@ -21,7 +21,7 @@ interface Vendor {
   is_verified: boolean | null; is_available: boolean | null;
   is_featured: boolean | null; instant_booking: boolean | null;
   average_rating: number | null; total_reviews: number | null;
-  total_bookings: number | null; verification_status: string | null;
+  total_bookings: number | null;
   cover_image_url: string | null;
   // joined from profiles
   full_name: string; avatar_url: string | null; city: string | null;
@@ -161,10 +161,10 @@ export default function CategoryPage() {
     if (!category) return;
     setLoading(true);
     try {
-      let q = supabase.from("provider_profiles").select("*", { count: "exact" })
+      let q = supabase.from("provider_profiles").select("id, user_id, profession, experience_years, price_min, price_max, bio, is_verified, is_available, average_rating, total_reviews, total_bookings, specialties, stage_name, cover_image_url, languages, instagram, facebook, youtube, website, is_featured, featured_until, instant_booking, subcategory, social_links, is_published, band_category, created_at", { count: "exact" })
         .in("profession", category.professionTypes)
-        .in("verification_status", ["approved", "verified"])
         .eq("is_published", true)
+        .eq("is_available", true)
         .order("average_rating", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 

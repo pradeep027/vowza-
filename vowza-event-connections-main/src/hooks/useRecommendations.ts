@@ -53,7 +53,7 @@ export function useRecommendations(params: {
             area
           )
         `)
-        .in('verification_status', ['approved', 'verified'])
+        .eq('is_published', true)
         .eq('is_available', true);
 
       if (params.category) {
@@ -141,7 +141,9 @@ export function useSimilarArtists(providerId: string, category?: string) {
       // @ts-ignore
       const { data: original } = await supabase
         .from('provider_profiles')
-        .select('*')
+        .select('id, user_id, profession, experience_years, price_min, price_max, bio, is_verified, is_available, average_rating, total_reviews, total_bookings, specialties, stage_name, cover_image_url, languages, instagram, facebook, youtube, website, is_featured, featured_until, instant_booking, subcategory, social_links, is_published')
+        .eq('is_published', true)
+        .eq('is_available', true)
         .eq('id', providerId)
         .single();
 
@@ -175,7 +177,7 @@ export function useSimilarArtists(providerId: string, category?: string) {
           )
         `)
         .neq('id', providerId)
-        .in('verification_status', ['approved', 'verified'])
+        .eq('is_published', true)
         .eq('is_available', true);
 
       if (error) throw error;
