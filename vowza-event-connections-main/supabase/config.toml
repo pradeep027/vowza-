@@ -33,3 +33,6 @@ verify_jwt = true
 
 [functions.admin-user-roles]
 verify_jwt = true
+
+[functions.admin-provider-verification]
+verify_jwt = true

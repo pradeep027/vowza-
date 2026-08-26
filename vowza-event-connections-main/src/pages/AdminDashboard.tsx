@@ -310,7 +310,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleVerification = async (workerId: string, status: 'approved' | 'rejected') => {
+  const handleVerification = async (providerId: string, status: 'approved' | 'rejected') => {
     if (status === 'rejected' && !rejectionReason.trim()) {
       toast.error('Please provide a rejection reason');
       return;
@@ -319,52 +319,34 @@ const AdminDashboard = () => {
     setIsProcessing(true);
 
     try {
-      const now = new Date().toISOString();
+      const { data, error } = await supabase.functions.invoke('admin-provider-verification', {
+        body: {
+          providerId,
+          action: status,
+          rejectionReason: status === 'rejected' ? rejectionReason.trim() : undefined,
+        },
+      });
 
-      // Update provider profile status
-      const { error: updateError } = await supabase
-        .from('provider_profiles')
-        .update({
-          verification_status: status,
-          rejection_reason: status === 'rejected' ? rejectionReason : null,
-          verified_at: status === 'approved' ? now : null,
-        } as any)
-        .eq('user_id', workerId);
-
-      if (updateError) throw updateError;
-
-      // If approved, assign provider role and update provider profile
-      if (status === 'approved') {
-        await supabase
-          .from('user_roles')
-          .upsert({ user_id: workerId, role: 'provider' }, { onConflict: 'user_id,role' });
-
-        await supabase
-          .from('provider_profiles')
-          .update({ verification_status: 'approved' } as any)
-          .eq('user_id', workerId);
-      } else {
-        await supabase
-          .from('provider_profiles')
-          .update({ verification_status: 'rejected', rejection_reason: rejectionReason } as any)
-          .eq('user_id', workerId);
-      }
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || 'Provider verification failed');
 
       toast.success(`Worker ${status} successfully`);
-      
-      // Send notification to artist
-      if (status === 'approved') {
-        await NotificationService.notifyArtistApproved(workerId);
-      } else {
-        await NotificationService.notifyArtistRejected(workerId, rejectionReason);
+
+      const workerUserId = selectedWorker?.user_id;
+      if (workerUserId) {
+        if (status === 'approved') {
+          await NotificationService.notifyArtistApproved(workerUserId);
+        } else {
+          await NotificationService.notifyArtistRejected(workerUserId, rejectionReason.trim());
+        }
       }
-      
+
       setRejectionReason('');
       setSelectedWorker(null);
       fetchWorkers();
       fetchStats();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Provider verification failed');
     } finally {
       setIsProcessing(false);
     }
@@ -955,7 +937,7 @@ const AdminDashboard = () => {
                                     <Button
                                       variant="outline"
                                       className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
-                                      onClick={() => handleVerification(selectedWorker.user_id, 'rejected')}
+                                      onClick={() => handleVerification(selectedWorker.id, 'rejected')}
                                       disabled={isProcessing}
                                     >
                                       <XCircle className="w-4 h-4 mr-2" />
@@ -963,7 +945,7 @@ const AdminDashboard = () => {
                                     </Button>
                                     <Button
                                       className="flex-1 bg-green-600 hover:bg-green-700"
-                                      onClick={() => handleVerification(selectedWorker.user_id, 'approved')}
+                                      onClick={() => handleVerification(selectedWorker.id, 'approved')}
                                       disabled={isProcessing}
                                     >
                                       <CheckCircle className="w-4 h-4 mr-2" />
