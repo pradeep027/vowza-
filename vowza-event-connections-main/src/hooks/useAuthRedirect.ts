@@ -26,6 +26,7 @@
 import { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { isSafeInternalPath, sanitizeInternalPath } from '@/lib/safeNavigation';
 
 interface ReturnToAction {
   path: string;
@@ -42,6 +43,10 @@ export const useAuthRedirect = () => {
   // Save the intended action to return to after auth
   const setReturnTo = useCallback(
     (path: string, options?: { query?: Record<string, any>; state?: Record<string, any> }) => {
+      if (!isSafeInternalPath(path)) {
+        sessionStorage.removeItem(RETURN_TO_KEY);
+        return;
+      }
       const action: ReturnToAction = {
         path,
         query: options?.query,
@@ -79,8 +84,8 @@ export const useAuthRedirect = () => {
     // Clear before navigating (prevent infinite loops)
     clearReturnTo();
 
-    // Build URL with query params if provided
-    let url = returnAction.path;
+    // Build URL with query params only from a validated internal path.
+    let url = sanitizeInternalPath(returnAction.path);
     if (returnAction.query) {
       const params = new URLSearchParams();
       Object.entries(returnAction.query).forEach(([key, value]) => {

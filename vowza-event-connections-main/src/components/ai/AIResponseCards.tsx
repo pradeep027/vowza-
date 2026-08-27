@@ -16,6 +16,7 @@ import type {
   WeddingPlan, DayPlan, TimeSlot
 } from '@/lib/aiPlannerTypes';
 import { dedupeVerifiedDBVendors } from '@/lib/vendorTrust';
+import { classifySafeLink } from '@/lib/safeNavigation';
 
 interface Props { response: AIResponse; }
 
@@ -188,10 +189,21 @@ const VendorCard = ({ response }: { response: AIResponse }) => {
                 </span>
               ))}
             </div>
-            <Link to={v.vowzaSearchUrl}
-              className="flex items-center gap-1 text-xs font-semibold text-gold hover:text-gold-dark transition-colors flex-shrink-0">
-              Find on Vowza <ExternalLink className="w-3 h-3" />
-            </Link>
+            {(() => {
+              const target = classifySafeLink(v.vowzaSearchUrl);
+              if (!target) return null;
+              return target.kind === 'internal' ? (
+                <Link to={target.href}
+                  className="flex items-center gap-1 text-xs font-semibold text-gold hover:text-gold-dark transition-colors flex-shrink-0">
+                  Find on Vowza <ExternalLink className="w-3 h-3" />
+                </Link>
+              ) : (
+                <a href={target.href} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs font-semibold text-gold hover:text-gold-dark transition-colors flex-shrink-0">
+                  Find on Vowza <ExternalLink className="w-3 h-3" />
+                </a>
+              );
+            })()}
           </div>
         </div>
       ))}

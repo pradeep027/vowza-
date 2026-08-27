@@ -12,6 +12,7 @@
 //      opened directly (e.g. a shared URL, or a new tab with no history).
 import { useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { isSafeInternalPath, sanitizeInternalPath } from '@/lib/safeNavigation';
 
 export interface BackNavigationState {
   /** Path to return to, set by the linking page for guaranteed contextual return. */
@@ -54,18 +55,20 @@ export function useBackNavigation(fallback: string = '/') {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state ?? {}) as BackNavigationState;
+  const safeFrom = isSafeInternalPath(state.from) ? state.from : undefined;
+  const safeFallback = sanitizeInternalPath(fallback);
 
   const goBack = useCallback(() => {
-    if (state.from) {
-      navigate(state.from, { replace: true });
+    if (safeFrom) {
+      navigate(safeFrom, { replace: true });
       return;
     }
     if (hasInAppHistory()) {
       navigate(-1);
       return;
     }
-    navigate(fallback, { replace: true });
-  }, [navigate, state.from, fallback]);
+    navigate(safeFallback, { replace: true });
+  }, [navigate, safeFrom, safeFallback]);
 
-  return { goBack, fromLabel: state.fromLabel, canGoBack: !!state.from || hasInAppHistory() };
+  return { goBack, fromLabel: state.fromLabel, canGoBack: !!safeFrom || hasInAppHistory() };
 }

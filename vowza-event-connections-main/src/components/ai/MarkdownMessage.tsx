@@ -4,6 +4,7 @@
 
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { classifySafeLink } from '@/lib/safeNavigation';
 
 interface Props {
   text: string;
@@ -73,20 +74,23 @@ function renderInline(text: string): React.ReactNode {
         </code>
       );
     } else if (match[5]) {
-      const url = match[6];
-      const isInternal = url.startsWith('/');
-      parts.push(
-        isInternal ? (
-          <Link key={match.index} to={url} className="text-gold underline hover:text-gold-dark transition-colors">
+      const target = classifySafeLink(match[6]);
+      if (!target) {
+        parts.push(match[5]);
+      } else if (target.kind === 'internal') {
+        parts.push(
+          <Link key={match.index} to={target.href} className="text-gold underline hover:text-gold-dark transition-colors">
             {match[5]}
           </Link>
-        ) : (
-          <a key={match.index} href={url} target="_blank" rel="noopener noreferrer"
+        );
+      } else {
+        parts.push(
+          <a key={match.index} href={target.href} target="_blank" rel="noopener noreferrer"
              className="text-gold underline hover:text-gold-dark transition-colors">
             {match[5]}
           </a>
-        )
-      );
+        );
+      }
     }
     lastIdx = match.index + match[0].length;
   }
