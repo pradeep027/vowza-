@@ -1,5 +1,5 @@
 // VendorPackages — 100% real packages from pricing_packages with live booking metrics.
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -9,24 +9,29 @@ import {
   Check, X, TrendingUp,
 } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorPackages } from '@/hooks/useVendorData';
-import WaterProductsManager from './WaterProductsManager';
-import WaterPackageManager from './WaterPackageManager';
-import PhotographerPackageManager from './PhotographerPackageManager';
-import CateringPackageManager from './CateringPackageManager';
-import VideographyPackageManager from './VideographyPackageManager';
-import PhotoVideoPackageManager from './PhotoVideoPackageManager';
-import DronePackageManager from './DronePackageManager';
-import DJPackageManager from './DJPackageManager';
-import DecoratorPackageManager from './DecoratorPackageManager';
-import MakeupPackageManager from './MakeupPackageManager';
-import MehendiPackageManager from './MehendiPackageManager';
-import AnchorPackageManager from './AnchorPackageManager';
-import BanquetHallPackageManager from './BanquetHallPackageManager';
-import RentalPackageManager from './RentalPackageManager';
-import PriestPackageManager from './PriestPackageManager';
-import BandPackageManager from './BandPackageManager';
-import SingerPackageManager from './SingerPackageManager';
-import DancerPackageManager from './DancerPackageManager';
+const WaterPackageManager = lazy(() => import('./WaterPackageManager'));
+const PhotographerPackageManager = lazy(() => import('./PhotographerPackageManager'));
+const CateringPackageManager = lazy(() => import('./CateringPackageManager'));
+const VideographyPackageManager = lazy(() => import('./VideographyPackageManager'));
+const PhotoVideoPackageManager = lazy(() => import('./PhotoVideoPackageManager'));
+const DronePackageManager = lazy(() => import('./DronePackageManager'));
+const DJPackageManager = lazy(() => import('./DJPackageManager'));
+const DecoratorPackageManager = lazy(() => import('./DecoratorPackageManager'));
+const MakeupPackageManager = lazy(() => import('./MakeupPackageManager'));
+const MehendiPackageManager = lazy(() => import('./MehendiPackageManager'));
+const AnchorPackageManager = lazy(() => import('./AnchorPackageManager'));
+const BanquetHallPackageManager = lazy(() => import('./BanquetHallPackageManager'));
+const RentalPackageManager = lazy(() => import('./RentalPackageManager'));
+const PriestPackageManager = lazy(() => import('./PriestPackageManager'));
+const BandPackageManager = lazy(() => import('./BandPackageManager'));
+const SingerPackageManager = lazy(() => import('./SingerPackageManager'));
+const DancerPackageManager = lazy(() => import('./DancerPackageManager'));
+
+const PackageManagerLoader = () => (
+  <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground" role="status" aria-live="polite">
+    Loading package manager…
+  </div>
+);
 import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isSinger, isDancer, isPhotographyOrVideography } from '@/lib/providerCategory';
 
 const TIER_CFG: Record<string, { icon: React.ElementType; gradient: string }> = {
@@ -60,56 +65,56 @@ export default function VendorPackages() {
   // Water Suppliers use a product catalogue. All other professions retain
   // the original Services & Packages experience below without any changes.
   if (isWaterSupplier(provider)) {
-    return <WaterPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><WaterPackageManager provider={provider} /></Suspense>;
   }
   // Combined Photography & Videography (must check before individual photographer/videographer)
   if (isPhotographyOrVideography(provider) && provider?.profession === 'photography_videography') {
-    return <PhotoVideoPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><PhotoVideoPackageManager provider={provider} /></Suspense>;
   }
   if (isPhotographer(provider)) {
-    return <PhotographerPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><PhotographerPackageManager provider={provider} /></Suspense>;
   }
   if (isCaterer(provider)) {
-    return <CateringPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><CateringPackageManager provider={provider} /></Suspense>;
   }
   if (isVideographer(provider)) {
-    return <VideographyPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><VideographyPackageManager provider={provider} /></Suspense>;
   }
   if (isDroneOperator(provider)) {
-    return <DronePackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><DronePackageManager provider={provider} /></Suspense>;
   }
   if (isDJ(provider)) {
-    return <DJPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><DJPackageManager provider={provider} /></Suspense>;
   }
   if (isDecorator(provider)) {
-    return <DecoratorPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><DecoratorPackageManager provider={provider} /></Suspense>;
   }
   if (isMakeupArtist(provider)) {
-    return <MakeupPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><MakeupPackageManager provider={provider} /></Suspense>;
   }
   if (isMehendiArtist(provider)) {
-    return <MehendiPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><MehendiPackageManager provider={provider} /></Suspense>;
   }
   if (isAnchor(provider)) {
-    return <AnchorPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><AnchorPackageManager provider={provider} /></Suspense>;
   }
   if (isBanquetHall(provider)) {
-    return <BanquetHallPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><BanquetHallPackageManager provider={provider} /></Suspense>;
   }
   if (isRentalService(provider)) {
-    return <RentalPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><RentalPackageManager provider={provider} /></Suspense>;
   }
   if (isPriest(provider)) {
-    return <PriestPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><PriestPackageManager provider={provider} /></Suspense>;
   }
   if (isBand(provider)) {
-    return <BandPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><BandPackageManager provider={provider} /></Suspense>;
   }
   if (isSinger(provider)) {
-    return <SingerPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><SingerPackageManager provider={provider} /></Suspense>;
   }
   if (isDancer(provider)) {
-    return <DancerPackageManager provider={provider} />;
+    return <Suspense fallback={<PackageManagerLoader />}><DancerPackageManager provider={provider} /></Suspense>;
   }
 
   const openCreate = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };

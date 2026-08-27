@@ -321,8 +321,8 @@ export default function AdminArtists() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => { load(); loadCounts(); }} className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-secondary" title="Refresh">
-            <RefreshCw className="w-4 h-4" />
+          <button type="button" onClick={() => { void load(); void loadCounts(); }} aria-label="Refresh artist list" className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-secondary" title="Refresh">
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
           </button>
           <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-secondary">
             <Download className="w-4 h-4" /> Export
@@ -425,30 +425,30 @@ export default function AdminArtists() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 flex-wrap">
-                      <button onClick={() => setSelected(a)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground" title="View">
-                        <Eye className="w-3.5 h-3.5" />
+                      <button type="button" onClick={() => setSelected(a)} aria-label={`View ${a.full_name || 'artist'}`} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground" title="View">
+                        <Eye className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                       {a.verification_status !== 'approved' && (
-                        <button onClick={() => handleApprove(a)} disabled={processing}
+                        <button type="button" onClick={() => void handleApprove(a)} disabled={processing} aria-label={`Approve ${a.full_name || 'artist'}`}
                           className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 disabled:opacity-40" title="Approve">
-                          <CheckCircle className="w-3.5 h-3.5" />
+                          <CheckCircle className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       )}
                       {a.verification_status !== 'rejected' && (
-                        <button onClick={() => { setRejectModalFor(a); setRejectReason(''); setRejectOther(''); }}
-                          disabled={processing} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 disabled:opacity-40" title="Reject">
-                          <XCircle className="w-3.5 h-3.5" />
+                        <button type="button" onClick={() => { setRejectModalFor(a); setRejectReason(''); setRejectOther(''); }}
+                          disabled={processing} aria-label={`Reject ${a.full_name || 'artist'}`} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 disabled:opacity-40" title="Reject">
+                          <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       )}
                       {a.verification_status === 'approved' && (
-                        <button onClick={() => handleSuspend(a)} disabled={processing}
+                        <button type="button" onClick={() => void handleSuspend(a)} disabled={processing} aria-label={`Suspend ${a.full_name || 'artist'}`}
                           className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-500 disabled:opacity-40" title="Suspend">
-                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       )}
-                      <button onClick={() => handleDelete(a)}
+                      <button type="button" onClick={() => void handleDelete(a)} aria-label={`Delete ${a.full_name || 'artist'}`}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Delete">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -464,11 +464,11 @@ export default function AdminArtists() {
             Showing {total === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
           </p>
           <div className="flex gap-1">
-            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary">
-              <ChevronLeft className="w-4 h-4" />
+            <button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Previous artist page" className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary">
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <button disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary">
-              <ChevronRight className="w-4 h-4" />
+            <button type="button" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage(p => p + 1)} aria-label="Next artist page" className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary">
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>

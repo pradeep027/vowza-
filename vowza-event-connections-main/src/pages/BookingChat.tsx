@@ -240,8 +240,8 @@ const BookingChat = () => {
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-gold/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
+          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Go back">
+            <ArrowLeft className="w-5 h-5" aria-hidden="true" />
           </Button>
           <AppLogo size="md" />
           <div className="flex-1" />
