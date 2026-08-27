@@ -30,11 +30,73 @@ BEGIN
   DELETE FROM storage.buckets WHERE id = 'chat-files';
 END $$;
 
+-- KYC and chat media are private by control-plane metadata, not only by
+-- object policies. Fail closed if the expected buckets are absent so a
+-- partially configured deployment cannot silently continue.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'verification-documents') THEN
+    RAISE EXCEPTION 'Missing required private bucket: verification-documents';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'chat-media') THEN
+    RAISE EXCEPTION 'Missing required private bucket: chat-media';
+  END IF;
+  UPDATE storage.buckets
+  SET public = false
+  WHERE id IN ('verification-documents', 'chat-media');
+END $$;
+
 DROP POLICY IF EXISTS "Chat participants can upload files" ON storage.objects;
 DROP POLICY IF EXISTS "Participants can read chat files" ON storage.objects;
+DROP POLICY IF EXISTS "chat_media_upload" ON storage.objects;
+DROP POLICY IF EXISTS "chat_media_read" ON storage.objects;
+DROP POLICY IF EXISTS "chat_media_delete" ON storage.objects;
 
--- Public downloads are provided by the bucket's public flag. These policies
--- govern authenticated object management and require user_id as path segment 1.
+-- The chat path is <sender-user-id>/<booking-id>/<object-name>. Reuse the
+-- existing SECURITY DEFINER participant helper, but make its function ACL
+-- explicit because it is evaluated from a storage policy.
+REVOKE ALL ON FUNCTION public.is_chat_participant(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_chat_participant(uuid, uuid) TO authenticated;
+
+CREATE POLICY "chat_media_upload"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'chat-media'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+  AND (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}$'
+  AND public.is_chat_participant(((storage.foldername(name))[2])::uuid, auth.uid())
+);
+
+CREATE POLICY "chat_media_read"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'chat-media'
+  AND (
+    (storage.foldername(name))[1] = auth.uid()::text
+    OR (
+      (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}$'
+      AND public.is_chat_participant(((storage.foldername(name))[2])::uuid, auth.uid())
+    )
+  )
+);
+
+CREATE POLICY "chat_media_delete"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'chat-media'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Public downloads are provided only by the provider-portfolio bucket's
+-- public flag. Verification and chat buckets remain private and have no
+-- anonymous SELECT policy. These policies govern authenticated portfolio
+-- object management and require user_id as path segment 1.
 DROP POLICY IF EXISTS "provider_portfolio_owner_insert" ON storage.objects;
 CREATE POLICY "provider_portfolio_owner_insert"
 ON storage.objects
