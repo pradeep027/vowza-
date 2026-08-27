@@ -67,9 +67,9 @@ const ChatBox = ({ bookingId, otherUserName, disabled = false, readOnly = false 
   const handleSendMedia = async () => {
     if (!previewFile || isUploading || disabled || readOnly) return;
     try {
-      const { url } = await uploadFile(previewFile.file);
+      const { path } = await uploadFile(previewFile.file);
       const msgType = previewFile.type === 'image' ? 'image' : previewFile.type === 'video' ? 'video' : 'file';
-      await sendMessage({ content: previewFile.file.name, messageType: msgType, attachmentUrl: url, fileName: previewFile.file.name, fileSize: previewFile.file.size, mimeType: previewFile.file.type });
+      await sendMessage({ content: previewFile.file.name, messageType: msgType, attachmentPath: path, fileName: previewFile.file.name, fileSize: previewFile.file.size, mimeType: previewFile.file.type });
       setPreviewFile(null);
     } catch { toast.error('Upload failed'); }
   };
