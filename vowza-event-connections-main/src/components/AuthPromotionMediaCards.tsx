@@ -137,7 +137,7 @@ const ImageCarouselCard = memo(
       }
     }, [playable]);
 
-    // Auto-rotate every 3 seconds (PHOTO_DURATION_MS)
+    // Auto-rotate every 10 seconds (PHOTO_DURATION_MS)
     useEffect(() => {
       if (playable.length < 2) return;
 

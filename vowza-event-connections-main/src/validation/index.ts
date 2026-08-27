@@ -68,7 +68,7 @@ export function validateName(
   }
 
   // Reject if mostly special characters
-  const specialCount = (trimmed.match(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g) || []).length;
+  const specialCount = (trimmed.match(/[^\p{L}\p{N}\s.'-]/gu) || []).length;
   if (specialCount / totalChars > 0.2) {
     return { valid: false, error: `${fieldName} contains invalid characters` };
   }
@@ -176,7 +176,7 @@ export function isGarbageText(value: string): boolean {
   const keyboardPatterns = [
     /^(qwerty|asdfgh|zxcvbn|qweasd|123456|abcdef)$/,
     /(.)\\1{5,}/, // repeated chars
-    /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{3,}$/, // only special chars
+    /^[^\p{L}\p{N}\s.'-]{3,}$/u, // only special chars
   ];
 
   for (const pattern of keyboardPatterns) {
@@ -461,7 +461,7 @@ export function validateHouseNumber(value: string): { valid: boolean; error?: st
   }
 
   // Reject repeated special characters only
-  if (/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{2,}$/.test(trimmed)) {
+  if (/^[^\p{L}\p{N}\s.'-]{2,}$/u.test(trimmed)) {
     return { valid: false, error: 'Enter a valid house or shop number' };
   }
 
@@ -708,7 +708,7 @@ export function validateLocation(
  * Returns true only if ALL required fields have valid values
  */
 export function areAllFieldsValid(
-  fields: Record<string, { valid: boolean; value: any }>
+  fields: Record<string, { valid: boolean; value: unknown }>
 ): boolean {
   for (const field of Object.values(fields)) {
     if (!field.valid) return false;
