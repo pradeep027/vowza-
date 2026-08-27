@@ -13,7 +13,7 @@
  * 7. Full plan generation for housewarming
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EventBudgetPlanner } from '../eventBudgetPlanner';
 import { generateChecklist, recommendVendors, generateTimeline, generateEventOverviewText } from '../aiPlanner';
 import type { PlannerContext } from '../aiPlannerTypes';
@@ -196,7 +196,7 @@ describe('🏠 HOUSEWARMING INTEGRATION TEST - Real User Flow', () => {
     });
 
     it('should include event type and guest count', () => {
-      expect(overview).toContain('housewarming');
+      expect(overview).toContain('Housewarming');
       expect(overview).toContain('Hyderabad');
       expect(overview).toContain('300');
     });

@@ -75,8 +75,8 @@ const testContexts: Record<string, PlannerContext> = {
     venueType: 'indoor',
     durationDays: 1,
   },
-  college_event: {
-    eventType: 'college_event',
+  collegefest: {
+    eventType: 'collegefest',
     city: 'Hyderabad',
     guestCount: 300,
     budget: 100000,
@@ -101,7 +101,7 @@ const eventSpecificTerms: Record<string, string[]> = {
   babyshower: ['baby', 'mom-to-be', 'pregnancy', 'shower'],
   corporate: ['corporate', 'business', 'presentation', 'session', 'conference'],
   engagement: ['ring', 'engagement', 'couple', 'ceremony'],
-  college_event: ['college', 'student', 'event', 'performance'],
+  collegefest: ['college', 'student', 'event', 'performance'],
 };
 
 describe('🎯 EVENT ISOLATION COMPREHENSIVE TEST SUITE', () => {
@@ -430,7 +430,7 @@ describe('🎯 EVENT ISOLATION COMPREHENSIVE TEST SUITE', () => {
     });
 
     it('COLLEGE_EVENT: should have student/college focus', () => {
-      const overview = generateEventOverviewText(testContexts.college_event);
+      const overview = generateEventOverviewText(testContexts.collegefest);
       expect(overview.toLowerCase()).toContain('college');
     });
   });

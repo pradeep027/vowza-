@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run src/lib/plannerRecommendation.test.ts src/lib/promotionMediaPlaylist.test.ts src/lib/vendorTrust.test.ts src/lib/__tests__/budget-crash-regression.test.ts",
+    "test:all": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {

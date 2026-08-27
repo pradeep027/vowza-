@@ -14,6 +14,7 @@ import type {
   WeddingPlan, WeddingOverview, DayPlan, DayBudget,
   DayChecklist, DayVendor, TimeSlot,
 } from "./aiPlannerTypes";
+import { normalizeEventType } from "./aiPlannerTypes";
 
 import { EventBudgetPlanner } from "./eventBudgetPlanner";
 // Appends ONE natural follow-up question (Veg/Non-Veg, Indoor/Outdoor, etc.)
@@ -93,9 +94,8 @@ const DECORATION_IDEAS: Record<string, string[]> = {
   housewarming:  ["Traditional torans and rangoli at the entrance", "Diya and flower decor around the puja area", "Fresh flower garlands on doors and windows", "Simple elegant table settings for guests"],
   engagement:    ["Floral arch for the ring ceremony moment", "Fairy-lit backdrop in soft pastel tones", "Elegant centerpieces with candles and roses", "Welcome signage with the couple's names"],
   corporate:     ["Branded backdrop with company logo and colours", "Clean stage setup with LED screen for presentations", "Registration desk with branded standees", "Minimal, professional centerpieces"],
-  corporate_event: ["Branded backdrop with company logo and colours", "Clean stage setup with LED screen for presentations", "Registration desk with branded standees", "Minimal, professional centerpieces"],
   babyshower:    ["Soft pastel balloon arch (pink/blue/neutral)", "Themed banner and welcome signage", "Baby-themed centerpieces and dessert table styling", "Photo corner with props for the mom-to-be"],
-  college_event: ["Vibrant college colors and banners", "Photo booth with college branding", "Stage setup with sound system and LED screen", "Casual seating and standing areas with casual decor"],
+  collegefest: ["Vibrant college colors and banners", "Photo booth with college branding", "Stage setup with sound system and LED screen", "Casual seating and standing areas with casual decor"],
   anniversary:   ["Romantic setup with candles and soft lighting", "Photo collage of the couple through the years", "Elegant floral arrangements in gold/silver tones", "Intimate seating arrangement for the couple"],
   default:       ["Backdrop styled to match your chosen theme and colour palette", "Fresh floral or fabric centerpieces for each table", "Entrance decor that sets the tone for guests", "Ambient lighting — fairy lights or uplighting for evening events"],
 };
@@ -107,8 +107,8 @@ const PHOTOGRAPHY_PLANS: Record<string, string[]> = {
   housewarming: ["Griha Pravesh ceremony moments", "Family inside the new home", "Group photos with guests", "Detail shots of decoration and ritual setup"],
   babyshower: ["Mom-to-be portrait shots", "Belly painting or maternity photos", "Group photos with friends and family", "Candid moments of games and celebrations"],
   engagement: ["Couple's ring exchange moment", "Formal couple portraits", "Family group photos", "Candid guest interaction shots"],
-  college_event: ["Event opening and key moments", "Performer/artist shots", "Audience candid shots", "Award distribution moments"],
-  corporate_event: ["Venue setup and registration", "Speaker/panelist shots during sessions", "Networking and casual interaction moments", "Award/recognition ceremony moments"],
+  collegefest: ["Event opening and key moments", "Performer/artist shots", "Audience candid shots", "Award distribution moments"],
+  corporate: ["Venue setup and registration", "Speaker/panelist shots during sessions", "Networking and casual interaction moments", "Award/recognition ceremony moments"],
   anniversary: ["Couple portrait shots", "Candid moments with guests", "Cake-cutting ceremony", "Special anniversary dance or moment"],
   default:   ["Candid coverage of key moments throughout the event", "Formal group photos with family/guests", "Detail shots of decor and setup", "Golden hour outdoor shots if the venue allows"],
 };
@@ -120,9 +120,8 @@ const ENTERTAINMENT_PLANS: Record<string, string[]> = {
   birthday:   ["Music playlist or DJ matched to the age group and theme", "Games/activities appropriate to guest ages", "Cake-cutting moment with a dedicated song"],
   housewarming: ["Soft background music during gathering", "Informal socializing and conversations", "Optional: light music during meal service"],
   babyshower: ["Soft, relaxing background music", "Fun games for guests", "Special moment for mom-to-be recognition"],
-  engagement: ["Background music during cocktails", "First dance of the newly engaged couple", "DJ for dancing post-dinner"],
-  corporate_event: ["Background music during sessions (if applicable)", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
-  college_event: ["Opening performance or cultural show", "Live performances/DJ for entertainment", "Energetic music and dancing"],
+  engagement: ["Background music during cocktails", "A celebratory couple's dance", "DJ for dancing post-dinner"],
+  collegefest: ["Opening performance or cultural show", "Live performances/DJ for entertainment", "Energetic music and dancing"],
   anniversary: ["Romantic background music", "Special dance or renewal of vows moment", "DJ for evening dancing"],
   corporate:  ["Welcome/background music during networking", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
   default:    ["Curated music playlist or DJ matched to the event mood", "An anchor/emcee if the event has a formal programme", "A dedicated moment for key highlights (e.g. speeches, cake, awards)"],
@@ -156,7 +155,7 @@ function pick(map: Record<string, string[]>, key?: string): string[] {
 }
 
 export function generateEventOverviewText(ctx: PlannerContext): string {
-  const eventType = ctx.eventType ?? "wedding";
+  const eventType = normalizeEventType(ctx.eventType) ?? "wedding";
   const eventLabel = eventType.charAt(0).toUpperCase() + eventType.slice(1);
   const city = ctx.city ?? "your city";
   const guestCount = ctx.guestCount ?? 200;
@@ -199,6 +198,38 @@ export function generateEventOverviewText(ctx: PlannerContext): string {
   );
 
   return lines.join('\n');
+}
+
+// ─── Deprecated compatibility adapter ─────────────────────────────────────────
+// Preserve the historical BudgetPlan contract while delegating allocation
+// decisions to the event-aware engine.
+export function generateBudgetPlan(ctx: PlannerContext): BudgetPlan {
+  const eventAwareBudget = EventBudgetPlanner.allocate({
+    ...ctx,
+    eventType: normalizeEventType(ctx.eventType) ?? "wedding",
+  });
+
+  const breakdown: BudgetLineItem[] = eventAwareBudget.allocations.map(allocation => ({
+    category: allocation.category,
+    minCost: allocation.minAmount,
+    maxCost: allocation.maxAmount,
+    recommended: allocation.allocatedAmount,
+    percentage: allocation.actualPercentage,
+    notes: allocation.reasoning,
+    canReduce: allocation.priority === "low",
+    reduceTip: allocation.priority === "low" ? `${allocation.category} can be reduced if needed` : undefined,
+  }));
+
+  return {
+    totalBudget: eventAwareBudget.totalBudget,
+    breakdown,
+    grandTotal: eventAwareBudget.totalAllocated,
+    remaining: eventAwareBudget.remaining,
+    isFeasible: eventAwareBudget.isFeasible,
+    feasibilityNote: eventAwareBudget.feasibilityNotes[0] ?? "Budget analysis complete",
+    savingTips: eventAwareBudget.recommendations,
+    hiddenCosts: [],
+  };
 }
 
 // ─── DEPRECATED: Legacy fixed-percentage budget planner ───────────────────────
@@ -500,8 +531,9 @@ export function generateTimeline(ctx: PlannerContext): EventTimeline {
 
 // ─── Vendor Recommender ───────────────────────────────────────────────────────
 export function recommendVendors(ctx: PlannerContext): VendorRecommendation[] {
-  const { city = "Hyderabad", eventType = "wedding", guestCount = 200 } = ctx;
-  const m = getMul(ctx);
+  const { city = "Hyderabad", guestCount = 200 } = ctx;
+  const eventType = normalizeEventType(ctx.eventType) ?? "wedding";
+  const m = getMul({ ...ctx, eventType });
   type T = { cat: string; reason: string; bMin: number; bMax: number; tips: string[]; slug: string; urgency: "book_now" | "flexible" };
   
   // Base templates for all events
@@ -534,7 +566,7 @@ export function recommendVendors(ctx: PlannerContext): VendorRecommendation[] {
     engagement: [
       { cat: "Ring Bearer Ceremony", reason: "Special choreography for ring exchange to make it memorable.", bMin: 2000, bMax: 8000, tips: ["Rehearse timing with couple", "Ensure smooth transitions"], slug: "ceremony-coord", urgency: "flexible" },
     ],
-    corporate_event: [
+    corporate: [
       { cat: "AV/Sound System Specialist", reason: "Professional audio-visual setup for presentations & visibility.", bMin: 30000, bMax: 100000, tips: ["Check screen & projector quality", "Confirm backup power", "Test microphones day before"], slug: "av-tech", urgency: "book_now" },
       { cat: "Event Coordinator", reason: "Professional coordination for schedule, vendor management, guest flow.", bMin: 15000, bMax: 50000, tips: ["Clarify scope & deliverables", "Confirm emergency contact protocol"], slug: "coordinators", urgency: "book_now" },
     ],
@@ -568,8 +600,8 @@ export function getWeatherAdvice(ctx: PlannerContext): WeatherAdvice {
 
 // ─── Checklist Generator ──────────────────────────────────────────────────────
 export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
-  const { eventType = "wedding" } = ctx;
-  const isWedding = ["wedding","reception","sangeet","haldi","engagement","mehendi"].includes(eventType);
+  const eventType = normalizeEventType(ctx.eventType) ?? "wedding";
+  const isWedding = ["wedding","reception","sangeet","haldi","mehendi"].includes(eventType);
   const isHousewarming = eventType === "housewarming" || eventType === "gruhapravesam";
   const isHouseWarmingCeremony = ["housewarming", "gruhapravesam"].includes(eventType);
   
@@ -932,6 +964,16 @@ export async function processMessage(
         type: 'text',
         text: `${summary}${canGenerate ? `I'll update the plan for ${finalContext.guestCount} guests in **${finalContext.city}** with a budget of **${fmt(finalContext.budget!)}**. Want me to regenerate the full plan?` : `What else should I know?`}`,
       },
+      updatedContext: finalContext,
+    };
+  }
+
+  // Budget generation is strict about event type. A chat message may provide
+  // only a budget, so acknowledge the extraction instead of calling the
+  // allocator with incomplete context.
+  if (result.intent === 'budget_breakdown' && !finalContext.eventType) {
+    return {
+      response: { type: 'question', text: `I've noted your budget of **${fmt(finalContext.budget ?? 0)}**. What type of event are you planning?` },
       updatedContext: finalContext,
     };
   }
@@ -1363,17 +1405,19 @@ export function generateEventAwarePlan(ctx: PlannerContext): WeddingPlan {
     durationDays = 3, eventType = "event",
     luxuryLevel = "standard", eventDate, theme = "Traditional & Elegant",
   } = ctx;
+  const normalizedEventType = normalizeEventType(eventType) ?? "wedding";
+  const normalizedContext: PlannerContext = { ...ctx, eventType: normalizedEventType };
 
   // Use EventBudgetPlanner for ALL budget allocation
-  const eventAwareBudget = EventBudgetPlanner.allocate(ctx);
+  const eventAwareBudget = EventBudgetPlanner.allocate(normalizedContext);
 
-  const m = getMul(ctx);
+  const m = getMul(normalizedContext);
   const season = getSeason(eventDate);
   const seasonLabel = { winter:"Winter (Nov–Feb)", summer:"Summer (Mar–May)", monsoon:"Monsoon (Jun–Sep)", autumn:"Autumn (Oct)" }[season];
 
   // Get event-specific day types
-  const dayTypes = getEventDayTypes(eventType, durationDays);
-  const dayLabels = getEventDayLabels(eventType, durationDays);
+  const dayTypes = getEventDayTypes(normalizedEventType, durationDays);
+  const dayLabels = getEventDayLabels(normalizedEventType, durationDays);
   const days = dayTypes.length;
 
   // Build day plans using event-aware budget allocations
@@ -1386,14 +1430,14 @@ export function generateEventAwarePlan(ctx: PlannerContext): WeddingPlan {
       label: dayLabels[i] ?? `Day ${i + 1}`,
       theme: getEventDayThemes(dt),
       description: getEventDayDescriptions(dt),
-      slots: buildTimeSlots(dt, eventType, city, luxuryLevel),
+      slots: buildTimeSlots(dt, normalizedEventType, city, luxuryLevel),
       budget: {
         total: Math.round(dayBudget),
         breakdown: buildEventDayBudgetBreakdown(dt, dayBudget, m),
       },
-      checklist: buildDayChecklist(dt, eventType),
+      checklist: buildDayChecklist(dt, normalizedEventType),
       vendors: buildDayVendors(dt, city, m),
-      aiTips: buildAiTips(dt, eventType, ctx),
+      aiTips: buildAiTips(dt, normalizedEventType, normalizedContext),
       sunrise: "06:15 AM",
       goldenHour: "05:30 PM – 06:30 PM",
     };
@@ -1837,6 +1881,7 @@ function buildDayChecklist(dayType: string, eventType: string): DayChecklist[] {
     housewarming: [{ task:"Confirm auspicious muhurat with priest", priority:"must", owner:"Family"},{task:"Home deep cleaning completed",priority:"must",owner:"Coordinator"},{task:"Puja materials & flowers ordered",priority:"must",owner:"Family"},{task:"Catering menu finalized",priority:"must",owner:"Caterer"},{task:"Guest list & arrival times confirmed",priority:"must",owner:"Family"},{task:"Photography & videography booked (if planned)",priority:"should",owner:"Coordinator"},{task:"Return gifts ready (if planned)",priority:"should",owner:"Family"},{task:"House orientation & parking arranged",priority:"should",owner:"Coordinator"}],
     // BIRTHDAY: Event-specific checklist
     birthday: [{ task:"Cake order confirmed with delivery time", priority:"must", owner:"Coordinator"},{task:"All decorations & supplies purchased",priority:"must",owner:"Coordinator"},{task:"Catering headcount finalized",priority:"must",owner:"Caterer"},{task:"Games & activities planned & ready",priority:"should",owner:"Event coordinator"},{task:"Music playlist created",priority:"should",owner:"Coordinator"},{task:"Photographer/videographer arrival time confirmed",priority:"should",owner:"Coordinator"},{task:"Birthday person outfit finalised",priority:"should",owner:"Birthday person"}],
+    event: [{ task:"Presentation agenda and session owners confirmed", priority:"must", owner:"Coordinator"},{task:"AV equipment, microphones, and screens tested",priority:"must",owner:"AV/Sound"},{task:"Attendee registration and access list prepared",priority:"must",owner:"Coordinator"},{task:"Catering and refreshment schedule finalized",priority:"should",owner:"Caterer"},{task:"Post-event feedback and attendance report assigned",priority:"should",owner:"Coordinator"}],
     // GENERIC DAY TYPES: Intermediate day types used across event types
     preparation: [{ task:"Venue & setup confirmed", priority:"must", owner:"Coordinator"},{task:"All supplies & materials ordered",priority:"must",owner:"Coordinator"},{task:"Catering contact & menu finalized",priority:"must",owner:"Caterer"},{task:"Decorator arrival time confirmed",priority:"should",owner:"Decorator"},{task:"Backup plan ready for weather/emergencies",priority:"should",owner:"Coordinator"}],
     ceremony: [{ task:"Auspicious time/muhurat confirmed", priority:"must", owner:"Family"},{task:"Priest/officiant arrival time confirmed",priority:"must",owner:"Coordinator"},{task:"All ceremonial items prepared & ready",priority:"must",owner:"Family"},{task:"Photographer positioned for key moments",priority:"should",owner:"Photographer"},{task:"Music/audio system tested",priority:"should",owner:"Coordinator"}],
@@ -1896,7 +1941,9 @@ export function generateWeddingPlan(ctx: PlannerContext): WeddingPlan {
     luxuryLevel = "standard", eventDate, theme = "Traditional & Elegant",
   } = ctx;
 
-  const m = getMul(ctx);
+  const normalizedEventType = normalizeEventType(eventType) ?? "wedding";
+  const normalizedContext: PlannerContext = { ...ctx, eventType: normalizedEventType };
+  const m = getMul(normalizedContext);
   const season = getSeason(eventDate);
   const seasonLabel = { winter:"Winter (Nov–Feb)", summer:"Summer (Mar–May)", monsoon:"Monsoon (Jun–Sep)", autumn:"Autumn (Oct)" }[season];
 
@@ -1941,11 +1988,11 @@ export function generateWeddingPlan(ctx: PlannerContext): WeddingPlan {
     label:       labels[i] ?? `Day ${i + 1}`,
     theme:       dayThemes[dt] ?? "Elegant & Traditional",
     description: dayDescriptions[dt] ?? "",
-    slots:       buildTimeSlots(dt, city, luxuryLevel),
+    slots:       buildTimeSlots(dt, normalizedEventType, city, luxuryLevel),
     budget:      buildDayBudget(dt, budget, days, m),
-    checklist:   buildDayChecklist(dt),
+    checklist:   buildDayChecklist(dt, normalizedEventType),
     vendors:     buildDayVendors(dt, city, m),
-    aiTips:      buildAiTips(dt, ctx),
+    aiTips:      buildAiTips(dt, normalizedEventType, normalizedContext),
     sunrise:     "06:15 AM",
     goldenHour:  "05:30 PM – 06:30 PM",
   }));

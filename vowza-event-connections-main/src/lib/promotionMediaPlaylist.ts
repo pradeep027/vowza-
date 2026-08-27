@@ -1,5 +1,5 @@
 /** Timing and index rules shared by the homepage promotion playlist UI and tests. */
-export const PHOTO_DURATION_MS = 3_000;
+export const PHOTO_DURATION_MS = 10_000;
 
 /** Returns the next item in a circular playlist; a one-item playlist stays at zero. */
 export function nextPlaylistIndex(currentIndex: number, itemCount: number): number {
