@@ -9,6 +9,7 @@
  * 4. Validates budget feasibility with contextual warnings
  */
 
+import { normalizeEventType } from './aiPlannerTypes';
 import type { PlannerContext, EventCategory } from './aiPlannerTypes';
 import type { BudgetAllocation, EventBudgetPlan } from './eventBudgetPlanner';
 
@@ -127,7 +128,7 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<EventCategory, Record<string, nu
     'Catering': 28,
     'Photography': 8,
     'Videography': 5,
-    'Priest/Rituals/Ceremony': 25,
+    'Pandit / Priest / Rituals': 25,
     'Lighting & Sound': 0,
     'Music/DJ/Band/Entertainment': 0,
     'Makeup & Hair': 0,
@@ -139,8 +140,8 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<EventCategory, Record<string, nu
   // CORPORATE: Professional events, AV essential
   corporate: {
     'Venue Rental': 20,
-    'Catering': 30,
-    'AV/Staging/Lighting': 20,
+    'Catering': 28,
+    'AV/Staging/Lighting': 22,
     'Photography': 12,
     'Videography': 8,
     'Anchor/Host': 5,
@@ -317,8 +318,10 @@ export function getActiveCategoriesForEvent(
   eventType: EventCategory,
   context: Partial<PlannerContext>
 ): CategoryActivation[] {
-  // Get baseline activations for this event
-  let activations = EVENT_CATEGORY_ACTIVATIONS[eventType] || EVENT_CATEGORY_ACTIVATIONS.wedding;
+  // Normalize legacy labels once at the engine boundary. Unknown values retain
+  // the existing safe fallback behavior rather than inventing a new category.
+  const normalizedEventType = normalizeEventType(eventType);
+  let activations = EVENT_CATEGORY_ACTIVATIONS[normalizedEventType ?? eventType] || EVENT_CATEGORY_ACTIVATIONS.wedding;
 
   // Start with all non-zero categories
   let active: CategoryActivation[] = Object.entries(activations)
@@ -332,7 +335,7 @@ export function getActiveCategoriesForEvent(
   // Handle conditional categories based on context
   
   // VENUE: Only relevant if external venue (not home/user's space)
-  if ((eventType === 'housewarming' || eventType === 'haldi' || eventType === 'mehendi') && 
+  if ((normalizedEventType === 'housewarming' || normalizedEventType === 'haldi' || normalizedEventType === 'mehendi') &&
       (context.venueType === 'external' || context.hasVenue)) {
     const existingVenue = active.find(a => a.category.includes('Venue'));
     if (!existingVenue) {
@@ -342,7 +345,7 @@ export function getActiveCategoriesForEvent(
         isConditional: true,
       });
     }
-  } else if (eventType === 'housewarming' && !context.venueType && !context.hasVenue) {
+  } else if (normalizedEventType === 'housewarming' && !context.venueType && !context.hasVenue) {
     // Home event: remove venue if present
     active = active.filter(a => !a.category.includes('Venue'));
   }
@@ -379,7 +382,7 @@ export function getActiveCategoriesForEvent(
   }
 
   // DANCERS: For Sangeet and similar events
-  if (context.userSelections?.wantsDancers && eventType === 'sangeet') {
+  if (context.userSelections?.wantsDancers && normalizedEventType === 'sangeet') {
     const existingDancers = active.find(a => a.category.includes('Dancer'));
     if (!existingDancers) {
       active.push({
@@ -589,29 +592,29 @@ export function generateEventAwareBudget(
   warnings: string[];
 } {
   // Step 1: Get active categories for this event
-  const activations = getActiveCategoriesForEvent(
-    (context.eventType as EventCategory) || 'wedding',
-    context
-  );
+  const normalizedEventType = normalizeEventType(context.eventType) ?? 'wedding';
+  const normalizedContext: PlannerContext = { ...context, eventType: normalizedEventType };
+  const activations = getActiveCategoriesForEvent(normalizedEventType, normalizedContext);
 
   // Step 2: Normalize so they sum to 100%
   const normalized = normalizeAllocationWeights(activations);
 
   // Step 3: Apply sensitivity checks (guest count, etc.)
-  const { adjustments, warnings } = applySensitivity(normalized, context);
+  const { adjustments, warnings } = applySensitivity(normalized, normalizedContext);
 
   // Step 4: Convert to monetary amounts
   const allocations: BudgetAllocation[] = adjustments.map(adj => {
     const amount = (totalBudget * adj.adjustedWeight) / 100;
     return {
       category: adj.category,
+      basePercentage: adj.adjustedWeight,
       allocatedAmount: Math.round(amount),
       actualPercentage: adj.adjustedWeight,
       minAmount: Math.round(amount * 0.8),
       maxAmount: Math.round(amount * 1.25),
       priority: 'medium',
       required: true,
-      reasoning: `Allocated for ${context.eventType} event with ${context.guestCount} guests`,
+      reasoning: `Allocated for ${normalizedEventType} event with ${normalizedContext.guestCount} guests`,
     };
   });
 

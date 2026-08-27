@@ -9,6 +9,7 @@
 //
 // Output: BudgetAllocation[] with min/max ranges for rebalancing
 
+import { normalizeEventType } from './aiPlannerTypes';
 import type { PlannerContext, EventCategory, LuxuryLevel } from './aiPlannerTypes';
 import { generateEventAwareBudget } from './eventAwareBudgetEngine';
 
@@ -260,7 +261,8 @@ export class EventBudgetPlanner {
    * - Validates feasibility against guest count & budget
    */
   static allocate(context: PlannerContext): EventBudgetPlan {
-    const { eventType, budget, guestCount, city, luxuryLevel } = context;
+    const eventType = normalizeEventType(context.eventType);
+    const { budget, guestCount, city, luxuryLevel } = context;
     
     // Validate required event type — no silent fallback to wedding
     if (!eventType) {
@@ -294,11 +296,11 @@ export class EventBudgetPlanner {
     // Convert engine output to EventBudgetPlan format
     const allocations: BudgetAllocation[] = engineResult.allocations.map(a => ({
       category: a.category,
-      basePercentage: a.percentage,
+      basePercentage: a.basePercentage,
       minAmount: a.allocatedAmount * 0.85, // 85-115% range for flexibility
       maxAmount: a.allocatedAmount * 1.15,
       allocatedAmount: a.allocatedAmount,
-      actualPercentage: a.percentage,
+      actualPercentage: a.actualPercentage,
       priority: this.getPriority(a.category, eventType),
       required: this.isRequired(a.category, eventType),
       reasoning: REASONING[a.category] ?? `Essential component for your ${eventType}`,
