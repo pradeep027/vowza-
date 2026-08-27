@@ -167,11 +167,11 @@ const ProviderProfile = () => {
 
   const fetchAll = async () => {
     try {
-      const { data: p, error } = await supabase.from("provider_profiles").select("*").eq("id", id).single();
+      const { data: p, error } = await supabase.from("provider_profiles").select("id,user_id,stage_name,profession,subcategory,experience_years,bio,languages,specialties,price_min,price_max,cover_image_url,average_rating,total_reviews,total_bookings,is_verified,is_featured,instant_booking,facebook,instagram,youtube,website,social_links").eq("id", id).single();
       if (error) throw error;
       setProvider(p);
 
-      const { data: prof } = await supabase.from("profiles").select("full_name,avatar_url,city,area,phone,state,email").eq("id", p.user_id).single();
+      const { data: prof } = await supabase.from("profiles").select("full_name,avatar_url,city,area").eq("id", p.user_id).single();
       if (prof) setProfile(prof);
 
       const [portRes, revRes, pkgRes, faqRes, menuRes, rentalRes, poojaRes] = await Promise.allSettled([
@@ -266,7 +266,10 @@ const ProviderProfile = () => {
 
   const langs = Array.isArray(provider.languages) ? provider.languages : (provider.languages || "").split(",").filter(Boolean);
   const specs  = Array.isArray(provider.specialties) ? provider.specialties : (provider.specialties || "").split(",").filter(Boolean);
-  const details = provider.vendor_details || provider.category_details || {};
+  // KYC/vendor JSON is intentionally absent from the public projection. Service
+  // detail fields will come from the reviewed provider_public view in the next
+  // schema phase rather than from an unrestricted JSONB column.
+  const details = {};
   const catDef = getCategoryByProfession(provider.profession);
   const socialLinks = provider.social_links || {};
 

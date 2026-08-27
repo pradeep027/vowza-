@@ -17,21 +17,45 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-const ALLOWED_ORIGINS = [
+const ALLOWED_ORIGINS = new Set([
   Deno.env.get("SUPABASE_URL") || "",
   "https://vavfeataqwwbpjonknne.supabase.co",
+  "https://vowza.co.in",
+  "https://www.vowza.co.in",
   "http://localhost:5173",
   "http://localhost:8080",
-];
+]);
 
-function getCorsHeaders(req: Request) {
+function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
+  if (ALLOWED_ORIGINS.has(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
+}
+
+function requireBearer(req: Request): void {
+  const authorization = req.headers.get("authorization") || "";
+  if (!/^Bearer\s+\S+$/i.test(authorization)) throw new Error("Unauthorized");
+}
+
+function validateInput(value: unknown): Input {
+  if (!value || typeof value !== "object") throw new Error("Invalid request");
+  const input = value as Partial<Input>;
+  const expectedTypes = new Set<Input["expectedType"]>(["aadhaar", "pan", "govt_id"]);
+  const detectedTypes = new Set<Input["detectedType"]>(["aadhaar", "pan", "govt_id", "unknown"]);
+  if (!expectedTypes.has(input.expectedType as Input["expectedType"])) throw new Error("Invalid document type");
+  if (!detectedTypes.has(input.detectedType as Input["detectedType"])) throw new Error("Invalid detected document type");
+  if (typeof input.confidence !== "number" || !Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 100) throw new Error("Invalid confidence");
+  if (typeof input.ocrSummary !== "string" || input.ocrSummary.length > 4000) throw new Error("Invalid OCR summary");
+  if (typeof input.hasValidAadhaarNumber !== "boolean" || typeof input.hasValidPanNumber !== "boolean") throw new Error("Invalid document flags");
+  const metadata = input.fileMetadata;
+  if (!metadata || typeof metadata !== "object" || typeof metadata.mimeType !== "string" || typeof metadata.fileSize !== "number" || typeof metadata.width !== "number" || typeof metadata.height !== "number") throw new Error("Invalid file metadata");
+  if (!Number.isFinite(metadata.fileSize) || metadata.fileSize < 0 || metadata.fileSize > 10 * 1024 * 1024) throw new Error("Invalid file size");
+  if (!Number.isFinite(metadata.width) || !Number.isFinite(metadata.height) || metadata.width <= 0 || metadata.height <= 0 || metadata.width > 10000 || metadata.height > 10000) throw new Error("Invalid image dimensions");
+  return input as Input;
 }
 
 interface Input {
@@ -52,7 +76,6 @@ interface Input {
     width: number;
     height: number;
   };
-  userId: string;
 }
 
 function decide(input: Input): Record<string, unknown> {
@@ -134,7 +157,8 @@ serve(async (req) => {
 
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
-    const input: Input = await req.json();
+    requireBearer(req);
+    const input = validateInput(await req.json());
     const result = decide(input);
 
     // Log only non-sensitive outcome
@@ -147,7 +171,9 @@ serve(async (req) => {
 
     return json(result, 200);
   } catch (err) {
-    console.error('[verify-document] Error:', (err as Error)?.message);
-    return json({ status: 'error', message: 'Document verification failed. Please try again.' }, 500);
+    const message = (err as Error)?.message;
+    if (message === 'Unauthorized') return json({ status: 'error', message: 'Authentication required.' }, 401);
+    console.error('[verify-document] Error:', message || 'unknown');
+    return json({ status: 'error', message: 'Document verification failed. Please try again.' }, 400);
   }
 });
