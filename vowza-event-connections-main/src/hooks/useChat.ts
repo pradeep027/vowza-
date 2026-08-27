@@ -136,7 +136,7 @@ export const useChat = (bookingId: string) => {
           });
           // Auto-mark as delivered + read if from other user
           if (rawMsg.sender_id !== user.id) {
-            supabase.from('messages').update({ is_read: true, read_at: new Date().toISOString(), delivered_at: rawMsg.delivered_at || new Date().toISOString() }).eq('id', rawMsg.id);
+            void supabase.from('messages').update({ is_read: true, read_at: new Date().toISOString(), delivered_at: rawMsg.delivered_at || new Date().toISOString() }).eq('id', rawMsg.id);
           }
         }
       )
