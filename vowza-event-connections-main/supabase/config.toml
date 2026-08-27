@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.verify-document]
 verify_jwt = true
+
+[functions.generate-embedding]
+verify_jwt = true

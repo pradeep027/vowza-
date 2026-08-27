@@ -16,21 +16,33 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = new Set([
+  Deno.env.get("SUPABASE_URL") || "",
+  "https://vavfeataqwwbpjonknne.supabase.co",
+  "https://vowza.co.in",
+  "https://www.vowza.co.in",
+  "http://localhost:5173",
+  "http://localhost:8080",
+]);
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") || "";
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  if (ALLOWED_ORIGINS.has(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
+}
 
 const OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings";
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 
-const json = (body: unknown, status: number) =>
+const json = (body: unknown, status: number, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...headers, "Content-Type": "application/json" },
   });
 
 // ── Build vendor text for embedding (same logic as frontend embeddingGenerator.ts) ──
@@ -63,29 +75,30 @@ function buildVendorText(provider: any, profile: any): string {
   if (provider.experience_years)
     parts.push(`Experience: ${provider.experience_years} years`);
 
-  const details = provider.vendor_details || provider.category_details || {};
-  for (const [k, v] of Object.entries(details)) {
-    if (v && typeof v !== "object") parts.push(`${k}: ${v}`);
-  }
+  // Deliberately exclude vendor_details/category_details: these JSON fields
+  // may contain KYC, bank, address, or document references and must never be
+  // copied into searchable embedding content.
 
   return parts.join(". ");
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const cors = corsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, cors);
 
   try {
     // ── Auth check ────────────────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Missing authorization" }, 401);
+    if (!authHeader)       return json({ error: "Missing authorization" }, 401, cors);
+
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      return json({ error: "Supabase environment not configured" }, 500);
+      return json({ error: "Service temporarily unavailable" }, 503, cors);
     }
 
     // Verify the user is authenticated
@@ -96,7 +109,7 @@ serve(async (req) => {
       data: { user },
       error: authErr,
     } = await userClient.auth.getUser();
-    if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+    if (authErr || !user) return json({ error: "Unauthorized" }, 401, cors);
 
     // Verify user has admin role
     const { data: roleData } = await userClient
@@ -107,7 +120,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!roleData) {
-      return json({ error: "Admin role required" }, 403);
+      return json({ error: "Admin role required" }, 403, cors);
     }
 
     // ── Parse request ─────────────────────────────────────────────────────────
@@ -116,24 +129,17 @@ serve(async (req) => {
       const body = await req.json();
       provider_id = body.provider_id;
     } catch {
-      return json({ error: "Invalid JSON body" }, 400);
+      return json({ error: "Invalid JSON body" }, 400, cors);
     }
 
-    if (!provider_id || typeof provider_id !== "string") {
-      return json({ error: "provider_id is required" }, 400);
+    if (!provider_id || typeof provider_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(provider_id)) {
+      return json({ error: "Valid provider_id is required" }, 400, cors);
     }
 
     // ── Check OpenAI key ──────────────────────────────────────────────────────
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey || !openaiKey.startsWith("sk-")) {
-      return json(
-        {
-          error: "OPENAI_API_KEY not configured. Run: supabase secrets set OPENAI_API_KEY=sk-...",
-          provider_id,
-          success: false,
-        },
-        503
-      );
+      return json({ error: "Embedding service temporarily unavailable", success: false }, 503, cors);
     }
 
     // ── Fetch vendor data (using service role to bypass RLS) ──────────────────
@@ -141,15 +147,12 @@ serve(async (req) => {
 
     const { data: provider, error: provErr } = await adminClient
       .from("provider_profiles")
-      .select("*")
+      .select("id,user_id,stage_name,service_city,profession,bio,specialties,languages,price_min,experience_years")
       .eq("id", provider_id)
       .single();
 
     if (provErr || !provider) {
-      return json(
-        { error: `Vendor not found: ${provErr?.message || "no data"}`, provider_id, success: false },
-        404
-      );
+      return json({ error: "Vendor not found", provider_id, success: false }, 404, cors);
     }
 
     // Fetch linked profile for name/city
@@ -162,10 +165,7 @@ serve(async (req) => {
     // ── Build embedding text ──────────────────────────────────────────────────
     const text = buildVendorText(provider, profile);
     if (!text.trim()) {
-      return json(
-        { error: "Vendor profile has no embeddable content", provider_id, success: false },
-        422
-      );
+      return json({ error: "Vendor profile has no embeddable content", provider_id, success: false }, 422, cors);
     }
 
     // ── Call OpenAI Embeddings API ────────────────────────────────────────────
@@ -183,35 +183,19 @@ serve(async (req) => {
 
     if (!openaiRes.ok) {
       const detail = await openaiRes.text().catch(() => `HTTP ${openaiRes.status}`);
-      return json(
-        {
-          error: `OpenAI API error ${openaiRes.status}: ${detail.slice(0, 200)}`,
-          provider_id,
-          success: false,
-        },
-        502
-      );
+      console.error("[generate-embedding] upstream status", openaiRes.status);
+      return json({ error: "Embedding provider request failed", provider_id, success: false }, 502, cors);
     }
 
     const openaiData = await openaiRes.json();
     const embedding: number[] | undefined = openaiData?.data?.[0]?.embedding;
 
     if (!embedding || !Array.isArray(embedding)) {
-      return json(
-        { error: "OpenAI returned no embedding data", provider_id, success: false },
-        502
-      );
+      return json({ error: "Embedding provider returned no data", provider_id, success: false }, 502, cors);
     }
 
     if (embedding.length !== EMBEDDING_DIMENSIONS) {
-      return json(
-        {
-          error: `Embedding dimension mismatch: expected ${EMBEDDING_DIMENSIONS}, got ${embedding.length}`,
-          provider_id,
-          success: false,
-        },
-        502
-      );
+      return json({ error: "Embedding provider returned invalid data", provider_id, success: false }, 502, cors);
     }
 
     // ── Store in vendor_embeddings (service role bypasses RLS) ─────────────────
@@ -229,30 +213,14 @@ serve(async (req) => {
       );
 
     if (upsertErr) {
-      return json(
-        {
-          error: `Database write failed: ${upsertErr.message}`,
-          provider_id,
-          success: false,
-        },
-        500
-      );
+      console.error("[generate-embedding] database write failed");
+      return json({ error: "Embedding could not be saved", provider_id, success: false }, 500, cors);
     }
 
     // ── Success ───────────────────────────────────────────────────────────────
-    return json(
-      {
-        success: true,
-        provider_id,
-        dimensions: embedding.length,
-        content_length: text.length,
-      },
-      200
-    );
-  } catch (err: any) {
-    return json(
-      { error: `Unexpected error: ${err?.message || "unknown"}`, success: false },
-      500
-    );
+    return json({ success: true, provider_id, dimensions: embedding.length, content_length: text.length }, 200, cors);
+  } catch (err) {
+    console.error("[generate-embedding] unexpected error", err instanceof Error ? err.message : "unknown");
+    return json({ error: "Embedding request failed", success: false }, 500, cors);
   }
 });
