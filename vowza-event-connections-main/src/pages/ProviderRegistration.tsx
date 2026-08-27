@@ -300,37 +300,41 @@ export default function ProviderRegistration() {
       }).eq('id', user.id);
 
       // 2. Upload selfie
-      let selfieUrl = '';
+      let selfiePath = '';
       if (s2.selfieBlob) {
-        const path = `selfies/${user.id}_${Date.now()}.jpg`;
-        const { data } = await supabase.storage.from('provider-media').upload(path, s2.selfieBlob, { upsert: true });
-        if (data) {
-          const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
-          selfieUrl = pub.publicUrl;
-        }
+        const path = `${user.id}/onboarding/selfie-${crypto.randomUUID()}.jpg`;
+        const { data, error: uploadError } = await supabase.storage
+          .from('verification-documents')
+          .upload(path, s2.selfieBlob, { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) throw uploadError;
+        if (data) selfiePath = data.path;
       }
 
       // 3. Upload portfolio
       const galleryUrls: string[] = [];
       for (const pf of s3.portfolioFiles.slice(0, 10)) {
-        const path = `portfolio/${user.id}_${Date.now()}_${pf.file.name}`;
-        const { data } = await supabase.storage.from('provider-media').upload(path, pf.file, { upsert: true });
+        const ext = pf.file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+        const { data } = await supabase.storage.from('provider-portfolio').upload(path, pf.file, { contentType: pf.file.type, upsert: true });
         if (data) {
-          const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
+          const { data: pub } = supabase.storage.from('provider-portfolio').getPublicUrl(path);
           galleryUrls.push(pub.publicUrl);
         }
       }
 
-      // 4. Upload documents
-      const uploadDoc = async (file: File, prefix: string) => {
-        const path = `docs/${user.id}_${prefix}_${Date.now()}`;
-        const { data } = await supabase.storage.from('provider-media').upload(path, file, { upsert: true });
-        if (data) { const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path); return pub.publicUrl; }
-        return '';
+      // 4. Upload documents to private verification storage; persist object paths only.
+      const uploadVerification = async (file: File, prefix: string) => {
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const path = `${user.id}/onboarding/${prefix}-${crypto.randomUUID()}.${ext}`;
+        const { data, error: uploadError } = await supabase.storage
+          .from('verification-documents')
+          .upload(path, file, { contentType: file.type, upsert: true });
+        if (uploadError) throw uploadError;
+        return data?.path || '';
       };
-      const aadhaarUrl = s4.aadhaarFile ? await uploadDoc(s4.aadhaarFile, 'aadhaar') : '';
-      const panUrl     = s4.panFile     ? await uploadDoc(s4.panFile,     'pan')     : '';
-      const govtIdUrl  = s4.govtIdFile  ? await uploadDoc(s4.govtIdFile,  'govtid')  : '';
+      const aadhaarPath = s4.aadhaarFile ? await uploadVerification(s4.aadhaarFile, 'aadhaar') : '';
+      const panPath     = s4.panFile     ? await uploadVerification(s4.panFile,     'pan')     : '';
+      const govtIdPath  = s4.govtIdFile  ? await uploadVerification(s4.govtIdFile,  'govtid')  : '';
 
       // 5. Create provider profile
       const { error } = await supabase.from('provider_profiles').insert({
@@ -344,7 +348,7 @@ export default function ProviderRegistration() {
         social_links: { instagram: s3.instagram, website: s3.website },
         verification_status: 'pending',
         onboarding_completed: true,
-        vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, pan_url: panUrl, govt_id_url: govtIdUrl, address: s1.address },
+        vendor_details: { selfie_path: selfiePath, aadhaar_path: aadhaarPath, pan_path: panPath, govt_id_path: govtIdPath, address: s1.address },
       } as any);
       if (error && error.code !== '23505') throw error;
 

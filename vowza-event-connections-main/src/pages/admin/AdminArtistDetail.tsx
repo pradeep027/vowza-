@@ -24,9 +24,54 @@ interface ProviderData { profile: any; provider: any; portfolio: any[]; }
 interface CheckItem { key: string; label: string; checked: boolean; }
 interface Props {
   artist: Artist;
-  onClose: () => void; onApprove: () => void;
-  onReject: () => void; onSuspend: () => void;
+  onClose: () => void; onApprove: () => void; onReject: () => void; onSuspend: () => void;
   processing: boolean;
+}
+
+const VERIFICATION_BUCKET = 'verification-documents';
+const LEGACY_VERIFICATION_BUCKET = 'provider-media';
+const VERIFICATION_FIELDS = ['aadhaar', 'govtId', 'pan', 'selfie'] as const;
+
+type VerificationField = typeof VERIFICATION_FIELDS[number];
+
+const privatePathFor = (details: Record<string, any>, field: VerificationField) => {
+  const key = field === 'govtId' ? 'govt_id' : field;
+  return details[`${key}_path`] || details[`${key}_url`] || '';
+};
+
+async function resolveVerificationUrls(details: Record<string, any>) {
+  const resolved = { ...details };
+  await Promise.all(VERIFICATION_FIELDS.map(async field => {
+    const stored = privatePathFor(details, field);
+    if (!stored) return;
+    const outputKey = `${field === 'govtId' ? 'govt_id' : field}_url`;
+    if (/^https?:\/\//i.test(stored)) {
+      // Legacy values may point at provider-media, which is private after Step 1.
+      try {
+        const url = new URL(stored);
+        const marker = `/storage/v1/object/public/${LEGACY_VERIFICATION_BUCKET}/`;
+        const markerIndex = url.pathname.indexOf(marker);
+        if (markerIndex !== -1) {
+          const legacyPath = decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+          const { data, error } = await supabase.storage
+            .from(LEGACY_VERIFICATION_BUCKET)
+            .createSignedUrl(legacyPath, 300);
+          if (error || !data?.signedUrl) throw new Error(`Unable to sign legacy ${outputKey}`);
+          resolved[outputKey] = data.signedUrl;
+          return;
+        }
+      } catch {
+        throw new Error(`Unsupported legacy verification reference for ${outputKey}`);
+      }
+      throw new Error(`Unsupported legacy verification reference for ${outputKey}`);
+    }
+    const { data, error } = await supabase.storage
+      .from(VERIFICATION_BUCKET)
+      .createSignedUrl(stored, 300);
+    if (error || !data?.signedUrl) throw new Error(`Unable to sign verification ${outputKey}`);
+    resolved[outputKey] = data.signedUrl;
+  }));
+  return resolved;
 }
 
 export default function AdminArtistDetail({ artist, onClose, onApprove, onReject, onSuspend, processing }: Props) {
@@ -78,6 +123,9 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
       }
 
       console.log('[Drawer] provider found — id:', provider.id, 'status:', provider.verification_status);
+
+      // Resolve only for this authenticated admin view; never expose these URLs through public provider data.
+      provider = { ...provider, vendor_details: await resolveVerificationUrls(provider.vendor_details ?? {}) };
 
       // ── 3. profiles table: array query ─────────────────────────────────────
       const uid = provider.user_id || artist.user_id;
