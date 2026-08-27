@@ -352,10 +352,10 @@ export default function ProviderRegistration() {
       } as any);
       if (error && error.code !== '23505') throw error;
 
-      // 6. Add provider role
-      await supabase.from('user_roles').upsert({ user_id: user.id, role: 'provider' }, { onConflict: 'user_id,role' });
+      // Provider role assignment is intentionally deferred until an operator
+      // approves this pending application through the server-side approval path.
 
-      // 7. Send notification
+      // 6. Send notification
       await supabase.from('notifications' as any).insert({
         user_id: user.id, type: 'registration',
         title: 'Application Submitted',

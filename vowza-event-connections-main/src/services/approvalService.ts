@@ -112,24 +112,10 @@ export async function approveArtist(
     }
   }
 
-  // ── STEP 4: Assign provider role ─────────────────────────────────────────
-  console.log('[approve] STEP 4 — assigning provider role...');
-  const { data: existRole } = await supabase
-    .from('user_roles')
-    .select('user_id')
-    .eq('user_id', providerUserId)
-    .eq('role', 'provider');
+  // Provider-role assignment is performed by the audited server-side approval
+  // path, never by this browser-side legacy helper.
 
-  if (!existRole || existRole.length === 0) {
-    const { error: roleErr } = await supabase
-      .from('user_roles')
-      .insert({ user_id: providerUserId, role: 'provider' });
-    console.log('[approve] role insert error:', roleErr?.message ?? 'none');
-  } else {
-    console.log('[approve] provider role already exists');
-  }
-
-  // ── STEP 5: Insert notification ───────────────────────────────────────────
+  // ── STEP 4: Insert notification ───────────────────────────────────────────
   console.log('[approve] STEP 5 — inserting notification for user:', providerUserId);
   const { error: notifErr } = await supabase
     .from('notifications' as any)
@@ -198,9 +184,8 @@ export async function rejectArtist(
     console.log('[reject] UPDATE error:', updErr ?? 'none');
     if (updErr) return { success: false, message: `UPDATE failed: ${updErr.message}` };
 
-    // Remove provider role
-    await supabase.from('user_roles').delete()
-      .eq('user_id', providerUserId).eq('role', 'provider');
+    // Provider-role revocation is performed by the audited server-side
+    // approval path, never by this browser-side legacy helper.
 
     // Notification
     await supabase.from('notifications' as any).insert({

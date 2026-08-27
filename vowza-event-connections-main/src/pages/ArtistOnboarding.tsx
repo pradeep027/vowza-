@@ -247,16 +247,16 @@ const ArtistOnboarding = () => {
         }
       }
 
-      // Add provider role
-      await supabase
-        .from('user_roles')
-        .insert({ user_id: user.id, role: 'provider' });
+      // Assign the provider role through the authenticated server path. The
+      // browser never supplies an arbitrary target user or role.
+      const { error: roleError } = await supabase.functions.invoke('complete-provider-onboarding');
+      if (roleError) throw roleError;
 
       // Refresh auth state to pick up the new provider role immediately
       console.log('[ArtistOnboarding] Refreshing auth state after provider role added');
       await refreshAuthState();
 
-      // Insert provider role then navigate to the correct dashboard
+      // Read the server-assigned roles, then navigate to the correct dashboard
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')

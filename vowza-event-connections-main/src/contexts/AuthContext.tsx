@@ -113,25 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] roles fetched for', uid, ':', data);
 
       if (!data || data.length === 0) {
-        console.warn('[AuthContext] No roles found for user', uid, '— seeding customer role');
-        // Seed default customer role atomically
-        // Use upsert to prevent race conditions if this function is called multiple times
-        try {
-          const { error: upsertError } = await supabase
-            .from('user_roles')
-            .upsert(
-              { user_id: uid, role: 'customer' },
-              { onConflict: 'user_id,role' }
-            );
-          
-          if (upsertError) {
-            console.warn('[AuthContext] Failed to seed customer role:', upsertError.message);
-            // Still proceed with fallback
-          }
-        } catch (e) {
-          console.warn('[AuthContext] Upsert exception:', e);
-        }
-
+        // The auth.users trigger owns default-role creation. Do not write to
+        // user_roles from the browser when a read is temporarily empty.
         const fallback = ['customer'];
         _roleCache.set(uid, fallback);
         setRoles(fallback);

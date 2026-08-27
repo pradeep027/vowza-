@@ -241,22 +241,18 @@ class AdminVerificationService {
         return { success: false, message: 'Failed to update worker verification' }
       }
 
-      // If approved, assign provider role
+      // This legacy worker-verification service is not a supported approval
+      // path. Refuse the privileged transition rather than mutating user_roles
+      // from browser code; the audited server-side provider approval path must
+      // be used instead.
       if (request.status === 'approved') {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .upsert({
-            user_id: request.workerId,
-            role: 'provider'
-          }, {
-            onConflict: 'user_id,role'
-          })
+        return { success: false, message: 'This legacy approval path is disabled. Use the audited server-side approval flow.' }
+      }
 
-        if (roleError) {
-          console.error('Role assignment error:', roleError)
-          return { success: false, message: 'Failed to assign provider role' }
-        }
-
+      /* Legacy provider-profile creation intentionally remains unreachable from
+         the approved branch above and is preserved only for historical source
+         compatibility. */
+      if (false) {
         // Create provider profile
         const { data: profile } = await supabase
           .from('profiles')

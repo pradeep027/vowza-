@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { approveArtist, rejectArtist, suspendArtist } from '@/services/approvalService';
+import { suspendArtist } from '@/services/approvalService';
 import {
   Search, RefreshCw, Download, ChevronLeft, ChevronRight,
   Eye, CheckCircle, XCircle, AlertTriangle, Trash2,
@@ -176,21 +176,28 @@ export default function AdminArtists() {
       .some(v => v?.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const invokeProviderVerification = async (providerId: string, action: 'approved' | 'rejected', rejectionReason?: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-provider-verification', {
+      body: { providerId, action, rejectionReason },
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.message || 'Provider verification failed');
+    return data;
+  };
+
   // ── APPROVE ───────────────────────────────────────────────────────────────
   const handleApprove = async (artist: Artist) => {
     if (!user) return;
     setProcessing(true);
 
-    // Full debug log before any DB call
-    console.log('[handleApprove] ══════════════════════════════');
-    console.log('[handleApprove] complete artist object:', JSON.stringify(artist, null, 2));
-    console.log('[handleApprove] artist.id      :', artist.id);
-    console.log('[handleApprove] artist.user_id :', artist.user_id);
-    console.log('[handleApprove] admin user.id  :', user.id);
-    console.log('[handleApprove] table          : provider_profiles');
-
     const tid = toast.loading(`Approving ${artist.full_name ?? 'artist'}…`);
-    const result = await approveArtist(artist.id, artist.user_id, user.id, queryClient);
+    let result: { success: boolean; message?: string } = { success: false };
+    try {
+      await invokeProviderVerification(artist.id, 'approved');
+      result = { success: true };
+    } catch (error) {
+      result = { success: false, message: error instanceof Error ? error.message : 'Provider verification failed' };
+    }
     toast.dismiss(tid);
 
     if (result.success) {
@@ -217,7 +224,13 @@ export default function AdminArtists() {
     setRejectModalFor(null); setRejectReason(''); setRejectOther('');
 
     const tid = toast.loading(`Rejecting ${target.full_name ?? 'artist'}…`);
-    const result = await rejectArtist(target.id, target.user_id, user.id, reason, queryClient);
+    let result: { success: boolean; message?: string } = { success: false };
+    try {
+      await invokeProviderVerification(target.id, 'rejected', reason);
+      result = { success: true };
+    } catch (error) {
+      result = { success: false, message: error instanceof Error ? error.message : 'Provider verification failed' };
+    }
     toast.dismiss(tid);
 
     if (result.success) {
