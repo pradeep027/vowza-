@@ -7,6 +7,33 @@ export type EventCategory =
   | "collegefest" | "concert" | "djnight" | "fashionshow" | "sportsEvent"
   | "temple" | "festival" | "charity" | "privateparty";
 
+/**
+ * Normalize user/legacy event labels at the public planner boundary.
+ * Internal planners should operate only on the typed canonical values.
+ */
+export function normalizeEventType(eventType?: string): EventCategory | undefined {
+  if (!eventType) return undefined;
+
+  const aliases: Record<string, EventCategory> = {
+    baby_shower: "babyshower",
+    "baby shower": "babyshower",
+    "baby-shower": "babyshower",
+    corporate_event: "corporate",
+    "corporate event": "corporate",
+    college_event: "collegefest",
+    "college event": "collegefest",
+    "college fest": "collegefest",
+    product_launch: "productlaunch",
+    dj_night: "djnight",
+    fashion_show: "fashionshow",
+    sports_event: "sportsEvent",
+    private_party: "privateparty",
+  };
+
+  return aliases[eventType] ?? (eventType as EventCategory);
+}
+
+
 export type LuxuryLevel = "budget" | "standard" | "premium" | "luxury";
 export type VenueType   = "indoor" | "outdoor" | "both";
 export type Season      = "winter" | "summer" | "monsoon" | "autumn";
