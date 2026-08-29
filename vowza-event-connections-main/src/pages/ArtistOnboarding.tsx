@@ -3,6 +3,7 @@ import VowzaIcon from '@/components/VowzaIcon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { claimProviderRole } from '@/lib/userRoles';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
@@ -247,22 +248,45 @@ const ArtistOnboarding = () => {
         }
       }
 
-      // Add provider role
-      await supabase
-        .from('user_roles')
-        .insert({ user_id: user.id, role: 'provider' });
+      // Add provider role via the public.claim_provider_role() RPC, which
+      // derives the subject from the JWT and refuses unless a provider_profiles
+      // row already exists for the caller. That precondition is satisfied here:
+      // providerData above IS the inserted provider_profiles row (its id is used
+      // for the portfolio inserts), so this call must stay after it.
+      //
+      // Idempotent -- the RPC's insert is ON CONFLICT (user_id, role) DO NOTHING
+      // and returns {ok:true, changed:false} when the role was already held, so
+      // re-running onboarding no longer produces an invisible duplicate-key
+      // error the way the bare .insert() did.
+      const roleResult = await claimProviderRole(user.id);
+      if (!roleResult.ok) {
+        // The profile and portfolio above are saved, so this is not a failed
+        // registration -- but without the provider role the artist cannot reach
+        // the provider dashboard, so do not claim the profile is live.
+        console.error('[ArtistOnboarding] provider role claim failed:', roleResult.code, roleResult.message);
+        toast.error('Your profile was saved, but we could not enable your artist dashboard. Please contact support.');
+        navigate('/');
+        return;
+      }
 
       // Refresh auth state to pick up the new provider role immediately
       console.log('[ArtistOnboarding] Refreshing auth state after provider role added');
       await refreshAuthState();
 
-      // Insert provider role then navigate to the correct dashboard
+      // Read back the full role set to pick the right dashboard. The role grant
+      // above succeeded, so 'provider' is guaranteed present -- but this user may
+      // also hold 'customer', which changes where resolveDashboard sends them.
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
 
-      const roles = rolesData?.map(r => r.role as string) ?? ['provider'];
+      // Note the length check: rolesData can come back as an empty array rather
+      // than null (an RLS-filtered read returns [] without erroring), and `??`
+      // does not catch that -- the previous code passed [] to resolveDashboard.
+      const roles = rolesData && rolesData.length > 0
+        ? rolesData.map(r => r.role as string)
+        : ['provider'];
       const destination = resolveDashboard(roles);
 
       toast.success('🎉 Welcome to Vowza! Your profile is now live.');

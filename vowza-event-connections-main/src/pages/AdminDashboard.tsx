@@ -1,7 +1,18 @@
-﻿import { useState, useEffect } from 'react';
+﻿// ─────────────────────────────────────────────────────────────────────────────
+// DEAD FILE — not routed. App.tsx serves the admin dashboard from
+// pages/admin/AdminDashboardHome.tsx; nothing imports this module.
+//
+// It is kept only as reference and is NOT maintained in step with the live
+// admin surface. Do not wire a route to it without re-auditing its writes
+// first: it mutates provider_profiles and user_roles directly, and it has no
+// equivalent of the checks the live approval path (services/approvalService.ts)
+// performs. Prefer deleting it over reviving it.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { grantRole } from '@/lib/userRoles';
 import { NotificationService } from '@/services/notificationService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -335,9 +346,12 @@ const AdminDashboard = () => {
 
       // If approved, assign provider role and update provider profile
       if (status === 'approved') {
-        await supabase
-          .from('user_roles')
-          .upsert({ user_id: workerId, role: 'provider' }, { onConflict: 'user_id,role' });
+        // grantRole() rather than .upsert({ onConflict }) -- upsert needs the
+        // UPDATE privilege on user_roles, which `authenticated` does not have.
+        const roleResult = await grantRole(workerId, 'provider');
+        if (!roleResult.ok) {
+          throw new Error(`Failed to assign provider role: ${roleResult.message}`);
+        }
 
         await supabase
           .from('provider_profiles')

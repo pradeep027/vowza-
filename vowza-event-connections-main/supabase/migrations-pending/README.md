@@ -1,0 +1,92 @@
+# `supabase/migrations-pending/` — migrations that must NOT be pushed yet
+
+Everything in this directory is a finished, reviewed migration that is **deliberately
+withheld from `supabase/migrations/`**.
+
+`supabase db push` applies every file in `supabase/migrations/` whose version is not
+yet in the remote ledger. It has no notion of "apply this one later". So the only
+reliable way to stop a migration from being applied before its prerequisite is to
+keep it out of that directory entirely. That is what this folder is for.
+
+**Do not move a file out of here because a push failed or because the version
+numbering looks incomplete.** Each file's header states the exact precondition that
+must hold first. Read it.
+
+## Why a migration would ever be withheld
+
+Some changes are only safe in a particular order relative to a **Vercel deploy**,
+and the two orderings are not symmetric:
+
+- A migration that **removes** a privilege must ship **after** the frontend that
+  stops relying on it. Push first and the live site breaks immediately.
+  (`20261201000006_restrict_anon_column_access.sql` is this shape — its deploy
+  order is inverted for exactly this reason.)
+- A migration that **adds** something must ship **before** the frontend that calls
+  it, but is harmless on its own.
+  (`20261201000007_claim_provider_role.sql` is this shape.)
+
+When a single change would break the site in *both* orderings, it has to be split
+into phases, and the phase that removes the old path is what lands here until the
+new path is live in production.
+
+## Current contents
+
+### `PHASE_C_narrow_self_role_grant.sql`
+
+Phase C of three. Narrows `user_roles_insert_unprivileged` so a user can only
+self-grant `customer`, closing the hole where any authenticated account could give
+itself `provider` with no `provider_profiles` row, no KYC documents and no audit
+trail.
+
+| Phase | What | Where it lives | State |
+|---|---|---|---|
+| A | Add `public.claim_provider_role()` | `supabase/migrations/20261201000007_claim_provider_role.sql` | in the normal migration path |
+| B | Frontend calls the RPC instead of inserting directly | `src/lib/userRoles.ts` (`claimProviderRole`), `src/pages/ProviderRegistration.tsx`, `src/pages/ArtistOnboarding.tsx` | in the working tree |
+| C | Narrow the INSERT policy | **this folder** | withheld |
+
+Applying C before B is live in production **breaks vendor registration and artist
+onboarding**: the running bundle would still be inserting its own `provider` row,
+and C is precisely what refuses that insert. The vendor would finish uploading KYC
+documents and then be unable to reach their dashboard.
+
+Note that B is *safe* to deploy before A. `claimProviderRole()` falls back to the
+direct insert when the RPC is absent from PostgREST's schema cache, so the ordering
+hazard is only ever between C and B — never between A and B.
+
+#### Promoting it
+
+1. Apply Phase A and confirm `public.claim_provider_role()` exists.
+2. Deploy the Phase B frontend to Vercel.
+3. In a **fresh private window** on https://vowza.co.in, register a test vendor all
+   the way through. Then confirm the new code path is the one running:
+
+   ```sql
+   select occurred_at, outcome, detail
+     from vowza_audit.privileged_actions
+    where action = 'claim_provider_role'
+    order by occurred_at desc
+    limit 5;
+   ```
+
+   An `outcome='applied'` row is the only positive proof. "The Vercel deploy
+   finished" is not the same as "the new bundle is being served" — a cached bundle
+   or a failed build would leave the old path live, and pushing C on top of that is
+   the failure this whole arrangement exists to prevent.
+4. Only then: `git mv` it into `supabase/migrations/` as
+   `20261201000008_narrow_self_role_grant.sql`, and push.
+5. Run the negative probe from the file header — as an ordinary logged-in user,
+   `POST /rest/v1/user_roles` with `{"user_id":"<own uuid>","role":"provider"}`
+   **must** return 403. Until that has actually returned 403, the hole is not
+   closed, whatever the migration output said.
+
+## Adding a file here
+
+Name it `PHASE_<x>_<slug>.sql`, **without** a timestamp prefix, so that it is
+visibly not a versioned migration and a stray copy into `supabase/migrations/` is
+obvious on sight. Do not rely on the filename as the safeguard — the safeguard is
+the directory. (Whether the CLI skips, warns about, or errors on a non-conforming
+filename inside `migrations/` has not been tested here, so it is not something to
+depend on either way.)
+
+State the precondition in the file header, not only here. A file that leaves this
+folder loses this README but keeps its header.

@@ -26,3 +26,28 @@ dist-ssr
 .vercel
 .env
 .env.*
+
+# Supabase CLI scratch state. Holds project link details and the cached CLI
+# version; regenerated on demand and not useful to anyone else.
+supabase/.temp/
+
+# ---------------------------------------------------------------------------
+# NEVER COMMIT A PRODUCTION DATA DUMP.
+#
+# baseline_data.sql was a 3.4 MB `pg_dump --data-only` of production. It carried
+# real customer and vendor rows, KYC-related fields, and at least one uploaded
+# photograph with its Samsung SEF/EXIF block intact -- including the GPS
+# coordinates of a real person's neighbourhood. Committing it would publish all
+# of that irreversibly, and rewriting history afterwards does not un-publish it.
+#
+# Dump SCHEMA ONLY. `supabase db dump` without `--data-only`, or
+# `pg_dump --schema-only`. If you need row counts, ask the database for counts --
+# do not pull the rows down to count them locally.
+#
+# This is a DPDP Act 2023 exposure as much as a security one.
+# ---------------------------------------------------------------------------
+supabase/baseline_data.sql
+supabase/*_data.sql
+supabase/dump*.sql
+supabase/**/baseline_data.sql
+*.dump

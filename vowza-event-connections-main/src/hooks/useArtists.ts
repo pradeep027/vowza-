@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { artistCategories } from '@/data/artistCategories';
+import { PUBLIC_PROVIDER_SELECT } from '@/lib/publicColumns';
 
 export interface ArtistFilters {
   category?:   string;
@@ -146,7 +147,9 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       // Step 1 — Fetch provider_profiles (no nested join)
       let query = supabase
         .from('provider_profiles')
-        .select('*')
+        // Explicit column list, not '*': anon holds SELECT on only 46 of the 69
+        // columns. See src/lib/publicColumns.ts.
+        .select(PUBLIC_PROVIDER_SELECT)
         .in('verification_status', ['approved', 'verified']);
 
       // Only add is_published filter if not filtering by categories (event mode fetches all then filters)
@@ -280,7 +283,11 @@ export function useArtist(id: string) {
       // Use array query + [0] — never .single() which throws on 0 rows
       const { data: rows, error } = await supabase
         .from('provider_profiles')
-        .select('*')
+        // Explicit column list, not '*'. NOTE: this query applies no approval
+        // filter, so it can address any provider row by uuid. It is currently
+        // unreachable (nothing imports useArtist); if it is ever wired up, add
+        // .in('verification_status', ['approved','verified']) first.
+        .select(PUBLIC_PROVIDER_SELECT)
         .eq('id', id)
         .limit(1);
 
@@ -290,7 +297,9 @@ export function useArtist(id: string) {
 
       const { data: profileRows } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, city, state, area, phone')
+        // 'phone' removed: anon no longer holds SELECT on it, and nothing here
+        // rendered it.
+        .select('id, full_name, avatar_url, city, state, area')
         .eq('id', p.user_id)
         .limit(1);
 

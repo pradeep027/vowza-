@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, memo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORY_MAP, type CategoryDef } from "@/data/categoryConfig";
+import { PUBLIC_PROVIDER_SELECT } from "@/lib/publicColumns";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { cn } from "@/lib/utils";
@@ -161,7 +162,9 @@ export default function CategoryPage() {
     if (!category) return;
     setLoading(true);
     try {
-      let q = supabase.from("provider_profiles").select("*", { count: "exact" })
+      // Explicit column list, not '*': anon holds SELECT on only 46 of the 69
+      // columns on this table. See src/lib/publicColumns.ts.
+      let q = supabase.from("provider_profiles").select(PUBLIC_PROVIDER_SELECT, { count: "exact" })
         .in("profession", category.professionTypes)
         .in("verification_status", ["approved", "verified"])
         .eq("is_published", true)

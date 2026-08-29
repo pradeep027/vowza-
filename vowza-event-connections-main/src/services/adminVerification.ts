@@ -1,4 +1,5 @@
 import { supabase } from '../integrations/supabase/client'
+import { grantRole } from '../lib/userRoles'
 import type { Database } from '../integrations/supabase/types'
 
 export interface WorkerVerificationRequest {
@@ -241,20 +242,16 @@ class AdminVerificationService {
         return { success: false, message: 'Failed to update worker verification' }
       }
 
-      // If approved, assign provider role
+      // If approved, assign provider role.
+      // grantRole() uses .insert() with 23505 treated as success -- .upsert()
+      // compiles to ON CONFLICT DO UPDATE and needs the UPDATE privilege that
+      // migration 20261201000002 deliberately withholds from `authenticated`.
       if (request.status === 'approved') {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .upsert({
-            user_id: request.workerId,
-            role: 'provider'
-          }, {
-            onConflict: 'user_id,role'
-          })
+        const roleResult = await grantRole(request.workerId, 'provider')
 
-        if (roleError) {
-          console.error('Role assignment error:', roleError)
-          return { success: false, message: 'Failed to assign provider role' }
+        if (!roleResult.ok) {
+          console.error('Role assignment error:', roleResult.code, roleResult.message)
+          return { success: false, message: `Failed to assign provider role: ${roleResult.message}` }
         }
 
         // Create provider profile
