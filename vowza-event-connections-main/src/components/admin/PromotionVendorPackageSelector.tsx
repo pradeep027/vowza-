@@ -4,7 +4,7 @@
 // Groups profession types correctly (e.g., "Photography & Videography" includes photographers, videographers, cinematographers)
 // Validates vendor/package relationships before saving
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MAIN_CATEGORIES, getProfessionTypesForMainCategory } from '@/config/mainCategoryMapping';
 import { ChevronDown, AlertCircle, Loader2 } from 'lucide-react';
@@ -183,13 +183,18 @@ export default function PromotionVendorPackageSelector({
           'photographer': 'photography_packages',
           'videographer': 'videography_packages',
           'cinematographer': 'videography_packages',
+          'photography_videography': 'photography_packages',
           'drone_operator': 'drone_packages',
           'music_band': 'band_packages',
           'maharashta_band': 'band_packages',
           'traditional_band': 'band_packages',
           'instrumental_artist': 'band_packages',
           'classical_musician': 'band_packages',
+          'wedding_band': 'band_packages',
+          'dhol_band': 'band_packages',
+          'brass_band': 'band_packages',
           'dj': 'dj_packages',
+          'singer': 'singer_packages',
           'dancer': 'dancer_packages',
           'kuchipudi_dancer': 'dancer_packages',
           'classical_dancer': 'dancer_packages',
@@ -200,7 +205,24 @@ export default function PromotionVendorPackageSelector({
           'makeup_artist': 'makeup_packages',
           'mehendi_artist': 'mehendi_packages',
           'anchor': 'anchor_packages',
+          'host': 'anchor_packages',
           'catering_services': 'catering_packages',
+          'pandit': 'priest_packages',
+          'priest': 'priest_packages',
+          'religious_services': 'priest_packages',
+          'banquet_hall': 'banquet_packages',
+          'wedding_venue': 'banquet_packages',
+          'event_venue': 'banquet_packages',
+          'rentals': 'rental_packages',
+          'tent_shamiana': 'rental_packages',
+          'stage_rental': 'rental_packages',
+          'furniture_rental': 'rental_packages',
+          'generator_rental': 'rental_packages',
+          'ac_cooler': 'rental_packages',
+          'led_wall': 'rental_packages',
+          'water_supplier': 'water_packages',
+          'drinking_water': 'water_packages',
+          'water_tanker': 'water_packages',
         };
 
         const packageTable = packageTableMap[profession];
@@ -279,13 +301,18 @@ export default function PromotionVendorPackageSelector({
           'photographer': 'photography_packages',
           'videographer': 'videography_packages',
           'cinematographer': 'videography_packages',
+          'photography_videography': 'photography_packages',
           'drone_operator': 'drone_packages',
           'music_band': 'band_packages',
           'maharashta_band': 'band_packages',
           'traditional_band': 'band_packages',
           'instrumental_artist': 'band_packages',
           'classical_musician': 'band_packages',
+          'wedding_band': 'band_packages',
+          'dhol_band': 'band_packages',
+          'brass_band': 'band_packages',
           'dj': 'dj_packages',
+          'singer': 'singer_packages',
           'dancer': 'dancer_packages',
           'kuchipudi_dancer': 'dancer_packages',
           'classical_dancer': 'dancer_packages',
@@ -296,7 +323,24 @@ export default function PromotionVendorPackageSelector({
           'makeup_artist': 'makeup_packages',
           'mehendi_artist': 'mehendi_packages',
           'anchor': 'anchor_packages',
+          'host': 'anchor_packages',
           'catering_services': 'catering_packages',
+          'pandit': 'priest_packages',
+          'priest': 'priest_packages',
+          'religious_services': 'priest_packages',
+          'banquet_hall': 'banquet_packages',
+          'wedding_venue': 'banquet_packages',
+          'event_venue': 'banquet_packages',
+          'rentals': 'rental_packages',
+          'tent_shamiana': 'rental_packages',
+          'stage_rental': 'rental_packages',
+          'furniture_rental': 'rental_packages',
+          'generator_rental': 'rental_packages',
+          'ac_cooler': 'rental_packages',
+          'led_wall': 'rental_packages',
+          'water_supplier': 'water_packages',
+          'drinking_water': 'water_packages',
+          'water_tanker': 'water_packages',
         };
 
         const packageTable = packageTableMap[vendor.profession];
