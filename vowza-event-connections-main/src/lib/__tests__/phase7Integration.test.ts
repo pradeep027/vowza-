@@ -50,7 +50,7 @@ describe('Phase 7A: Booking Integration', () => {
     const eventDate = '2026-08-15';
     const guestCount = 100;
 
-    const bookingUrl = `https://vowza.com/book/${vendorId}?date=${eventDate}&guests=${guestCount}`;
+    const bookingUrl = `https://vowza.co.in/book/${vendorId}?date=${eventDate}&guests=${guestCount}`;
     expect(bookingUrl).toContain(vendorId);
     expect(bookingUrl).toContain(eventDate);
   });

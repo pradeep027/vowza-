@@ -3,6 +3,7 @@ import { useState, useEffect, memo } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { PUBLIC_PROVIDER_SELECT } from "@/lib/publicColumns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -167,11 +168,18 @@ const ProviderProfile = () => {
 
   const fetchAll = async () => {
     try {
-      const { data: p, error } = await supabase.from("provider_profiles").select("*").eq("id", id).single();
+      // Explicit column list, not '*': anon holds SELECT on only 46 of the 69
+      // columns. See src/lib/publicColumns.ts. NOTE: this query applies no
+      // approval filter, so any provider row is addressable by uuid --
+      // including rows still pending review. Worth gating separately.
+      const { data: p, error } = await supabase.from("provider_profiles").select(PUBLIC_PROVIDER_SELECT).eq("id", id).single();
       if (error) throw error;
       setProvider(p);
 
-      const { data: prof } = await supabase.from("profiles").select("full_name,avatar_url,city,area,phone,state,email").eq("id", p.user_id).single();
+      // 'phone' and 'email' removed. They were sent to every anonymous visitor
+      // and this file never rendered either one -- the old select was the only
+      // occurrence of either identifier in it.
+      const { data: prof } = await supabase.from("profiles").select("full_name,avatar_url,city,area,state").eq("id", p.user_id).single();
       if (prof) setProfile(prof);
 
       const [portRes, revRes, pkgRes, faqRes, menuRes, rentalRes, poojaRes] = await Promise.allSettled([

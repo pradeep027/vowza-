@@ -18,3 +18,9 @@ verify_jwt = false
 
 [functions.send-booking-otp]
 verify_jwt = false
+
+# Stated explicitly even though true is the default. This endpoint mints admins,
+# so the setting that keeps anonymous callers out should be visible in the diff
+# if anyone ever changes it.
+[functions.admin-user-roles]
+verify_jwt = true

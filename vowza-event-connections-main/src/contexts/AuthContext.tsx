@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { grantRole } from '@/lib/userRoles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface UserProfile {
@@ -114,22 +115,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!data || data.length === 0) {
         console.warn('[AuthContext] No roles found for user', uid, '— seeding customer role');
-        // Seed default customer role atomically
-        // Use upsert to prevent race conditions if this function is called multiple times
-        try {
-          const { error: upsertError } = await supabase
-            .from('user_roles')
-            .upsert(
-              { user_id: uid, role: 'customer' },
-              { onConflict: 'user_id,role' }
-            );
-          
-          if (upsertError) {
-            console.warn('[AuthContext] Failed to seed customer role:', upsertError.message);
-            // Still proceed with fallback
-          }
-        } catch (e) {
-          console.warn('[AuthContext] Upsert exception:', e);
+        // Seed the default customer role.
+        //
+        // grantRole() uses .insert() and treats 23505 as success, which handles
+        // the concurrent-call race the previous .upsert({ onConflict }) was
+        // reaching for -- and, critically, does not require the UPDATE privilege.
+        // Migration 20261201000002 revoked UPDATE on user_roles from
+        // `authenticated` on purpose (UPDATE is the escalation primitive: it
+        // lets a customer row be rewritten to admin), and ON CONFLICT DO UPDATE
+        // needs it. The old upsert would 42501 here for every new signup.
+        const seed = await grantRole(uid, 'customer');
+        if (!seed.ok) {
+          // The in-memory fallback below keeps the session usable, but the
+          // database now genuinely has no role row for this user. That is a
+          // durable inconsistency, not a transient glitch, so log it loudly.
+          // It is not a privilege risk -- `customer` is least-privilege and the
+          // server enforces authorization from user_roles regardless of what
+          // this cache says.
+          console.error('[AuthContext] Failed to seed customer role for', uid, seed.code, seed.message);
         }
 
         const fallback = ['customer'];

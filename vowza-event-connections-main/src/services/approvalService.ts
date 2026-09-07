@@ -5,6 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateRoleCache } from '@/contexts/AuthContext';
+import { grantRole, revokeRole } from '@/lib/userRoles';
 import type { QueryClient } from '@tanstack/react-query';
 
 export interface ApprovalResult { success: boolean; message: string; }
@@ -113,21 +114,32 @@ export async function approveArtist(
   }
 
   // ── STEP 4: Assign provider role ─────────────────────────────────────────
+  //
+  // This step is load-bearing, not cosmetic. The UPDATE above has already set
+  // verification_status='approved' and is_published=true, so the vendor's
+  // listing is LIVE. If the role write fails and we report success anyway, the
+  // result is a published vendor who cannot reach their own dashboard, and an
+  // admin who was told everything worked. That is the worst of the three
+  // possible outcomes, so it gets reported.
+  //
+  // grantRole() is idempotent (23505 => ok), which replaces the previous
+  // select-then-insert. That pattern was also a race: two admins approving the
+  // same vendor could both read zero rows and both insert.
   console.log('[approve] STEP 4 — assigning provider role...');
-  const { data: existRole } = await supabase
-    .from('user_roles')
-    .select('user_id')
-    .eq('user_id', providerUserId)
-    .eq('role', 'provider');
-
-  if (!existRole || existRole.length === 0) {
-    const { error: roleErr } = await supabase
-      .from('user_roles')
-      .insert({ user_id: providerUserId, role: 'provider' });
-    console.log('[approve] role insert error:', roleErr?.message ?? 'none');
-  } else {
-    console.log('[approve] provider role already exists');
+  const roleResult = await grantRole(providerUserId, 'provider');
+  if (!roleResult.ok) {
+    console.error('[approve] role grant FAILED:', roleResult.code, roleResult.message);
+    invalidateRoleCache(providerUserId);
+    invalidateAllCaches(queryClient);
+    return {
+      success: false,
+      message:
+        `The profile was approved and is now live, but assigning the provider role failed ` +
+        `(${roleResult.code}). The vendor cannot access their dashboard until this is fixed. ` +
+        `Re-run the approval, or grant the role from user management.`,
+    };
   }
+  console.log('[approve] role grant ok, newly created:', roleResult.changed);
 
   // ── STEP 5: Insert notification ───────────────────────────────────────────
   console.log('[approve] STEP 5 — inserting notification for user:', providerUserId);
@@ -198,9 +210,26 @@ export async function rejectArtist(
     console.log('[reject] UPDATE error:', updErr ?? 'none');
     if (updErr) return { success: false, message: `UPDATE failed: ${updErr.message}` };
 
-    // Remove provider role
-    await supabase.from('user_roles').delete()
-      .eq('user_id', providerUserId).eq('role', 'provider');
+    // Remove provider role.
+    //
+    // revokeRole() checks the affected row count, because a DELETE refused by
+    // the RLS policy matches zero rows WITHOUT raising -- the bare
+    // .delete().eq().eq() this replaces could not tell "removed" from "refused".
+    // A role that was never held returns ok/changed:false, so this cannot
+    // false-alarm on a vendor who had no provider row.
+    const roleResult = await revokeRole(providerUserId, 'provider');
+    if (!roleResult.ok) {
+      console.error('[reject] role revoke FAILED:', roleResult.code, roleResult.message);
+      invalidateRoleCache(providerUserId);
+      invalidateAllCaches(queryClient);
+      return {
+        success: false,
+        message:
+          `The profile was rejected and unpublished, but removing the provider role failed ` +
+          `(${roleResult.code}). The vendor retains dashboard access. Re-run the rejection, ` +
+          `or remove the role from user management.`,
+      };
+    }
 
     // Notification
     await supabase.from('notifications' as any).insert({
@@ -212,6 +241,10 @@ export async function rejectArtist(
       is_read:      false,
     });
 
+    // The provider role was just removed, so the cached role set for this user
+    // is stale. approveArtist() already did this; reject was missing it, which
+    // left the revoked role live in cache.
+    invalidateRoleCache(providerUserId);
     invalidateAllCaches(queryClient);
     console.log('[reject] DONE');
     return { success: true, message: 'Artist rejected and notified' };

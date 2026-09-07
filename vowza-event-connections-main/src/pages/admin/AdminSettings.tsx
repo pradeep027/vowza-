@@ -148,7 +148,7 @@ export default function AdminSettings() {
         <Section title="Platform" icon={Globe} onSave={() => save('Platform')}>
           <div className="space-y-3">
             <Field id="platform-name"  label="Platform Name"  value={platformName}  onChange={setPlatformName}  placeholder="Vowza" />
-            <Field id="support-email"  label="Support Email"  value={supportEmail}  onChange={setSupportEmail}  placeholder="support@vowza.com" />
+            <Field id="support-email"  label="Support Email"  value={supportEmail}  onChange={setSupportEmail}  placeholder="support@vowza.co.in" />
             <Field id="contact-phone"  label="Contact Phone"  value={contactPhone}  onChange={setContactPhone}  placeholder="+91 87123 21751" />
           </div>
         </Section>

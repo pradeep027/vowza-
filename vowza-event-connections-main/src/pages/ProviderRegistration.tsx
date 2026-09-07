@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { claimProviderRole } from '@/lib/userRoles';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -348,8 +349,31 @@ export default function ProviderRegistration() {
       } as any);
       if (error && error.code !== '23505') throw error;
 
-      // 6. Add provider role
-      await supabase.from('user_roles').upsert({ user_id: user.id, role: 'provider' }, { onConflict: 'user_id,role' });
+      // 6. Add provider role.
+      //
+      // claimProviderRole() calls the public.claim_provider_role() RPC rather
+      // than inserting into user_roles directly. The RPC derives the subject
+      // from the JWT, refuses unless the provider_profiles row written above
+      // exists, and writes an audit row -- which is what lets migration Phase C
+      // close the self-grant hole in user_roles_insert_unprivileged. It falls
+      // back to a direct insert if the function is not deployed yet, so this
+      // bundle is safe to ship before or after that migration.
+      //
+      // Ordering matters and is already correct: the provider_profiles insert is
+      // step 5 above, so the precondition the RPC checks is satisfied by the
+      // time this runs. Do not move this call earlier.
+      //
+      // A failure here does NOT invalidate the submission: the provider_profile
+      // above is written, the application is genuinely in the review queue, and
+      // approveArtist() assigns this role again at approval time. So report it
+      // rather than throwing -- telling a vendor "Submission failed" after their
+      // KYC documents uploaded successfully would send them through the whole
+      // flow a second time for nothing.
+      const roleResult = await claimProviderRole(user.id);
+      if (!roleResult.ok) {
+        console.error('[ProviderRegistration] provider role claim failed:', roleResult.code, roleResult.message);
+        toast.warning('Application submitted, but we could not finish setting up your dashboard access. Our team will complete it during review.');
+      }
 
       // 7. Send notification
       await supabase.from('notifications' as any).insert({
