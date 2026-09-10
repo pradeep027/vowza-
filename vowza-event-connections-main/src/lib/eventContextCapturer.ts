@@ -52,14 +52,17 @@ export const CONTEXT_QUESTIONS: ContextQuestion[] = [
     validator: (v) => typeof v === 'number' && v > 0 && v <= 100000,
   },
   {
-    field: 'date',
+    // PlannerContext has no `date` field — the canonical field is eventDate.
+    field: 'eventDate' as keyof PlannerContext,
     question: '📅 When is the event planned? (optional)',
     priority: 'optional',
     examples: ['August 15', '2 months from now', 'next month'],
     validator: (v) => !v || (typeof v === 'string' && v.length > 0),
   },
   {
-    field: 'style',
+    // Free-text style preference. Maps to styleVibe/theme via extraction;
+    // kept under a cast because PlannerContext models it as styleVibe/theme.
+    field: 'styleVibe' as keyof PlannerContext,
     question: '✨ What style do you prefer? (optional)',
     priority: 'optional',
     examples: ['traditional', 'modern', 'luxury', 'simple', 'theme-based'],
@@ -224,7 +227,9 @@ export function mergeContext(
     }
     
     if (current[field] !== value) {
-      merged[field] = value;
+      // Field values are union members of PlannerContext; the generic write
+      // needs the same escape hatch as the Object.entries loop itself.
+      (merged as Record<string, unknown>)[field as string] = value;
       changes.push(`${field}: ${current[field] ?? '(empty)'} → ${value}`);
     }
   }

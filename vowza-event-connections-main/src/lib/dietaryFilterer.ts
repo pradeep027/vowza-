@@ -68,7 +68,7 @@ export function filterVendorsByDietaryPreference(
   const filteredVendors = [...filteredCaterers, ...nonCaterers];
 
   const excludedVendors = caterers.filter(
-    v => !filteredCaterers.find(fc => fc.id === v.id)
+    v => !filteredCaterers.find(fc => fc.provider_id === v.provider_id)
   );
 
   return {
@@ -124,7 +124,7 @@ export function getRecommendedMenuItems(
     isMenuItemSuitableForDiet(item, preferences)
   );
 
-  return suitableItems.slice(0, limit);
+  return suitableItems.slice(0, limit) as unknown as any[];
 }
 
 /**

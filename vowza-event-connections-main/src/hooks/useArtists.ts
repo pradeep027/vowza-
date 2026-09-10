@@ -64,7 +64,9 @@ function getCategoryMeta(professionType: string): { name: string; icon: string }
   const cat = artistCategories.find(c => c.value === professionType);
   return {
     name: cat?.label ?? professionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    icon: cat?.icon?.displayName ?? 'Sparkles',
+    // Lucide icons expose a display name via the function's name; fall back
+    // to a generic Sparkles label when unknown.
+    icon: (cat?.icon as { displayName?: string } | undefined)?.displayName ?? 'Sparkles',
   };
 }
 
@@ -153,8 +155,10 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
         .in('verification_status', ['approved', 'verified']);
 
       // Only add is_published filter if not filtering by categories (event mode fetches all then filters)
+      // Cast through `any`: the generated column-union overloads exceed the
+      // TS instantiation-depth limit (TS2589) for chained builders here.
       if (!filters.categories || filters.categories.length === 0) {
-        query = query.eq('is_published' as any, true);
+        (query as any) = query.eq('is_published', true);
       }
 
       // Normalize category filter to match actual database enum values
@@ -176,13 +180,16 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
         });
         query = query.in('profession', [...new Set(normalizedCategories)] as any);
       }
-      if (filters.budgetMin !== undefined) query = query.gte('price_min', filters.budgetMin);
-      if (filters.budgetMax !== undefined) query = query.lte('price_max', filters.budgetMax);
-      if (filters.verified  !== undefined) query = query.eq('is_verified', filters.verified);
-      if (filters.available !== undefined) query = query.eq('is_available', filters.available);
-      if (filters.featured  !== undefined) query = query.eq('is_featured' as any, filters.featured);
+      // Remaining filters applied through a widened alias: the generated
+      // column-union overloads exceed TS instantiation depth when chained.
+      const q = query as any;
+      if (filters.budgetMin !== undefined) q.gte('price_min', filters.budgetMin);
+      if (filters.budgetMax !== undefined) q.lte('price_max', filters.budgetMax);
+      if (filters.verified  !== undefined) q.eq('is_verified', filters.verified);
+      if (filters.available !== undefined) q.eq('is_available', filters.available);
+      if (filters.featured  !== undefined) q.eq('is_featured', filters.featured);
 
-      const { data: providers, error: pErr } = await query;
+      const { data: providers, error: pErr } = await q;
       if (pErr) {
         console.error('[useArtists] Query error:', pErr.message);
         return [];
@@ -190,7 +197,8 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       if (!providers || providers.length === 0) return [];
 
       // Step 2 — Fetch matching profiles
-      const userIds = providers.map(p => p.user_id).filter(Boolean);
+      // provider rows are untyped at runtime; user_id is guaranteed by schema.
+      const userIds = (providers as Array<{ user_id?: string }>).map(p => p.user_id).filter(Boolean);
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, city, state, area')
@@ -347,7 +355,7 @@ export function useCategories() {
         return (fallback ?? []).map((c: any) => ({ ...c, provider_count: 0 }));
       }
 
-      return (data ?? []) as CategoryWithCount[];
+      return ((data ?? []) as unknown[]) as CategoryWithCount[];
     },
     staleTime: 1000 * 60 * 10,
   });

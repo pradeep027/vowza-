@@ -570,8 +570,9 @@ export function getWeatherAdvice(ctx: PlannerContext): WeatherAdvice {
 export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
   const { eventType = "wedding" } = ctx;
   const isWedding = ["wedding","reception","sangeet","haldi","engagement","mehendi"].includes(eventType);
-  const isHousewarming = eventType === "housewarming" || eventType === "gruhapravesam";
-  const isHouseWarmingCeremony = ["housewarming", "gruhapravesam"].includes(eventType);
+  // gruhapravesam is a regional alias of housewarming (not in EventCategory yet;
+  // Phase 1 event state will preserve user vocabulary instead of aliases).
+  const isHouseWarmingCeremony = ["housewarming", "gruhapravesam" as string].includes(eventType);
   
   const base: Omit<ChecklistItem, "id" | "done">[] = [
     { task: "Government IDs for venue booking",            category: "Documents", dueWhen: "6 months before",  priority: "must", owner: "Coordinator" },
@@ -1941,11 +1942,11 @@ export function generateWeddingPlan(ctx: PlannerContext): WeddingPlan {
     label:       labels[i] ?? `Day ${i + 1}`,
     theme:       dayThemes[dt] ?? "Elegant & Traditional",
     description: dayDescriptions[dt] ?? "",
-    slots:       buildTimeSlots(dt, city, luxuryLevel),
+    slots:       buildTimeSlots(dt, eventType, city, luxuryLevel),
     budget:      buildDayBudget(dt, budget, days, m),
-    checklist:   buildDayChecklist(dt),
+    checklist:   buildDayChecklist(dt, eventType),
     vendors:     buildDayVendors(dt, city, m),
-    aiTips:      buildAiTips(dt, ctx),
+    aiTips:      buildAiTips(dt, eventType, ctx),
     sunrise:     "06:15 AM",
     goldenHour:  "05:30 PM – 06:30 PM",
   }));

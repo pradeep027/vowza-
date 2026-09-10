@@ -33,6 +33,20 @@ export interface PlannerContext {
   hasVenue?:            boolean;
   guestCity?:           string;
   specialRequirements?: string;
+  // Locality/area hint for vendor search (e.g. "Banjara Hills"). Consumed by
+  // the retriever hints; never treated as a city on its own.
+  locality?:            string;
+  // ─── Phase 7F: Real-time vendor availability slots (when fetched live) ────
+  // Optional on the shared vendor type because most retrieval paths do not
+  // fetch calendar data. realTimeAvailability consumes it when present.
+  provider_availability?: Array<{
+    date:          string;   // YYYY-MM-DD
+    status:        'available' | 'booked' | 'hold' | 'maintenance';
+    startTime?:    string;   // HH:mm
+    endTime?:      string;   // HH:mm
+    holdExpiresAt?: string;  // ISO timestamp
+    notes?:        string;
+  }>;
   // ── Intelligent follow-up preferences (asked naturally, one at a time) ─────
   serviceStyle?:        "buffet" | "table_service";
   timeOfDay?:           "morning" | "afternoon" | "evening" | "night";
@@ -188,6 +202,21 @@ export interface DBVendor {
   experience_years?: number | null;
   cover_image_url?:  string | null;
   avatar_url?:       string;
+  // ─── Optional enrichment payloads attached by the retriever ────────────
+  // These mirror ragRetriever's enrichment output. Consumers (dietary
+  // filtering, comparison) must treat them as possibly undefined.
+  packages?:         Array<{ name: string; price: number; description?: string; duration?: string; features?: string[] }>;
+  menu_items?:       Array<{ dish_name: string; category?: string; price_per_plate: number; description?: string }>;
+  faqs?:             Array<{ question: string; answer: string }>;
+  // ─── Phase 7F: live calendar slots (absent = no availability data) ───────
+  provider_availability?: Array<{
+    date:          string;   // YYYY-MM-DD
+    status:        'available' | 'booked' | 'hold' | 'maintenance';
+    startTime?:    string;   // HH:mm
+    endTime?:      string;   // HH:mm
+    holdExpiresAt?: string;  // ISO timestamp
+    notes?:        string;
+  }>;
 }
 
 // ─── Active marketplace category (from artist_categories) ─────────────────────
@@ -329,10 +358,17 @@ export interface AIResponse {
   text: string;
   data?: {
     budgetPlan?:    BudgetPlan;
+    // EventBudgetPlan instance (Phase 2A/2C/6 pipeline). Distinct from the
+    // legacy BudgetPlan shape above; cards read one or the other.
+    plan?:          import('./eventBudgetPlanner').EventBudgetPlan;
     timeline?:      EventTimeline;
     vendors?:       VendorRecommendation[];
     dbVendors?:     DBVendor[];   // real vendors retrieved from Vowza DB — never invented
     categories?:    MarketplaceCategory[]; // active categories from Vowza DB — never hardcoded
+    // Phase 7D: mark a vendor_results payload as a side-by-side comparison
+    comparison?:    boolean;
+    // Phase 7A: booking handoff payload (deeplink into the existing flow)
+    booking?:       Record<string, unknown>;
     weather?:       WeatherAdvice;
     checklist?:     ChecklistItem[];
     foodPlan?:      FoodPlan;
@@ -353,6 +389,35 @@ export interface ChatMessage {
   response?: AIResponse;
   timestamp: Date;
   reaction?: "like" | "dislike"; // user feedback on assistant messages (client-side)
+}
+
+/**
+ * Narrowing helpers for pipeline code that previously reached into
+ * `msg.type` / `msg.data` (fields that never existed on ChatMessage). The
+ * authoritative vendor payload lives at `msg.response.type === 'vendor_results'`
+ * with `msg.response.data.dbVendors`.
+ */
+export function getMessageResponseType(msg: ChatMessage): ResponseType | undefined {
+  return msg.response?.type;
+}
+
+export function getMessageData(msg: ChatMessage): AIResponse['data'] | undefined {
+  return msg.response?.data;
+}
+
+/**
+ * Most recent real vendor set from prior assistant messages, newest first.
+ * Uses only trusted DBVendor records already validated by the retriever.
+ */
+export function getPriorVendorsFromHistory(history: readonly ChatMessage[]): DBVendor[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg.role === 'assistant' && msg.response?.type === 'vendor_results') {
+      const vendors = msg.response.data?.dbVendors;
+      if (Array.isArray(vendors) && vendors.length > 0) return vendors;
+    }
+  }
+  return [];
 }
 
 export interface QuickPrompt {

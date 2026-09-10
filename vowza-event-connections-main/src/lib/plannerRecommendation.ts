@@ -30,11 +30,15 @@ export interface RankableMarketplaceVendor {
   availability_reason?: string;
 }
 
-export interface RankedMarketplaceVendor<T extends RankableMarketplaceVendor = RankableMarketplaceVendor> extends T {
+/**
+ * A marketplace vendor ranked for the current search. Composed (not `extends`)
+ * so the ranking fields can never collide with unknown T fields.
+ */
+export type RankedMarketplaceVendor<T extends RankableMarketplaceVendor = RankableMarketplaceVendor> = T & {
   availability_status: MarketplaceAvailabilityStatus;
   recommendation_reasons: string[];
   match_score: number;
-}
+};
 
 const SERVICE_TERMS: Array<[RegExp, string]> = [
   [/photograph|photo\b/i, 'photographer'],

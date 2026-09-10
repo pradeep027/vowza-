@@ -43,14 +43,16 @@ export function calculateCostPerUnit(vendor: DBVendor): {
 } {
   const metrics: any = {};
 
-  if (!vendor.pricing_packages || vendor.pricing_packages.length === 0) {
+  // DBVendor carries optional enrichment payloads from the retriever
+  const packages = vendor.packages ?? [];
+
+  if (packages.length === 0) {
     // Use min/max price
     if (vendor.price_min) metrics.perEvent = vendor.price_min;
     return metrics;
   }
 
   // Get average package info
-  const packages = vendor.pricing_packages;
   const avgPrice = packages.reduce((sum, p) => sum + (p.price || 0), 0) / packages.length;
 
   // Estimate based on profession
@@ -134,10 +136,10 @@ function extractMetrics(vendor: DBVendor, profession: string): ComparisonMetric[
   }
 
   // Packages count
-  if (vendor.pricing_packages && vendor.pricing_packages.length > 0) {
+  if (vendor.packages && vendor.packages.length > 0) {
     metrics.push({
       name: 'Packages',
-      value: vendor.pricing_packages.length,
+      value: vendor.packages.length,
       weight: 2,
     });
   }
@@ -193,8 +195,8 @@ function calculateComparisonScore(vendor: DBVendor): number {
   }
 
   // Packages (max 10 points)
-  if (vendor.pricing_packages && vendor.pricing_packages.length > 0) {
-    score += Math.min(10, vendor.pricing_packages.length);
+  if (vendor.packages && vendor.packages.length > 0) {
+    score += Math.min(10, vendor.packages.length);
   }
 
   return Math.min(100, Math.round(score));
@@ -218,7 +220,7 @@ function identifyStrengths(vendor: DBVendor): string[] {
     strengths.push('Veteran professional');
   }
 
-  if (vendor.pricing_packages && vendor.pricing_packages.length >= 3) {
+  if (vendor.packages && vendor.packages.length >= 3) {
     strengths.push('Flexible packages');
   }
 
@@ -252,7 +254,7 @@ function identifyWeaknesses(vendor: DBVendor): string[] {
     weaknesses.push('Limited experience');
   }
 
-  if (!vendor.pricing_packages || vendor.pricing_packages.length < 2) {
+  if (!vendor.packages || vendor.packages.length < 2) {
     weaknesses.push('Limited package options');
   }
 

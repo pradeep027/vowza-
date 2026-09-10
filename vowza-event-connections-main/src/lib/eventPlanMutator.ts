@@ -7,8 +7,8 @@
 //
 // CRITICAL: Never fabricate data. Always use real vendor/package IDs.
 
-import type { EventBudgetPlan, BudgetAllocation, Customization } from './eventBudgetPlanner';
-import type { PlannerContext } from './aiPlannerTypes';
+import type { EventBudgetPlan, BudgetAllocation } from './eventBudgetPlanner';
+import type { PlannerContext, Customization } from './aiPlannerTypes';
 
 // ─── Modification types ───────────────────────────────────────────────────────
 export type ModificationType =
@@ -149,8 +149,10 @@ export function removeService(
     allocations: rebalancedAllocations,
     totalAllocated: newTotalAllocated,
     remaining: plan.totalBudget - newTotalAllocated,
-    versionNumber: plan.versionNumber + 1,
-  };
+    // Version tracking lives on the wider plan record (Phase 5 planning
+    // engine will formalize it); cast keeps the mutator tolerant today.
+    versionNumber: ((plan as { versionNumber?: number }).versionNumber ?? 0) + 1,
+  } as EventBudgetPlan;
 
   return {
     success: true,
@@ -217,8 +219,8 @@ export function adjustServiceBudget(
     allocations: newAllocations,
     totalAllocated: newTotalAllocated,
     remaining: plan.totalBudget - newTotalAllocated,
-    versionNumber: plan.versionNumber + 1,
-  };
+    versionNumber: ((plan as { versionNumber?: number }).versionNumber ?? 0) + 1,
+  } as EventBudgetPlan;
 
   const delta = difference > 0 ? `+₹${(difference / 1000).toFixed(0)}K` : `-₹${(-difference / 1000).toFixed(0)}K`;
 
@@ -278,8 +280,8 @@ export function rebalancePlanBudget(
     allocations: rebalancedAllocations,
     totalAllocated: rebalancedAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0),
     remaining: newTotalBudget - rebalancedAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0),
-    versionNumber: plan.versionNumber + 1,
-  };
+    versionNumber: ((plan as { versionNumber?: number }).versionNumber ?? 0) + 1,
+  } as EventBudgetPlan;
 
   const oldBudgetStr = (plan.totalBudget / 100000).toFixed(1);
   const newBudgetStr = (newTotalBudget / 100000).toFixed(1);
@@ -362,8 +364,8 @@ export function setPriority(
     allocations: newAllocations,
     totalAllocated,
     remaining: plan.totalBudget - totalAllocated,
-    versionNumber: plan.versionNumber + 1,
-  };
+    versionNumber: ((plan as { versionNumber?: number }).versionNumber ?? 0) + 1,
+  } as EventBudgetPlan;
 
   const delta = newAmount > oldAllocation.allocatedAmount ? `+₹${((newAmount - oldAllocation.allocatedAmount) / 1000).toFixed(0)}K` : `-₹${((oldAllocation.allocatedAmount - newAmount) / 1000).toFixed(0)}K`;
 

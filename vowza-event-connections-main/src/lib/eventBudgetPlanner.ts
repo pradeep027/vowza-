@@ -15,7 +15,7 @@ import { generateEventAwareBudget } from './eventAwareBudgetEngine';
 // ─── Budget allocation template per event type ────────────────────────────────
 // Format: [{ category, basePercentage, minRange, maxRange, priority }, ...]
 // minRange/maxRange allow rebalancing without going below/above
-const BUDGET_TEMPLATES: Record<EventCategory, BudgetCategoryTemplate[]> = {
+const BUDGET_TEMPLATES: Record<string, BudgetCategoryTemplate[]> = {
   wedding: [
     { category: 'Photography', basePercentage: 12, minRange: 10, maxRange: 15, priority: 'high', required: true },
     { category: 'Videography', basePercentage: 8, minRange: 5, maxRange: 12, priority: 'high', required: false },
@@ -220,7 +220,7 @@ const LUXURY_MULTIPLIER: Record<LuxuryLevel, number> = {
 };
 
 // ─── Per-Guest Cost Ranges (base, before luxury/city adjustment) ────────────────
-const PER_GUEST_RANGES: Record<EventCategory, { min: number; max: number }> = {
+const PER_GUEST_RANGES: Record<string, { min: number; max: number }> = {
   'wedding': { min: 1500, max: 2500 },
   'reception': { min: 1200, max: 2000 },
   'birthday': { min: 800, max: 1500 },
@@ -276,13 +276,15 @@ export class EventBudgetPlanner {
     const finalLuxury = luxuryLevel ?? 'standard';
     
     // Use event-aware budget engine for intelligent allocation
-    const engineContext: PlannerContext = {
+    const engineContext: PlannerContext & { userSelections?: Record<string, unknown> } = {
       eventType: eventType as EventCategory,
       budget: finalBudget,
       guestCount: finalGuestCount,
       city: finalCity,
       luxuryLevel: finalLuxury,
-      userSelections: context.userSelections,
+      // userSelections is carried by the awareness engine (eventAwareBudgetEngine)
+      // but is not part of PlannerContext yet — forward it when present.
+      userSelections: (context as { userSelections?: Record<string, unknown> }).userSelections,
       durationDays: context.durationDays,
       venueType: context.venueType,
       hasVenue: context.hasVenue,
@@ -294,14 +296,14 @@ export class EventBudgetPlanner {
     // Convert engine output to EventBudgetPlan format
     const allocations: BudgetAllocation[] = engineResult.allocations.map(a => ({
       category: a.category,
-      basePercentage: a.percentage,
+      basePercentage: a.basePercentage ?? a.actualPercentage,
       minAmount: a.allocatedAmount * 0.85, // 85-115% range for flexibility
       maxAmount: a.allocatedAmount * 1.15,
       allocatedAmount: a.allocatedAmount,
-      actualPercentage: a.percentage,
+      actualPercentage: a.actualPercentage,
       priority: this.getPriority(a.category, eventType),
       required: this.isRequired(a.category, eventType),
-      reasoning: REASONING[a.category] ?? `Essential component for your ${eventType}`,
+      reasoning: a.reasoning ?? REASONING[a.category] ?? `Essential component for your ${eventType}`,
     }));
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
@@ -341,7 +343,7 @@ export class EventBudgetPlanner {
   /**
    * Determine priority level for a category based on event type
    */
-  private static getPriority(category: string, eventType: string): 'critical' | 'high' | 'medium' | 'low' {
+  private static getPriority(category: string, eventType: string): 'high' | 'medium' | 'low' {
     const cat = category.toLowerCase();
 
     // High priority by event type

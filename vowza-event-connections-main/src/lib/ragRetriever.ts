@@ -308,7 +308,9 @@ async function sqlSearch(
     .limit(limit);
 
   if (profession) {
-    q = q.eq('profession', profession);
+    // Profession comes from the live artist_categories taxonomy (or the legacy
+    // synonym map), not arbitrary user text, so the enum cast is safe here.
+    q = q.eq('profession', profession as never);
   }
   if (priceMax)   q = q.lte('price_min', priceMax);
   if (minRating)  q = q.gte('average_rating', minRating);
@@ -622,7 +624,9 @@ export async function retrieveVendors(
   });
   const professions = criteria.professions;
   const city = criteria.city;
-  const area = criteria.area;
+  // criteria has no area field yet (Phase 1 event state will carry locality);
+  // fall back to the context locality hint when present.
+  const area = (criteria as { area?: string }).area ?? ctx.locality;
   const priceMax = criteria.serviceBudget;
   const minRating = criteria.minimumRating ?? 0;
 
