@@ -293,7 +293,11 @@ export class EventBudgetPlanner {
     // Generate event-aware budget
     const engineResult = generateEventAwareBudget(engineContext, finalBudget);
 
-    // Convert engine output to EventBudgetPlan format
+    // Convert engine output to EventBudgetPlan format.
+    // NOTE: the engine emits `actualPercentage` (from adj.adjustedWeight); it has no
+    // `percentage` field. Reading `a.percentage` here left BOTH basePercentage and
+    // actualPercentage undefined on every allocation, which made the UI show 0%
+    // (aiPlanner's `a.actualPercentage || a.basePercentage || 0` fell through to 0).
     const allocations: BudgetAllocation[] = engineResult.allocations.map(a => ({
       category: a.category,
       basePercentage: a.basePercentage ?? a.actualPercentage,
@@ -343,6 +347,11 @@ export class EventBudgetPlanner {
   /**
    * Determine priority level for a category based on event type
    */
+  // Return type narrowed to match BudgetAllocation.priority. No code path below
+  // returns 'critical', so declaring it only made the allocations literal
+  // unassignable to BudgetAllocation[] (TS2322). Widening the interface instead
+  // would have been wrong: eventRiskDetector and budgetConflictEngine filter on
+  // 'high'/'low'/'medium' and would silently skip a 'critical' row.
   private static getPriority(category: string, eventType: string): 'high' | 'medium' | 'low' {
     const cat = category.toLowerCase();
 

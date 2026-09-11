@@ -3,7 +3,8 @@
 // Covers: greeting → context extraction → context update → full plan generation.
 
 import { describe, it, expect } from 'vitest';
-import { processMessage, generateBudgetPlan, generateWeddingPlan, fmt } from '../aiPlanner';
+import { processMessage, generateWeddingPlan, fmt } from '../aiPlanner';
+import { EventBudgetPlanner } from '../eventBudgetPlanner';
 import type { PlannerContext, ChatMessage } from '../aiPlannerTypes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -218,19 +219,24 @@ describe('Chat Flow: Full Plan Generation', () => {
 describe('Chat Flow: Budget Plan Data Integrity', () => {
   it('budget breakdown categories should sum close to total', () => {
     const ctx = weddingCtx();
-    const plan = generateBudgetPlan(ctx);
+    // aiPlanner.generateBudgetPlan is deprecated and commented out; EventBudgetPlanner
+    // .allocate() is the single source of truth. Field mapping from the old BudgetPlan:
+    // breakdown -> allocations, percentage -> actualPercentage,
+    // recommended -> allocatedAmount, minCost/maxCost -> minAmount/maxAmount,
+    // notes -> reasoning.
+    const plan = EventBudgetPlanner.allocate(ctx);
 
     expect(plan.totalBudget).toBe(500000);
-    expect(plan.breakdown.length).toBeGreaterThan(0);
+    expect(plan.allocations.length).toBeGreaterThan(0);
 
-    // All breakdown items should have valid values
-    for (const item of plan.breakdown) {
-      expect(item.percentage).toBeGreaterThan(0);
-      expect(item.percentage).toBeLessThanOrEqual(100);
-      expect(item.recommended).toBeGreaterThan(0);
-      expect(item.minCost).toBeLessThanOrEqual(item.recommended);
-      expect(item.maxCost).toBeGreaterThanOrEqual(item.recommended);
-      expect(item.notes.length).toBeGreaterThan(0);
+    // All allocation items should have valid values
+    for (const item of plan.allocations) {
+      expect(item.actualPercentage).toBeGreaterThan(0);
+      expect(item.actualPercentage).toBeLessThanOrEqual(100);
+      expect(item.allocatedAmount).toBeGreaterThan(0);
+      expect(item.minAmount).toBeLessThanOrEqual(item.allocatedAmount);
+      expect(item.maxAmount).toBeGreaterThanOrEqual(item.allocatedAmount);
+      expect(item.reasoning.length).toBeGreaterThan(0);
     }
   });
 

@@ -12,6 +12,51 @@
 import type { PlannerContext, EventCategory, VenueType } from './aiPlannerTypes';
 import type { BudgetAllocation, EventBudgetPlan } from './eventBudgetPlanner';
 
+// ─── Canonical event-type resolution ──────────────────────────────────────
+// The context capturer, the UI, and older callers emit many spellings for the
+// same event ('corporate event', 'gruhapravesam', 'baby shower', 'college_event').
+// The activation map below is keyed on canonical EventCategory values, so we
+// resolve variants to their canonical key before looking anything up. Unknown
+// values pass through unchanged and hit the neutral fallback — never wedding.
+export function normalizeEventType(raw?: string): string {
+  if (!raw) return raw ?? '';
+  const k = raw.trim().toLowerCase().replace(/[\s_/-]+/g, '');
+  const aliases: Record<string, EventCategory> = {
+    wedding: 'wedding', shaadi: 'wedding', vivah: 'wedding', marriage: 'wedding', nikah: 'wedding',
+    reception: 'reception',
+    engagement: 'engagement', roka: 'engagement', sagan: 'engagement',
+    haldi: 'haldi', mehendi: 'mehendi', mehndi: 'mehendi', sangeet: 'sangeet',
+    birthday: 'birthday', bday: 'birthday',
+    babyshower: 'babyshower', maternity: 'babyshower', godhbharai: 'babyshower',
+    housewarming: 'housewarming', gruhapravesam: 'housewarming', gruhapravesh: 'housewarming',
+    grihapravesh: 'housewarming', grihapravesam: 'housewarming',
+    anniversary: 'anniversary',
+    corporate: 'corporate', corporateevent: 'corporate', conference: 'corporate',
+    seminar: 'corporate', summit: 'corporate', businessevent: 'corporate', officeparty: 'corporate',
+    productlaunch: 'productlaunch', launch: 'productlaunch',
+    exhibition: 'exhibition',
+    collegefest: 'collegefest', collegeevent: 'collegefest', college: 'collegefest',
+    concert: 'concert', djnight: 'djnight', fashionshow: 'fashionshow', sportsevent: 'sportsEvent',
+    temple: 'temple', festival: 'festival', charity: 'charity',
+    privateparty: 'privateparty', party: 'privateparty', gettogether: 'privateparty', celebration: 'privateparty',
+  };
+  return aliases[k] ?? raw;
+}
+
+// Neutral fallback profile for unrecognised event types. Deliberately holds no
+// event-specific (especially wedding) categories, so an unmapped type can never
+// inject bridal / mehendi / baraat budget lines into an unrelated event.
+const GENERIC_ACTIVATIONS: Record<string, number> = {
+  'Venue Rental': 20,
+  'Catering': 30,
+  'Decoration & Flowers': 15,
+  'Photography': 12,
+  'Videography': 6,
+  'Music/DJ/Band/Entertainment': 10,
+  'Lighting & Sound': 4,
+  'Invitations': 3,
+};
+
 // ─── Service Selection Tracking ───────────────────────────────────────────
 
 export interface UserSelections {
@@ -49,7 +94,7 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<string, Record<string, number>> 
     'Mehendi/Haldi Artists': 2,
     'Anchor/Host': 1,
     'Invitations': 2,
-    'Priest/Rituals/Ceremony': 2,
+    'Pandit/Priest/Rituals': 2,
   },
 
   // ENGAGEMENT: Remove Mehendi/Haldi
@@ -64,7 +109,7 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<string, Record<string, number>> 
     'Lighting & Sound': 3,
     'Anchor/Host': 1,
     'Invitations': 3,
-    'Priest/Rituals/Ceremony': 3,
+    'Pandit/Priest/Rituals': 3,
   },
 
   // HALDI: Yellow oil ritual, female-focused, 2-4 hours
@@ -76,7 +121,7 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<string, Record<string, number>> 
     'Makeup & Hair': 15,
     'Lighting & Sound': 5,
     'Music/DJ/Band/Entertainment': 5,
-    'Priest/Rituals/Ceremony': 5,
+    'Pandit/Priest/Rituals': 5,
     // Venue: conditional (home=0%, external=10%)
   },
 
@@ -126,7 +171,7 @@ export const EVENT_CATEGORY_ACTIVATIONS: Record<string, Record<string, number>> 
     'Catering': 28,
     'Photography': 8,
     'Videography': 5,
-    'Priest/Rituals/Ceremony': 25,
+    'Pandit/Priest/Rituals': 25,
     'Lighting & Sound': 0,
     'Music/DJ/Band/Entertainment': 0,
     'Makeup & Hair': 0,
@@ -316,8 +361,13 @@ export function getActiveCategoriesForEvent(
   eventType: EventCategory,
   context: AwarenessContext
 ): CategoryActivation[] {
-  // Get baseline activations for this event
-  let activations = EVENT_CATEGORY_ACTIVATIONS[eventType] || EVENT_CATEGORY_ACTIVATIONS.wedding;
+  // Resolve synonyms/variants to a canonical key, then fall back to a neutral
+  // profile (never wedding) so an unrecognised event type can't inject bridal /
+  // mehendi / baraat categories into an unrelated event's budget.
+  const canonical = normalizeEventType(eventType) as EventCategory;
+  let activations = EVENT_CATEGORY_ACTIVATIONS[canonical]
+    || EVENT_CATEGORY_ACTIVATIONS[eventType]
+    || GENERIC_ACTIVATIONS;
 
   // Start with all non-zero categories
   let active: CategoryActivation[] = Object.entries(activations)
@@ -610,6 +660,7 @@ export function generateEventAwareBudget(
       // engine); EventBudgetPlanner reads actualPercentage downstream.
       basePercentage: adj.adjustedWeight,
       allocatedAmount: Math.round(amount),
+      basePercentage: adj.adjustedWeight,
       actualPercentage: adj.adjustedWeight,
       minAmount: Math.round(amount * 0.8),
       maxAmount: Math.round(amount * 1.25),
