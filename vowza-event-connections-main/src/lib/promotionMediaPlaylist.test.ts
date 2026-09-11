@@ -15,6 +15,6 @@ describe('homepage promotion playlists', () => {
 
   it('excludes failed assets without changing the intended photo interval', () => {
     expect(playableMediaIds([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Set(['b']))).toEqual(['a', 'c']);
-    expect(PHOTO_DURATION_MS).toBe(10_000);
+    expect(PHOTO_DURATION_MS).toBe(3_000);
   });
 });

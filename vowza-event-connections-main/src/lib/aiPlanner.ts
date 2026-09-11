@@ -16,6 +16,7 @@ import type {
 } from "./aiPlannerTypes";
 
 import { EventBudgetPlanner } from "./eventBudgetPlanner";
+import { normalizeEventType } from "./eventAwareBudgetEngine";
 // Appends ONE natural follow-up question (Veg/Non-Veg, Indoor/Outdoor, etc.)
 // to a completed structured response — never blocks the plan itself.
 // NOTE: aiOrchestrator is imported dynamically (not statically) to avoid a
@@ -120,7 +121,7 @@ const ENTERTAINMENT_PLANS: Record<string, string[]> = {
   birthday:   ["Music playlist or DJ matched to the age group and theme", "Games/activities appropriate to guest ages", "Cake-cutting moment with a dedicated song"],
   housewarming: ["Soft background music during gathering", "Informal socializing and conversations", "Optional: light music during meal service"],
   babyshower: ["Soft, relaxing background music", "Fun games for guests", "Special moment for mom-to-be recognition"],
-  engagement: ["Background music during cocktails", "First dance of the newly engaged couple", "DJ for dancing post-dinner"],
+  engagement: ["Background music during cocktails", "Couple's special song moment after the ring exchange", "DJ for dancing post-dinner"],
   corporate_event: ["Background music during sessions (if applicable)", "MC to manage agenda transitions smoothly", "Optional: live band or curated playlist for closing mixer"],
   college_event: ["Opening performance or cultural show", "Live performances/DJ for entertainment", "Energetic music and dancing"],
   anniversary: ["Romantic background music", "Special dance or renewal of vows moment", "DJ for evening dancing"],
@@ -419,9 +420,11 @@ function buildDaySchedule(day: number, label: string, eventType: string, isOutdo
 }
 
 export function generateTimeline(ctx: PlannerContext): EventTimeline {
-  const { eventType = "wedding", durationDays = 1, venueType = "indoor" } = ctx;
+  const { durationDays = 1, venueType = "indoor" } = ctx;
+  const eventType = normalizeEventType(ctx.eventType) || "wedding";
   const isOutdoor = venueType === "outdoor" || venueType === "both";
-  const isWedding = ["wedding","reception","sangeet","haldi","mehendi","engagement"].includes(eventType);
+  // Engagement is distinct from weddings — no bridal outfit / makeup-trial tasks.
+  const isWedding = ["wedding","reception","sangeet","haldi","mehendi"].includes(eventType);
 
   const milestones: TimelineMilestone[] = [
     { timeframe: "6 Months Before", priority: "critical", tasks: [
@@ -500,7 +503,8 @@ export function generateTimeline(ctx: PlannerContext): EventTimeline {
 
 // ─── Vendor Recommender ───────────────────────────────────────────────────────
 export function recommendVendors(ctx: PlannerContext): VendorRecommendation[] {
-  const { city = "Hyderabad", eventType = "wedding", guestCount = 200 } = ctx;
+  const { city = "Hyderabad", guestCount = 200 } = ctx;
+  const eventType = normalizeEventType(ctx.eventType) || "wedding";
   const m = getMul(ctx);
   type T = { cat: string; reason: string; bMin: number; bMax: number; tips: string[]; slug: string; urgency: "book_now" | "flexible" };
   
@@ -534,7 +538,7 @@ export function recommendVendors(ctx: PlannerContext): VendorRecommendation[] {
     engagement: [
       { cat: "Ring Bearer Ceremony", reason: "Special choreography for ring exchange to make it memorable.", bMin: 2000, bMax: 8000, tips: ["Rehearse timing with couple", "Ensure smooth transitions"], slug: "ceremony-coord", urgency: "flexible" },
     ],
-    corporate_event: [
+    corporate: [
       { cat: "AV/Sound System Specialist", reason: "Professional audio-visual setup for presentations & visibility.", bMin: 30000, bMax: 100000, tips: ["Check screen & projector quality", "Confirm backup power", "Test microphones day before"], slug: "av-tech", urgency: "book_now" },
       { cat: "Event Coordinator", reason: "Professional coordination for schedule, vendor management, guest flow.", bMin: 15000, bMax: 50000, tips: ["Clarify scope & deliverables", "Confirm emergency contact protocol"], slug: "coordinators", urgency: "book_now" },
     ],
@@ -568,8 +572,10 @@ export function getWeatherAdvice(ctx: PlannerContext): WeatherAdvice {
 
 // ─── Checklist Generator ──────────────────────────────────────────────────────
 export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
-  const { eventType = "wedding" } = ctx;
-  const isWedding = ["wedding","reception","sangeet","haldi","engagement","mehendi"].includes(eventType);
+  const eventType = normalizeEventType(ctx.eventType) || "wedding";
+  // Engagement is a distinct event, NOT a wedding sub-function — it must not
+  // inherit bridal/mehendi/groom checklist items.
+  const isWedding = ["wedding","reception","sangeet","haldi","mehendi"].includes(eventType);
   const isHousewarming = eventType === "housewarming" || eventType === "gruhapravesam";
   const isHouseWarmingCeremony = ["housewarming", "gruhapravesam"].includes(eventType);
   
@@ -931,6 +937,23 @@ export async function processMessage(
       response: {
         type: 'text',
         text: `${summary}${canGenerate ? `I'll update the plan for ${finalContext.guestCount} guests in **${finalContext.city}** with a budget of **${fmt(finalContext.budget!)}**. Want me to regenerate the full plan?` : `What else should I know?`}`,
+      },
+      updatedContext: finalContext,
+    };
+  }
+
+  // ── Guard: event-dependent intents need an event type ────────────────────
+  // Without an event type we cannot produce a budget, plan, checklist, etc.
+  // Ask for it rather than throwing or silently defaulting to a wedding.
+  const eventDependentIntents: string[] = [
+    'budget_breakdown', 'plan_event', 'checklist', 'timeline',
+    'food_plan', 'weather_advice', 'risk_analysis', 'success_score',
+  ];
+  if (!finalContext.eventType && eventDependentIntents.includes(result.intent)) {
+    return {
+      response: {
+        type: 'question',
+        text: `Happy to help with that! First — what type of event are you planning? (e.g. wedding, birthday, housewarming, corporate, engagement…)`,
       },
       updatedContext: finalContext,
     };
@@ -1450,6 +1473,54 @@ export function generateEventAwarePlan(ctx: PlannerContext): WeddingPlan {
   };
 }
 
+// ─── Generic day-type fallbacks ───────────────────────────────────────────────
+// getEventDayTypes() can emit 37 distinct day types (event, setup, post-event,
+// followup, registration, cleanup, awards, launch, conference, …) while the
+// hand-written tables below only cover the main ceremony days. Unknown day types
+// used to throw, which took the entire plan down — a corporate or conference plan
+// could not be generated at all. These fallbacks keep plans generating while
+// staying strictly event-type-neutral: they must NEVER fall back to wedding
+// content, which is what previously leaked bride/groom/mehendi tasks into
+// non-wedding plans. buildTimeSlots() and buildAiTips() already work this way.
+type DayPhase = 'pre' | 'main' | 'post';
+
+function classifyDayPhase(dayType: string): DayPhase {
+  if (/^(setup|preparation|rehearsal|registration)$/.test(dayType)) return 'pre';
+  if (/^(post-|followup|cleanup|reporting)/.test(dayType)) return 'post';
+  return 'main';
+}
+
+/** Event-neutral budget split for an unrecognised day type. Each set sums to 100. */
+function genericDayAllocation(dayType: string): { category: string; pct: number; note: string }[] {
+  switch (classifyDayPhase(dayType)) {
+    case 'pre':
+      return [
+        { category: "Venue",       pct: 30, note: "Access & setup time" },
+        { category: "Decoration",  pct: 30, note: "Setup & materials" },
+        { category: "Logistics",   pct: 20, note: "Transport & labour" },
+        { category: "Catering",    pct: 15, note: "Crew meals & refreshments" },
+        { category: "Buffer",      pct:  5, note: "Contingency" },
+      ];
+    case 'post':
+      return [
+        { category: "Logistics",   pct: 40, note: "Teardown, returns & handover" },
+        { category: "Catering",    pct: 25, note: "Closing refreshments" },
+        { category: "Photography", pct: 20, note: "Deliverables & editing" },
+        { category: "Buffer",      pct: 15, note: "Contingency" },
+      ];
+    default:
+      return [
+        { category: "Venue",         pct: 22, note: "Hall or space hire" },
+        { category: "Catering",      pct: 34, note: "Food & beverages" },
+        { category: "Decoration",    pct: 16, note: "Staging & ambiance" },
+        { category: "Photography",   pct: 10, note: "Coverage" },
+        { category: "Entertainment", pct:  8, note: "Music or programme" },
+        { category: "Logistics",     pct:  5, note: "Transport & labour" },
+        { category: "Buffer",        pct:  5, note: "Contingency" },
+      ];
+  }
+}
+
 function buildEventDayBudgetBreakdown(dayType: string, dayBudget: number, m: number): { category: string; amount: number; note: string }[] {
   // Event-aware category allocations (NOT hardcoded percentages)
   const allocations: Record<string, { category: string; pct: number; note: string }[]> = {
@@ -1590,14 +1661,8 @@ function buildEventDayBudgetBreakdown(dayType: string, dayBudget: number, m: num
     ],
   };
 
-  if (!allocations[dayType]) {
-    throw new Error(
-      `Event budget configuration missing: dayType='${dayType}'. ` +
-      `Budget allocation not found in database. Please report this to support.`
-    );
-  }
-
-  const alloc = allocations[dayType];
+  // Generic fallback for intermediate/generic day types (event, setup, post-event, …)
+  const alloc = allocations[dayType] ?? genericDayAllocation(dayType);
   return alloc.map(a => ({
     category: a.category,
     amount: Math.round(dayBudget * a.pct / 100 * m),
@@ -1755,14 +1820,8 @@ function buildDayBudget(dayType: string, totalBudget: number, durationDays: numb
     birthday: [{ category:"Venue",pct:20,note:"Hall or lawn rental"},{category:"Catering",pct:35,note:"Food, cake, drinks"},{category:"Decoration",pct:18,note:"Theme decorations"},{category:"Entertainment",pct:12,note:"DJ or music"},{category:"Photography",pct:8,note:"Candid & cake moments"},{category:"Buffer",pct:7,note:"Contingency"}],
   };
   
-  if (!allocations[dayType]) {
-    throw new Error(
-      `Budget configuration missing: dayType='${dayType}'. ` +
-      `Budget allocation not found in database. Please report this to support.`
-    );
-  }
-  
-  const alloc = allocations[dayType];
+  // Generic fallback for intermediate/generic day types (event, setup, post-event, …)
+  const alloc = allocations[dayType] ?? genericDayAllocation(dayType);
   const breakdown = alloc.map(a => ({
     category: a.category,
     amount:   Math.round(dayShare * a.pct / 100 * m),
@@ -1845,12 +1904,39 @@ function buildDayChecklist(dayType: string, eventType: string): DayChecklist[] {
     ritual: [{ task:"Ritual specialist/priest confirmed", priority:"must", owner:"Family"},{task:"All ritual items & materials prepared",priority:"must",owner:"Family"},{task:"Timing of ritual synchronized with schedule",priority:"must",owner:"Coordinator"},{task:"Photography permission & positioning confirmed",priority:"should",owner:"Photographer"}],
   };
 
-  // If dayType is not found, throw explicit error (no fallback to wedding)
+  // Generic fallback for intermediate/generic day types (event, setup, post-event, …).
+  // Event-type-neutral by design — no fallback to the wedding checklist.
   if (!lists[dayType]) {
-    throw new Error(
-      `Event planning configuration missing: eventType='${eventType}', dayType='${dayType}'. ` +
-      `Checklist not found in database. Please report this to support.`
-    );
+    const label = eventType || 'event';
+    switch (classifyDayPhase(dayType)) {
+      case 'pre':
+        return [
+          { task:"Venue booking & access timings confirmed in writing", priority:"must", owner:"Coordinator"},
+          { task:"All vendor arrival times confirmed — 1 week before",  priority:"must", owner:"Coordinator"},
+          { task:"Supplies, materials & equipment ordered",             priority:"must", owner:"Coordinator"},
+          { task:"Final guest headcount shared with the caterer",       priority:"must", owner:"Host"},
+          { task:"Audio, lighting & power tested on site",              priority:"should", owner:"Coordinator"},
+          { task:"Weather or emergency backup plan agreed",             priority:"should", owner:"Coordinator"},
+        ];
+      case 'post':
+        return [
+          { task:"Final vendor payments released & receipts collected", priority:"must", owner:"Host"},
+          { task:"Rented equipment & decor returned",                   priority:"must", owner:"Coordinator"},
+          { task:"Venue handed back and deposit reclaimed",              priority:"must", owner:"Coordinator"},
+          { task:"Photos & videos received from the photographer",       priority:"should", owner:"Coordinator"},
+          { task:"Thank-you messages sent to guests",                    priority:"should", owner:"Host"},
+          { task:"Leftover food & materials distributed or stored",       priority:"should", owner:"Host"},
+        ];
+      default:
+        return [
+          { task:`Confirm the ${label} programme running order with all vendors`, priority:"must", owner:"Coordinator"},
+          { task:"Guest arrival, welcome & seating plan in place",       priority:"must", owner:"Coordinator"},
+          { task:"Catering service times confirmed with the caterer",    priority:"must", owner:"Caterer"},
+          { task:"Photography shot list agreed for the key moments",     priority:"should", owner:"Photographer"},
+          { task:"Emergency kit ready (first aid, water, spare cables)", priority:"should", owner:"Coordinator"},
+          { task:"One person owning vendor timings — not a guest",       priority:"should", owner:"Coordinator"},
+        ];
+    }
   }
   return lists[dayType];
 }
@@ -1941,11 +2027,16 @@ export function generateWeddingPlan(ctx: PlannerContext): WeddingPlan {
     label:       labels[i] ?? `Day ${i + 1}`,
     theme:       dayThemes[dt] ?? "Elegant & Traditional",
     description: dayDescriptions[dt] ?? "",
-    slots:       buildTimeSlots(dt, city, luxuryLevel),
+    // NOTE: these three calls were each missing the `eventType` argument, so every
+    // argument after it shifted left: buildTimeSlots got city-as-eventType, and
+    // buildAiTips got ctx-as-eventType with its own ctx undefined — which threw
+    // "Cannot read properties of undefined (reading 'eventDate')" and took the whole
+    // plan down. `vite build` runs no tsc, so TS2554 never failed the build.
+    slots:       buildTimeSlots(dt, eventType, city, luxuryLevel),
     budget:      buildDayBudget(dt, budget, days, m),
-    checklist:   buildDayChecklist(dt),
+    checklist:   buildDayChecklist(dt, eventType),
     vendors:     buildDayVendors(dt, city, m),
-    aiTips:      buildAiTips(dt, ctx),
+    aiTips:      buildAiTips(dt, eventType, ctx),
     sunrise:     "06:15 AM",
     goldenHour:  "05:30 PM – 06:30 PM",
   }));
