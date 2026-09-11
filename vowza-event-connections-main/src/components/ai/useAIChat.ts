@@ -26,6 +26,9 @@ import {
 } from '@/lib/conversationRepository';
 import type { ConversationRow } from '@/lib/conversationTypes';
 import { useDashboardLink } from '@/hooks/useDashboardLink';
+// Phase 1/2: Event State layer — additive sync only. The regex extraction,
+// prompts, and context_summary persistence below are untouched.
+import { syncEventStateFromTurn, restoreEventState, getCachedEventState } from '@/lib/eventStateBridge';
 
 // ─── sessionStorage keys ─────────────────────────────────────────────────────
 const CTX_KEY  = 'vowza_ai_context';
@@ -115,6 +118,9 @@ export function useAIChat() {
         setMessages(msgs);
         setHistoryLoading(false);
       });
+      // Phase 2: warm the Event State cache for this thread (used by the
+      // memory context and future UI). Conversation-scoped — no leakage.
+      if (user?.id) restoreEventState(storedId, user.id);
     }
   }, [user?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -135,13 +141,16 @@ export function useAIChat() {
     convIdRef.current = conv.id;
     setConversationId(conv.id);
     saveConvId(conv.id);
+    // Phase 2: restore this conversation's own Event State (cache keyed by
+    // conversationId — switching threads never mixes states).
+    if (user?.id) restoreEventState(conv.id, user.id);
     if (conv.context_summary) {
       contextRef.current = conv.context_summary;
       setContext(conv.context_summary);
       saveContext(conv.context_summary);
     }
     setHistoryLoading(false);
-  }, []);
+  }, [user?.id]);  // Phase 2: user?.id needed for Event State restore
 
   // ── Refresh sidebar conversation list ────────────────────────────────────────
   const refreshConversations = useCallback(async () => {
@@ -334,6 +343,7 @@ export function useAIChat() {
         history: currentMessages,
         context: currentContext,
         currentPlan: planRef.current, // NEW: Phase 2A - pass current plan
+        eventState: convIdRef.current ? getCachedEventState(convIdRef.current) : undefined, // Phase 2
         onChunk: ({ delta, done }) => {
           if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
           if (!done) {
@@ -343,7 +353,7 @@ export function useAIChat() {
           // Do NOT use `result` here — it doesn't exist yet (TDZ).
           // We handle the final message AFTER the await resolves below.
         },
-      }).then(res => {
+      }).then(async res => {
         // A clear/new-chat/conversation switch invalidates this request before
         // it can mutate cards, context, or persisted conversation history.
         if (abortRef.current || requestEpochRef.current !== requestEpoch || convIdRef.current !== currentConvId) return;
@@ -377,6 +387,16 @@ export function useAIChat() {
           saveMessage(currentConvId, user.id, 'assistant', finalText, res.aiResponse);
           touchConversation(currentConvId);
           updateConversation(currentConvId, { context_summary: res.updatedContext });
+          // Phase 2: apply the turn to Event State (user wording + explicit
+          // facts + latest-value-wins corrections) and AWAIT persistence so
+          // the outcome is known. Failures never break the chat — they are
+          // logged here instead of silently pretending everything saved.
+          const syncResult = await syncEventStateFromTurn(currentConvId, user.id, userText, res.updatedContext);
+          if (syncResult.outcome === 'persistedToMemoryOnly') {
+            console.warn('[Vowza Planner] Event State NOT saved to database (kept in session memory only):', syncResult.error);
+          } else if (syncResult.outcome === 'failed') {
+            console.warn('[Vowza Planner] Event State sync failed:', syncResult.error);
+          }
         }
 
         // Update context ref and state

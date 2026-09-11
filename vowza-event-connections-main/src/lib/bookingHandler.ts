@@ -2,10 +2,13 @@
  * Booking Handler — Phase 7A
  *
  * Handles booking_request intent by:
- * 1. Extracting vendor reference from message (name, previous mention)
- * 2. Finding vendor in prior conversation or current results
- * 3. Generating booking response with calendar/contact options
+ * 1. Extracting vendor reference from message (name, ordinal, previous mention)
+ * 2. Finding vendor in the prior AI response's trusted vendor list
+ * 3. Generating a deep link into Vowza's existing booking flow
  * 4. Saving booking intent to conversation history
+ *
+ * NOTE: Vendors are DBVendor records from the marketplace retriever — they are
+ * keyed by `provider_id` (provider_profiles.id). No vendor data is invented here.
  */
 
 import { DBVendor, PlannerContext, EventBudgetPlan } from './aiPlannerTypes';
@@ -35,7 +38,7 @@ function extractVendorReference(message: string, vendors: DBVendor[]): string | 
       : ['third', '3rd', '3'].includes(ordinalMatch[1].toLowerCase()) ? 2
       : 0;
     if (vendors[index]) {
-      return vendors[index].id;
+      return vendors[index].provider_id;
     }
   }
 
@@ -43,7 +46,7 @@ function extractVendorReference(message: string, vendors: DBVendor[]): string | 
   for (const vendor of vendors) {
     const vendorName = vendor.stage_name?.toLowerCase() || '';
     if (vendorName && msgLower.includes(vendorName)) {
-      return vendor.id;
+      return vendor.provider_id;
     }
   }
 
@@ -52,7 +55,7 @@ function extractVendorReference(message: string, vendors: DBVendor[]): string | 
     const nameParts = vendor.stage_name?.toLowerCase().split(' ') || [];
     for (const part of nameParts) {
       if (part.length > 3 && msgLower.includes(part)) {
-        return vendor.id;
+        return vendor.provider_id;
       }
     }
   }
@@ -61,32 +64,27 @@ function extractVendorReference(message: string, vendors: DBVendor[]): string | 
 }
 
 /**
- * Find vendor by ID from message history
- * Searches through prior AI responses for vendor data
+ * Find vendor by provider ID within the trusted vendor list. History search is
+ * unnecessary because callers pass the full trusted set from the most recent
+ * vendor_results response (see getPriorVendorsFromHistory).
  */
-function findVendorInHistory(
-  vendorId: string,
-  history: ChatMessage[],
+function findVendorById(
+  providerId: string,
   currentVendors: DBVendor[]
 ): DBVendor | null {
-  // First check current vendors
-  const found = currentVendors.find(v => v.id === vendorId);
-  if (found) return found;
-
-  // Then search history for vendor mention
-  for (const msg of history.reverse()) {
-    if (msg.role === 'assistant' && msg.text) {
-      // Vendors are typically in AI responses, but we'd need parsed data
-      // For now, return the vendor from current list or null
-    }
-  }
-
-  return null;
+  return currentVendors.find(v => v.provider_id === providerId) ?? null;
 }
 
 /**
  * Generate booking URL/link for vendor
  * Routes to vendor profile with booking parameters pre-filled
+ */
+/**
+ * Deep link into Vowza's EXISTING booking flow.
+ *
+ * Routes are /artist/:id and /provider/:id (both render ProviderProfile, which
+ * opens BookingModal). Query params pre-fill context for the booking modal —
+ * they never replace the real flow.
  */
 function generateBookingUrl(vendor: DBVendor, context: PlannerContext, plan: EventBudgetPlan | null): string {
   const params = new URLSearchParams({
@@ -107,7 +105,7 @@ function generateBookingUrl(vendor: DBVendor, context: PlannerContext, plan: Eve
     }
   }
 
-  return `/vendor/${vendor.id}/book?${params.toString()}`;
+  return `/artist/${vendor.provider_id}?${params.toString()}`;
 }
 
 /**
@@ -147,20 +145,20 @@ export async function handleBookingRequest(
       const vendor = priorVendors[0];
       const bookingUrl = generateBookingUrl(vendor, context, plan);
 
-      return {
-        vendorId: vendor.id,
-        vendorName: vendor.stage_name || 'Vendor',
-        vendorProfession: vendor.profession || 'professional',
-        bookingUrl,
-        message: `Great! I'm routing you to **${vendor.stage_name}**'s booking page with your event details pre-filled.\n\n[View Booking Calendar](#)\n\nThey'll contact you shortly to confirm availability and discuss package details.`,
-        action: 'show_calendar',
-      };
+  return {
+    vendorId: vendor.provider_id,
+    vendorName: vendor.stage_name || vendor.full_name || 'Vendor',
+    vendorProfession: vendor.profession || 'professional',
+    bookingUrl,
+    message: `Great! I'm taking you to **${vendor.stage_name || vendor.full_name}**'s Vowza profile with your event details pre-filled.\n\n[Open ${vendor.stage_name || vendor.full_name}'s profile](${bookingUrl})\n\nFrom there you can review packages and start the booking — they'll confirm availability and discuss details with you directly in Vowza.`,
+    action: 'show_calendar',
+  };
     }
 
     // Multiple vendors, need clarification
     const vendorList = priorVendors
       .slice(0, 3)
-      .map((v, i) => `${i + 1}. ${v.stage_name} (⭐ ${v.average_rating || 0}/5)`)
+      .map((v, i) => `${i + 1}. ${v.stage_name || v.full_name || 'Vendor'} (⭐ ${v.average_rating || 0}/5)`)
       .join('\n');
 
     return {
@@ -173,8 +171,8 @@ export async function handleBookingRequest(
     };
   }
 
-  // Found vendor, generate booking response
-  const vendor = findVendorInHistory(vendorId, [], priorVendors);
+  // Found vendor, resolve it from the trusted list
+  const vendor = findVendorById(vendorId, priorVendors);
   if (!vendor) {
     return {
       vendorId: null,
@@ -193,11 +191,11 @@ export async function handleBookingRequest(
   const guestLabel = context.guestCount ? ` for ${context.guestCount} guests` : '';
 
   return {
-    vendorId: vendor.id,
-    vendorName: vendor.stage_name || 'Vendor',
+    vendorId: vendor.provider_id,
+    vendorName: vendor.stage_name || vendor.full_name || 'Vendor',
     vendorProfession: vendor.profession || 'professional',
     bookingUrl,
-    message: `✨ **Booking ${vendor.stage_name}** for your ${eventTypeLabel}${guestLabel}\n\n📅 **View Calendar & Confirm**\n[Click here to check availability and complete booking](${bookingUrl})\n\n**What happens next:**\n1. Check their available dates on the calendar\n2. Select your preferred date & time\n3. Review package options & pricing\n4. Complete payment and confirm booking\n\nThe vendor will send you a confirmation within 2 hours. Have questions? You can chat with them directly on their profile.`,
+    message: `✨ **Booking ${vendor.stage_name || vendor.full_name}** for your ${eventTypeLabel}${guestLabel}\n\n📅 **Check availability & book**\n[Open their Vowza profile to book](${bookingUrl})\n\n**What happens next:**\n1. Review their packages and pricing on the profile\n2. Open the booking calendar and select your preferred date & time\n3. Add event details and confirm your booking request\n\nThe vendor will respond to your request inside Vowza. Have questions? You can chat with them directly from their profile.`,
     action: 'show_calendar',
   };
 }

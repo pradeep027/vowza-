@@ -17,6 +17,7 @@ import {
 } from './ragRetriever';
 import { dedupeVerifiedDBVendors } from './vendorTrust';
 import { orchestrate, buildDynamicSystemPrompt, extractContextUpdates, isActiveCategoryListRequest, nextSoftFollowUp, calculatePlanningReadiness, extractPlanState } from './aiOrchestrator';
+import { getPriorVendorsFromHistory } from './aiPlannerTypes';
 import { EventBudgetPlanner, formatBudgetAllocation, type EventBudgetPlan } from './eventBudgetPlanner';
 import { recommendPackages, type PackageRecommendation } from './packageMatcher'; // NEW Phase 2B
 import { matchPlanToVendors, formatVendorRecommendationsForPlan } from './vendorMatcher'; // NEW Phase 5
@@ -42,6 +43,8 @@ import { filterVendorsByDietaryPreference, formatDietaryFilterMessage, buildDiet
 import { formatDetailedComparison, formatComparisonTable, createComparisonCard } from './vendorComparison'; // NEW Phase 7D
 import { formatAdminPackageRecommendation, formatAdminVsCustomComparison, shouldPrioritizeAdminPackage, buildAdminPackageContext } from './adminPackageHandler'; // NEW Phase 7E
 import { checkVendorAvailability, getAvailableSlots, formatAvailabilityStatus, buildLiveAvailabilityContext, createHold, formatBookingWithHold } from './realTimeAvailability'; // NEW Phase 7F
+import { buildMemoryContext } from './eventMemory'; // Phase 2: compact conversation memory
+import type { EventState } from './eventState'; // Phase 2
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface LLMMessage {
@@ -58,6 +61,7 @@ export interface SendOptions {
   context:  PlannerContext;
   onChunk:  StreamCallback;
   currentPlan?: EventBudgetPlan; // Current plan from previous turns
+  eventState?: EventState;       // Phase 2: canonical memory for the LLM context
 }
 export interface SendResult {
   fullText:       string;
@@ -239,7 +243,9 @@ function extractContextFromMessage(message: string, currentContext: PlannerConte
   // Try to extract each essential field
   const eventType = extractEventTypeFromText(message);
   if (eventType && !currentContext.eventType) {
-    extracted.eventType = eventType;
+    // Extractor returns free text; the orchestrator's normalizer is the
+    // authority for canonical values — cast keeps this legacy path typed.
+    extracted.eventType = eventType as PlannerContext['eventType'];
   }
   
   const city = extractCityFromText(message);
@@ -526,21 +532,15 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   if (orch.intent === 'booking_request') {
     // Import booking handler
     const { handleBookingRequest, formatBookingResponse, generateBookingData } = await import('./bookingHandler');
-    
-    // Get prior vendors from message history or current context
-    let priorVendors: any[] = [];
-    for (const msg of history.reverse()) {
-      if (msg.role === 'assistant' && msg.type === 'vendor_results' && msg.data?.dbVendors) {
-        priorVendors = msg.data.dbVendors;
-        break;
-      }
-    }
-    
+
+    // Trusted vendor set from the most recent vendor_results response.
+    // (Non-mutating — history is scanned backwards without reversing it.)
+    const priorVendors = getPriorVendorsFromHistory(history);
+
     console.log('[Vowza AI Phase 7A] Booking request detected:', {
-      message,
       priorVendorsCount: priorVendors.length,
     });
-    
+
     const booking = await handleBookingRequest(message, priorVendors, updatedContext, currentPlan || null);
     const bookingText = formatBookingResponse(booking);
     
@@ -550,7 +550,7 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
       aiResponse: {
         type: 'booking_request',
         text: bookingText,
-        data: generateBookingData(booking, updatedContext, currentPlan || undefined),
+        data: { booking: generateBookingData(booking, updatedContext, currentPlan || undefined) },
       },
       updatedContext,
       generatedPlan,
@@ -562,16 +562,11 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   // ─── PHASE 7D: Handle vendor comparison requests ──────────────────────────────
   if (orch.intent === 'comparison') {
     // Get prior vendors from message history to compare
-    let priorVendors: any[] = [];
-    for (const msg of history.reverse()) {
-      if (msg.role === 'assistant' && msg.type === 'vendor_results' && msg.data?.dbVendors) {
-        priorVendors = msg.data.dbVendors;
-        break;
-      }
-    }
+    // Trusted vendor set from the most recent vendor_results response.
+    // (Non-mutating — history is scanned backwards without reversing it.)
+    let priorVendors = getPriorVendorsFromHistory(history);
 
     console.log('[Vowza AI Phase 7D] Comparison request detected:', {
-      message,
       priorVendorsCount: priorVendors.length,
     });
 
@@ -580,7 +575,6 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
       const ragResult = await retrieveVendors(message, updatedContext, 5, {
         professions: orch.professions || [],
         city: orch.city ?? undefined,
-        area: orch.area ?? undefined,
         priceMax: orch.priceMax ?? undefined,
         minRating: orch.minRating || 0,
       });
@@ -619,14 +613,12 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   // 3. Vendor discovery
   const explicitVendorRequest = /\b(show|find|search|display|list|profiles?)\s+(me\s+)?(all\s+)?(the\s+)?(verified\s+)?(vowza\s+)?(photographer|videographer|decorator|caterer|dj|band|makeup|artist|vendor|provider)\w*/i.test(message);
   
-  if (explicitVendorRequest || orch.needsRetrieval) {
-    const ragResult = await retrieveVendors(message, updatedContext, 12, {
-      professions: orch.professions || [],
-      city: orch.city ?? undefined,
-      area: orch.area ?? undefined,
-      priceMax: orch.priceMax ?? undefined,
-      minRating: orch.minRating || 0,
-    });
+  if (explicitVendorRequest || orch.needsRetrieval) {      const ragResult = await retrieveVendors(message, updatedContext, 12, {
+        professions: orch.professions || [],
+        city: orch.city ?? undefined,
+        priceMax: orch.priceMax ?? undefined,
+        minRating: orch.minRating || 0,
+      });
     
     const dbVendors = dedupeVerifiedDBVendors(ragResult.vendors);
     console.log('[Vowza AI] Retrieved vendors:', dbVendors.length);
@@ -702,7 +694,6 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
         {
           professions: [],
           city: generatedPlan.city,
-          area: updatedContext.locality,
           priceMax: Math.max(...generatedPlan.allocations.map(a => a.allocatedAmount)),
         }
       );
@@ -764,7 +755,12 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   }
 
   // 5. Edge Function + LLM fallback
-  const dynamicSystemPrompt = buildDynamicSystemPrompt(orch, updatedContext, '', history);
+  // Phase 2: give the LLM the maintained conversation memory (confirmed
+  // facts, the user's own wording, corrected/stale values, unknowns) as part
+  // of the system context. Compact by design — never a raw JSON dump.
+  const memoryBlock = opts.eventState ? buildMemoryContext(opts.eventState) : '';
+  const dynamicSystemPrompt = buildDynamicSystemPrompt(orch, updatedContext, '', history)
+    + (memoryBlock ? `\n\n${memoryBlock}` : '');
   if (useEdge && supabaseUrl) {
     try {
       const msgs = buildMessages(history, message, dynamicSystemPrompt);

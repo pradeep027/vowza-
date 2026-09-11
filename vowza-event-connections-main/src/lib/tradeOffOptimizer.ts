@@ -281,8 +281,8 @@ export function applyTradeOff(plan: EventBudgetPlan, optionLabel: string): { suc
     success: true,
     modifiedPlan: {
       ...modified,
-      versionNumber: plan.versionNumber + 1,
-    },
+      versionNumber: ((plan as { versionNumber?: number }).versionNumber ?? 0) + 1,
+    } as EventBudgetPlan,
     message: `✓ Applied **${optionLabel}**. Saved **₹${(savings / 1000).toFixed(0)}K**. New total: **₹${(modified.totalAllocated / 100000).toFixed(1)}L**.`,
   };
 }

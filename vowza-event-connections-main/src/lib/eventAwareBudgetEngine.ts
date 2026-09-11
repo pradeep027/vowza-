@@ -9,7 +9,7 @@
  * 4. Validates budget feasibility with contextual warnings
  */
 
-import type { PlannerContext, EventCategory } from './aiPlannerTypes';
+import type { PlannerContext, EventCategory, VenueType } from './aiPlannerTypes';
 import type { BudgetAllocation, EventBudgetPlan } from './eventBudgetPlanner';
 
 // ─── Canonical event-type resolution ──────────────────────────────────────
@@ -70,18 +70,17 @@ export interface UserSelections {
   videoPriority?: 'low' | 'medium' | 'high' | 'very_high';
 }
 
-// Extend PlannerContext to track user selections (in practice, added to context)
-declare global {
-  interface PlannerContext {
-    userSelections?: UserSelections;
-  }
-}
+// User selections carried through the planning context. Declared as a local
+// intersection type instead of a global augmentation so PlannerContext stays
+// the single authority in aiPlannerTypes.
+export type AwarenessContext = PlannerContext & { userSelections?: UserSelections };
 
 // ─── Event Category Activation Matrix ──────────────────────────────────────
 // Maps event type to baseline category weights (before normalization)
 // Excludes categories with 0 weight
 
-export const EVENT_CATEGORY_ACTIVATIONS: Record<EventCategory, Record<string, number>> = {
+// NOTE: keyed by EventCategory plus legacy aliases that appear in templates.
+export const EVENT_CATEGORY_ACTIVATIONS: Record<string, Record<string, number>> = {
   // WEDDING/MARRIAGE: All 12 baseline categories
   wedding: {
     'Venue Rental': 16,
@@ -360,7 +359,7 @@ export interface CategoryActivation {
  */
 export function getActiveCategoriesForEvent(
   eventType: EventCategory,
-  context: Partial<PlannerContext>
+  context: AwarenessContext
 ): CategoryActivation[] {
   // Resolve synonyms/variants to a canonical key, then fall back to a neutral
   // profile (never wedding) so an unrecognised event type can't inject bridal /
@@ -381,9 +380,11 @@ export function getActiveCategoriesForEvent(
 
   // Handle conditional categories based on context
   
-  // VENUE: Only relevant if external venue (not home/user's space)
+  // VENUE: Only relevant if external venue (not home/user's space).
+  // 'external' is not a VenueType yet — Phase 1 event state will formalize it.
+  const venueType = context.venueType as VenueType | 'external' | undefined;
   if ((eventType === 'housewarming' || eventType === 'haldi' || eventType === 'mehendi') && 
-      (context.venueType === 'external' || context.hasVenue)) {
+      (venueType === 'external' || context.hasVenue)) {
     const existingVenue = active.find(a => a.category.includes('Venue'));
     if (!existingVenue) {
       active.push({
@@ -507,7 +508,7 @@ export interface SensitivityAdjustment {
  */
 export function applySensitivity(
   normalized: NormalizedAllocation[],
-  context: Partial<PlannerContext>
+  context: AwarenessContext
 ): { adjustments: SensitivityAdjustment[]; warnings: string[] } {
   const warnings: string[] = [];
   let adjustments: SensitivityAdjustment[] = normalized.map(n => ({
@@ -597,7 +598,7 @@ const CITY_MULTIPLIER: Record<string, number> = {
 
 // ─── Per-Guest Cost Minimums ────────────────────────────────────────────────
 // Minimum catering cost per guest (before city multiplier)
-const PER_GUEST_COST_MIN: Record<EventCategory, number> = {
+const PER_GUEST_COST_MIN: Record<string, number> = {
   'wedding': 1000,  // ₹1000/guest for decent catering
   'marriage': 1000,
   'haldi': 600,
@@ -630,7 +631,7 @@ const PER_GUEST_COST_MIN: Record<EventCategory, number> = {
  * Complete event-aware budget generation pipeline
  */
 export function generateEventAwareBudget(
-  context: PlannerContext,
+  context: AwarenessContext,
   totalBudget: number
 ): {
   allocations: BudgetAllocation[];
@@ -655,12 +656,15 @@ export function generateEventAwareBudget(
     const amount = (totalBudget * adj.adjustedWeight) / 100;
     return {
       category: adj.category,
+      // basePercentage mirrors the normalized weight (no separate base in this
+      // engine); EventBudgetPlanner reads actualPercentage downstream.
+      basePercentage: adj.adjustedWeight,
       allocatedAmount: Math.round(amount),
       basePercentage: adj.adjustedWeight,
       actualPercentage: adj.adjustedWeight,
       minAmount: Math.round(amount * 0.8),
       maxAmount: Math.round(amount * 1.25),
-      priority: 'medium',
+      priority: 'medium' as const,
       required: true,
       reasoning: `Allocated for ${context.eventType} event with ${context.guestCount} guests`,
     };
@@ -674,6 +678,5 @@ export function generateEventAwareBudget(
   };
 }
 
-// ─── Export for integration ─────────────────────────────────────────────────
-
-export type { CategoryActivation, NormalizedAllocation, SensitivityAdjustment };
+// ─── Export for integration ───────────────────────────────────────────────
+// Interfaces above are already exported; nothing further to re-export.

@@ -16,7 +16,7 @@ const Footer = () => {
         { name: "Browse by Event",  href: "/artists"          },
         { name: "Vowza AI Planner", href: "/ai-planner"       },
         { name: "Contact Us",       href: "/contact"          },
-        { name: "About Us",         href: "/contact"          },
+        { name: "About Us",         href: "/about"            },
       ],
     },
     {

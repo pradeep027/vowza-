@@ -572,13 +572,14 @@ export function getWeatherAdvice(ctx: PlannerContext): WeatherAdvice {
 
 // ─── Checklist Generator ──────────────────────────────────────────────────────
 export function generateChecklist(ctx: PlannerContext): ChecklistItem[] {
+  // Normalize only for internal category logic — ctx.eventType (user vocabulary)
+  // is left untouched; aliases like gruhapravesam resolve to their canonical key.
   const eventType = normalizeEventType(ctx.eventType) || "wedding";
   // Engagement is a distinct event, NOT a wedding sub-function — it must not
   // inherit bridal/mehendi/groom checklist items.
   const isWedding = ["wedding","reception","sangeet","haldi","mehendi"].includes(eventType);
-  const isHousewarming = eventType === "housewarming" || eventType === "gruhapravesam";
   const isHouseWarmingCeremony = ["housewarming", "gruhapravesam"].includes(eventType);
-  
+
   const base: Omit<ChecklistItem, "id" | "done">[] = [
     { task: "Government IDs for venue booking",            category: "Documents", dueWhen: "6 months before",  priority: "must", owner: "Coordinator" },
     { task: "All vendor contracts signed and saved",        category: "Documents", dueWhen: "On booking",       priority: "must", owner: "Coordinator" },

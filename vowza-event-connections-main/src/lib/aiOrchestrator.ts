@@ -43,6 +43,9 @@ export interface OrchestrationResult {
   rewrittenQuery:   string;         // optimised for DB search
   professions:      string[];       // vendor categories to retrieve
   city:             string | null;
+  // Locality/area extracted from the message ("in Banjara Hills"), separate
+  // from city. Consumed by the retriever as a location hint.
+  area:             string | null;
   priceMax:         number | null;
   minRating:        number;
   responseStrategy: ResponseStrategy;
@@ -567,6 +570,11 @@ export function extractContextUpdates(
     [/\bmehendi\b|mehndi/i,'mehendi'], [/\bsangeet\b/i,'sangeet'],
     [/\bbirthday\b/i,'birthday'], [/\bbaby\s*[-]?\s*shower\b/i,'babyshower'],
     [/\bhouse\s*[-]?\s*warming\b/i,'housewarming'], [/\banniversary\b/i,'anniversary'],
+    // Gruhapravesam / griha pravesh are housewarming ceremonies across regions;
+    // keep the alias so planning works while Phase 1 event state records the
+    // user's own term for it.
+    [/\bgriha\s*[-]?\s*pravesh(?:am)?\b/i,'housewarming'],
+    [/\bgruhapravesham?\b/i,'housewarming'],
     [/\bcorporate\b/i,'corporate'], [/\bconcert\b/i,'concert'],
     [/\bparty\b/i,'privateparty'], [/\bnam(?:ing|ing)\s*[-]?\s*ceremon[yi]\b/i,'housewarming'],
     [/\bgrihapravesam\b/i,'housewarming'], [/\bgruhapravesam\b/i,'housewarming'],
@@ -710,6 +718,7 @@ export function orchestrate(
     rewrittenQuery,
     professions,
     city,
+    area: extractLocality(normalizedMessage),
     priceMax,
     minRating,
     responseStrategy,

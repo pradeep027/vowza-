@@ -104,21 +104,25 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
       setNearbyDates([]);
       setValidationErrors({});
       setTermsAccepted(false);
-      supabase.from('event_types').select('id, name').order('name').then(({ data }) => {
-        if (data && data.length > 0) setEventTypes(data);
-        else setEventTypes([
-          { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
-          { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
-          { id: 'corporate', name: 'Corporate Event' }, { id: 'haldi', name: 'Haldi' },
-          { id: 'sangeet', name: 'Sangeet' }, { id: 'other', name: 'Other' },
-        ]);
-      }).catch(() => {
-        setEventTypes([
-          { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
-          { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
-          { id: 'corporate', name: 'Corporate Event' }, { id: 'other', name: 'Other' },
-        ]);
-      });
+      // PromiseLike.then() has no .catch — use async/await with try/catch.
+      (async () => {
+        try {
+          const { data } = await supabase.from('event_types').select('id, name').order('name');
+          if (data && data.length > 0) setEventTypes(data as EventType[]);
+          else setEventTypes([
+            { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
+            { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
+            { id: 'corporate', name: 'Corporate Event' }, { id: 'haldi', name: 'Haldi' },
+            { id: 'sangeet', name: 'Sangeet' }, { id: 'other', name: 'Other' },
+          ]);
+        } catch {
+          setEventTypes([
+            { id: 'wedding', name: 'Wedding' }, { id: 'reception', name: 'Reception' },
+            { id: 'engagement', name: 'Engagement' }, { id: 'birthday', name: 'Birthday' },
+            { id: 'corporate', name: 'Corporate Event' }, { id: 'other', name: 'Other' },
+          ]);
+        }
+      })();
       if (selectedPackage?.price) setAmount(String(selectedPackage.price));
       else if (provider.price_min) setAmount(provider.price_min.toString());
     }

@@ -491,7 +491,9 @@ export function useVendorBookings(vendorId?: string | null, status?: string) {
         .select('*')
         .eq('provider_id', vendorId)
         .order('created_at', { ascending: false });
-      if (statusValues) q1 = q1.in('status', statusValues);
+      // statusValues is a string[] from the caller; 'pending' is a legacy
+      // status value kept working at runtime despite the current enum list.
+      if (statusValues) q1 = q1.in('status', statusValues as never[]);
       const { data: genericBookings } = await q1;
 
       // ── Query 2: Photography package bookings ────────────────────────────
@@ -1419,7 +1421,7 @@ export function useVendorAvailability(vendorId?: string | null) {
         supabase.from('bookings')
           .select('event_date, status')
           .eq('provider_id', vendorId)
-          .in('status', ['confirmed', 'accepted', 'requested', 'pending']),
+          .in('status', ['confirmed', 'accepted', 'requested', 'pending'] as never[]),
       ]);
 
       const avail = (availRes.data ?? []) as any[];
@@ -1610,7 +1612,7 @@ export function useVendorBadges(vendorId?: string | null) {
         .from('bookings')
         .select('id', { count: 'exact', head: true })
         .eq('provider_id', vendorId)
-        .in('status', ['requested', 'pending']);
+        .in('status', ['requested', 'pending'] as never[]);
 
       // Unread inquiries
       const inquiriesP = supabase

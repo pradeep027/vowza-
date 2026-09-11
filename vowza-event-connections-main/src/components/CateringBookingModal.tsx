@@ -215,7 +215,12 @@ export default function CateringBookingModal({ isOpen, onClose, pkg, provider, g
       },
     };
 
-    const validationResult = validateSpecialCategoryBooking(validationContext);
+    const validationResult = validateSpecialCategoryBooking(
+      'catering',
+      { id: provider.id, name: provider.business_name || provider.full_name },
+      { id: pkg.id, name: pkg.name, provider_id: pkg.provider_id || provider.id },
+      { event_date: event.eventDate, guest_count: guests, amount: baseAmount + addonsAmount }
+    );
     if (!validationResult.valid) {
       const errorMsg = formatValidationError(validationResult);
       toast.error(errorMsg);

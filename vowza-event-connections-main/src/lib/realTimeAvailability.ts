@@ -3,9 +3,17 @@
  *
  * Sync vendor calendars, implement 24-hour hold, show live availability
  * Integrates with provider_availability table for real-time vendor scheduling
+ *
+ * NOTE: operates on the optional `provider_availability` slot payload carried
+ * on DBVendor (attached by the live availability fetch). When absent, every
+ * function degrades to "no data — contact vendor" and never claims availability.
  */
 
 import type { DBVendor, PlannerContext } from './aiPlannerTypes';
+
+function calendarOf(vendor: DBVendor) {
+  return vendor.provider_availability ?? [];
+}
 
 export interface AvailabilitySlot {
   vendorId: string;
@@ -49,12 +57,12 @@ export function checkVendorAvailability(
   vendor: DBVendor,
   eventDate: string
 ): { available: boolean; reason?: string } {
-  if (!vendor.provider_availability) {
+  if (!calendarOf(vendor)) {
     return { available: true, reason: 'No availability data — contact vendor' };
   }
 
   // Check if any availability slots exist for the date
-  const slotsForDate = vendor.provider_availability.filter(slot => {
+  const slotsForDate = calendarOf(vendor).filter(slot => {
     return slot.date === eventDate && slot.status === 'available';
   });
 
@@ -72,9 +80,9 @@ export function getAvailableSlots(
   vendor: DBVendor,
   eventDate: string
 ): AvailabilitySlot[] {
-  if (!vendor.provider_availability) return [];
+  if (!calendarOf(vendor)) return [];
 
-  return vendor.provider_availability
+  return calendarOf(vendor)
     .filter(slot => {
       const isDateMatch = slot.date === eventDate;
       const isAvailable = slot.status === 'available';
@@ -82,7 +90,7 @@ export function getAvailableSlots(
       return isDateMatch && isAvailable && notExpired;
     })
     .map(slot => ({
-      vendorId: vendor.id,
+      vendorId: vendor.provider_id,
       vendorName: vendor.stage_name,
       date: slot.date,
       startTime: slot.startTime || '09:00',
@@ -97,7 +105,7 @@ export function getAvailableSlots(
  * Calculate next available date for vendor
  */
 export function getNextAvailableDate(vendor: DBVendor): string | null {
-  if (!vendor.provider_availability || vendor.provider_availability.length === 0) {
+  if (!calendarOf(vendor) || calendarOf(vendor).length === 0) {
     return null;
   }
 
@@ -105,7 +113,7 @@ export function getNextAvailableDate(vendor: DBVendor): string | null {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const availableSlots = vendor.provider_availability
+  const availableSlots = calendarOf(vendor)
     .filter(slot => {
       const slotDate = new Date(slot.date);
       const isInFuture = slotDate >= today;
@@ -122,7 +130,7 @@ export function getNextAvailableDate(vendor: DBVendor): string | null {
  * Format availability status for display
  */
 export function formatAvailabilityStatus(vendor: DBVendor, eventDate?: string): string {
-  if (!vendor.provider_availability || vendor.provider_availability.length === 0) {
+  if (!calendarOf(vendor) || calendarOf(vendor).length === 0) {
     return '⏱ No real-time availability data — contact vendor directly';
   }
 
@@ -137,9 +145,9 @@ export function formatAvailabilityStatus(vendor: DBVendor, eventDate?: string): 
   }
 
   // General availability overview
-  const total = vendor.provider_availability.length;
-  const available = vendor.provider_availability.filter(s => s.status === 'available').length;
-  const booked = vendor.provider_availability.filter(s => s.status === 'booked').length;
+  const total = calendarOf(vendor).length;
+  const available = calendarOf(vendor).filter(s => s.status === 'available').length;
+  const booked = calendarOf(vendor).filter(s => s.status === 'booked').length;
   const nextDate = getNextAvailableDate(vendor);
 
   let status = `📅 ${available}/${total} slots available`;
@@ -176,12 +184,12 @@ export function createHold(
     return null; // Cannot hold unavailable date
   }
 
-  const holdId = `hold_${vendor.id}_${Date.now()}`;
+  const holdId = `hold_${vendor.provider_id}_${Date.now()}`;
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + 24);
 
   return {
-    vendorId: vendor.id,
+    vendorId: vendor.provider_id,
     eventDate,
     holdId,
     expiresAt: expiresAt.toISOString(),
@@ -209,7 +217,7 @@ export function formatHoldExpiration(expiresAt: string): string {
  * Get vendor calendar status overview
  */
 export function getCalendarStatus(vendor: DBVendor): VendorCalendarStatus {
-  const availability = vendor.provider_availability || [];
+  const availability = calendarOf(vendor);
 
   const total = availability.length;
   const available = availability.filter(s => s.status === 'available').length;
@@ -217,7 +225,7 @@ export function getCalendarStatus(vendor: DBVendor): VendorCalendarStatus {
   const hold = availability.filter(s => s.status === 'hold').length;
 
   return {
-    vendorId: vendor.id,
+    vendorId: vendor.provider_id,
     vendorName: vendor.stage_name,
     profession: vendor.profession || 'Vendor',
     totalSlots: total,

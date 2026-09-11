@@ -126,13 +126,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // needs it. The old upsert would 42501 here for every new signup.
         const seed = await grantRole(uid, 'customer');
         if (!seed.ok) {
+          // Narrowing: in the failure branch `seed` carries code + message.
           // The in-memory fallback below keeps the session usable, but the
           // database now genuinely has no role row for this user. That is a
           // durable inconsistency, not a transient glitch, so log it loudly.
           // It is not a privilege risk -- `customer` is least-privilege and the
           // server enforces authorization from user_roles regardless of what
           // this cache says.
-          console.error('[AuthContext] Failed to seed customer role for', uid, seed.code, seed.message);
+          const { code, message } = seed as { code: string; message: string };
+          console.error('[AuthContext] Failed to seed customer role for', uid, code, message);
         }
 
         const fallback = ['customer'];
