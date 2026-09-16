@@ -200,7 +200,7 @@ const Artists = () => {
     available: available || undefined,
   };
 
-  const { data: artists = [], isLoading, error } = useArtists(filters);
+  const { data: artists = [], isLoading, error, refetch } = useArtists(filters);
   const { data: categories = [] } = useCategories();
 
   useEffect(() => {
@@ -452,6 +452,13 @@ const Artists = () => {
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className={cn("rounded-2xl skeleton", view === "grid" ? "h-72" : "h-28")} />
                 ))}
+              </div>
+            ) : error ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-5">⚠️</div>
+                <h3 className="text-xl font-display font-semibold text-foreground mb-2">Couldn't load artists</h3>
+                <p className="text-muted-foreground text-sm mb-6">Something went wrong while fetching artists. Please try again.</p>
+                <button onClick={() => refetch()} className="btn-primary">Try Again</button>
               </div>
             ) : artists.length === 0 ? (
               <div className="text-center py-20">

@@ -70,9 +70,6 @@ const Checkout = () => {
     try { const raw = sessionStorage.getItem('vowza_water_checkout'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
 
-  if (photographyCheckout) return <PhotographyPackageCheckout payload={photographyCheckout} />;
-  if (waterCheckout) return <WaterProductCheckout payload={waterCheckout} />;
-
   // ─── Price Validation ────────────────────────────────────────────────────
   const validatePrices = async () => {
     if (scopedItems.length === 0) return;
@@ -92,7 +89,16 @@ const Checkout = () => {
     setValidating(false);
   };
 
-  useEffect(() => { if (scopedItems.length > 0) validatePrices(); }, [scopedItems.length]);
+  useEffect(() => {
+    // Special flows render their own components; skip scoped-cart validation for them.
+    if (photographyCheckout || waterCheckout) return;
+    if (scopedItems.length > 0) validatePrices();
+  }, [scopedItems.length]);
+
+  // Special checkout flows take over rendering. Placed AFTER all hooks so hook
+  // order stays stable across renders (React rules-of-hooks).
+  if (photographyCheckout) return <PhotographyPackageCheckout payload={photographyCheckout} />;
+  if (waterCheckout) return <WaterProductCheckout payload={waterCheckout} />;
 
   const hasIssues = priceValidations.some(v => v.changed || v.unavailable);
   const unavailableItems = priceValidations.filter(v => v.unavailable);
