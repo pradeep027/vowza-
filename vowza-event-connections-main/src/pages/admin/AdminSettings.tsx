@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Globe, IndianRupee, Mail, Key, Percent } from 'lucide-react';
+import { Save, Globe, IndianRupee, Mail, Percent } from 'lucide-react';
 
 // ── Reusable setting card — module scope (stable reference) ──────────────────
 function Section({
@@ -73,8 +73,6 @@ export default function AdminSettings() {
   const [smtpHost,      setSmtpHost]      = useState('');
   const [smtpPort,      setSmtpPort]      = useState('587');
   const [smtpUser,      setSmtpUser]      = useState('');
-  const [openaiKey,     setOpenaiKey]     = useState('');
-  const [supabaseKey,   setSupabaseKey]   = useState('');
 
   // Platform Fee state (real DB-backed)
   const [feeType, setFeeType] = useState<'percentage' | 'fixed'>('percentage');
@@ -167,14 +165,6 @@ export default function AdminSettings() {
             <Field id="smtp-port" label="SMTP Port"     value={smtpPort} onChange={setSmtpPort} type="number" />
             <Field id="smtp-user" label="SMTP Username" value={smtpUser} onChange={setSmtpUser} placeholder="apikey" />
             <Field id="smtp-pass" label="SMTP Password" value=""         onChange={() => {}}    type="password" placeholder="•••••••••" />
-          </div>
-        </Section>
-
-        <Section title="API Keys" icon={Key} onSave={() => save('API Keys')}>
-          <div className="space-y-3">
-            <Field id="openai-key"    label="OpenAI API Key"        value={openaiKey}   onChange={setOpenaiKey}   type="password" placeholder="sk-proj-•••••" />
-            <Field id="supabase-key"  label="Supabase Service Key"  value={supabaseKey} onChange={setSupabaseKey} type="password" placeholder="eyJh•••••" />
-            <Field id="otp-key"       label="OTP Provider Key"      value=""            onChange={() => {}}       type="password" placeholder="Twilio / MSG91" />
           </div>
         </Section>
       </div>

@@ -192,7 +192,10 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       const { data: providers, error: pErr } = await q;
       if (pErr) {
         console.error('[useArtists] Query error:', pErr.message);
-        return [];
+        // Surface the failure so React Query sets its error state — a backend
+        // error must be distinguishable from a genuine empty result. Every caller
+        // defaults `data` to [] (or guards with `|| []`), so none crash on throw.
+        throw pErr;
       }
       if (!providers || providers.length === 0) return [];
 

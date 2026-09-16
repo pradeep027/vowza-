@@ -1,9 +1,9 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ProviderRegistrationProvider } from "@/contexts/ProviderRegistrationContext";
@@ -122,24 +122,14 @@ const queryClient = new QueryClient({
 // ─── AppContent — uses router context so hooks like useNavigate work ──────────
 const AppContent = () => {
   useInactivityLogout();
-  const { video, recordView, isLoading, hasUserViewed } = usePromotionVideoAd();
+  const { video, recordView, isLoading } = usePromotionVideoAd();
   const [showOverlay, setShowOverlay] = useState(true);
 
-  console.log('[AppContent] Render check:', {
-    video: video?.id,
-    showOverlay,
-    shouldRender: !!(video && showOverlay),
-    isLoading,
-    hasUserViewed,
-  });
-
   const handleClose = () => {
-    console.log('[AppContent] Overlay closed by user');
     setShowOverlay(false);
   };
 
   const handleViewRecorded = async () => {
-    console.log('[AppContent] Recording view...');
     await recordView();
   };
 
@@ -178,6 +168,7 @@ const AppContent = () => {
 
           {/* ── Admin — AdminLayout handles auth + admin role check internally ── */}
           <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard"    element={<AdminDashboardHome />} />
             <Route path="artists"      element={<AdminArtists />} />
             <Route path="customers"    element={<AdminCustomers />} />
@@ -218,6 +209,7 @@ const AppContent = () => {
 
           {/* ── Vendor — VendorLayout handles auth + provider role check internally ── */}
           <Route path="/vendor" element={<VendorLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard"     element={<VendorDashboardHome />} />
             <Route path="bookings"      element={<VendorBookings />} />
             <Route path="calendar"      element={<VendorCalendar />} />
@@ -254,6 +246,13 @@ const AppContent = () => {
   );
 };
 
+// Boundary that resets when the route changes, so a crashed page is escapable
+// by navigating away (rather than being stuck on the fallback until a reload).
+const RoutedErrorBoundary = ({ children }: { children: ReactNode }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
+
 // ─── Root ─────────────────────────────────────────────────────────────────────
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -264,9 +263,9 @@ const App = () => (
             <Toaster />
             <Sonner position="top-right" richColors />
             <BrowserRouter>
-              <ErrorBoundary>
+              <RoutedErrorBoundary>
                 <AppContent />
-              </ErrorBoundary>
+              </RoutedErrorBoundary>
             </BrowserRouter>
           </TooltipProvider>
         </ProviderRegistrationProvider>

@@ -1,8 +1,8 @@
 // ─── ErrorBoundary — Catches unhandled React render errors ───────────────────
 import { Component, type ReactNode, type ErrorInfo } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 
-interface Props  { children: ReactNode; fallback?: ReactNode; }
+interface Props  { children: ReactNode; fallback?: ReactNode; resetKey?: unknown; }
 interface State  { hasError: boolean; error: Error | null; }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -15,6 +15,14 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     // In production wire this to Sentry / Datadog
     console.error("[ErrorBoundary]", error, info.componentStack);
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    // Auto-recover when the reset key changes (e.g. route navigation) after an
+    // error, so a crashed route is escapable without a manual reload.
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
   }
 
   handleReset = () => {
@@ -45,12 +53,20 @@ export class ErrorBoundary extends Component<Props, State> {
               </pre>
             )}
           </div>
-          <button
-            onClick={this.handleReset}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-maroon text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            <RefreshCw className="w-4 h-4" /> Try Again
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={this.handleReset}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-maroon text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary transition-colors"
+            >
+              <Home className="w-4 h-4" /> Go to homepage
+            </a>
+          </div>
         </div>
       </div>
     );

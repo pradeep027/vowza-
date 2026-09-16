@@ -111,8 +111,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return fallback;
       }
 
-      console.log('[AuthContext] roles fetched for', uid, ':', data);
-
       if (!data || data.length === 0) {
         console.warn('[AuthContext] No roles found for user', uid, '— seeding customer role');
         // Seed the default customer role.
@@ -145,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const r = data.map(d => d.role as string);
-      console.log('[AuthContext] resolved roles:', r, '— isAdmin:', r.includes('admin'));
       _roleCache.set(uid, r);
       setRoles(r);
       setRolesLoaded(true);
@@ -300,15 +297,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: { full_name: fullName, phone: phone ?? '' },
       },
     });
-    if (!error && data?.user) {
-      console.log('[Auth] signUp success:', {
-        userId: data.user.id,
-        email: data.user.email,
-        emailConfirmedAt: data.user.email_confirmed_at,
-        hasSession: !!data.session,
-        identities: data.user.identities?.length,
-      });
-    }
     return { data, error };
   }, []);
 
