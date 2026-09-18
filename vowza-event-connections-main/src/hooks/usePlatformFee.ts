@@ -13,13 +13,14 @@ export function usePlatformFee() {
   return useQuery({
     queryKey: ['platform-fee'],
     queryFn: async (): Promise<PlatformFeeConfig> => {
+      // Phase 0b Stage 1: read via the key-fixed SECURITY DEFINER RPC instead
+      // of the platform_settings table (table reads are locked down for anon in
+      // Stage 2 — 20261201000011/20261201000012).
       const { data, error } = await supabase
-        .from('platform_settings' as any)
-        .select('value')
-        .eq('key', 'platform_fee')
-        .maybeSingle();
+        .rpc('get_public_platform_fee' as any);
       if (error || !data) return DEFAULT_FEE;
-      const val = (data as any).value;
+      // supabase-js parses jsonb responses; accept a raw string defensively.
+      const val = typeof data === 'string' ? JSON.parse(data) : (data as any);
       return {
         type: val?.type || 'percentage',
         rate: Number(val?.rate ?? 5),
