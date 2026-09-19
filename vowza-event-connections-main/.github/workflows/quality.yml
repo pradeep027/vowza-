@@ -1,0 +1,59 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Phase 1 boundary: quality gate only.
+# No deployment, no secrets, no Supabase access, no Vercel calls, no production mutation.
+# Production deployment remains an explicit, controlled, manual operation.
+
+jobs:
+  quality:
+    name: typecheck / tests / build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies (deterministic)
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Tests (curated suite)
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+  lint-baseline:
+    # Non-blocking visibility job for the recorded lint baseline.
+    # Phase 1 does not fix the ~1,900-error debt; cleanup is a separate controlled effort.
+    name: lint (non-blocking baseline)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies (deterministic)
+        run: npm ci
+
+      - name: ESLint baseline report
+        run: npm run lint

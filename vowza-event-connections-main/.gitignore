@@ -26,6 +26,7 @@ dist-ssr
 .vercel
 .env
 .env.*
+!.env.example
 
 # Supabase CLI scratch state. Holds project link details and the cached CLI
 # version; regenerated on demand and not useful to anyone else.
