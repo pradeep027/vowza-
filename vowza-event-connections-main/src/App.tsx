@@ -41,7 +41,7 @@ const TermsOfService       = lazy(() => import("./pages/TermsOfService"));
 const CategoryPage         = lazy(() => import("./pages/CategoryPage"));
 const CateringCartPage     = lazy(() => import("./pages/CateringCartPage"));
 const VendorEditProfile    = lazy(() => import("./pages/VendorEditProfile"));
-const About                = lazy(() => import("./pages/About"));
+const About                = lazy(() => import("./features/cms/pages/About"));
 
 // ─── Admin (new enterprise layout) ───────────────────────────────────────────
 const AdminLayout          = lazy(() => import("./pages/admin/AdminLayout"));
@@ -66,7 +66,7 @@ const AdminAdmins          = lazy(() => import("./pages/admin/AdminAdmins"));
 const AdminAuditLogs       = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminSystemHealth    = lazy(() => import("./pages/admin/AdminSystemHealth"));
 const AdminAuthPromotionalManager = lazy(() => import("./pages/admin/AdminAuthPromotionalManager"));
-const AdminAboutUs         = lazy(() => import("./pages/admin/AdminAboutUs"));
+const AdminAboutUs         = lazy(() => import("./features/cms/pages/AdminAboutUs"));
 
 // ─── Customer (user dashboard) ────────────────────────────────────────────────
 const CustomerLayout       = lazy(() => import("./pages/customer/CustomerLayout"));

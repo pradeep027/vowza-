@@ -3,7 +3,12 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Save, Upload, X, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  updateAboutContent,
+  verifyAboutHeroImageUrl,
+  uploadAboutHeroImage,
+  removeAboutHeroImage,
+} from "../api/aboutContent";
 
 interface AboutVowzaEditorProps {
   initialTitle?: string;
@@ -87,41 +92,8 @@ export function AboutVowzaEditor({
       setIsUploading(true);
       console.log("[AboutVowzaEditor] Upload starting for:", previewFile.name);
 
-      // Generate unique filename
-      const timestamp = Date.now();
-      const sanitizedName = previewFile.name
-        .toLowerCase()
-        .replace(/[^a-z0-9.-]/g, "-")
-        .replace(/\.([^.]*)$/, (match, ext) => `.${ext}`);
-      const filename = `hero-image-${timestamp}-${sanitizedName}`;
-
-      console.log("[AboutVowzaEditor] Generated filename:", filename);
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from("about-us")
-        .upload(filename, previewFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (error) {
-        console.error("[AboutVowzaEditor] Storage upload error:", {
-          message: error.message,
-          name: error.name,
-        });
-        throw new Error(`Storage upload failed: ${error.message}`);
-      }
-
-      console.log("[AboutVowzaEditor] Upload successful, path:", data.path);
-
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from("about-us")
-        .getPublicUrl(data.path);
-
-      const publicUrl = publicUrlData.publicUrl;
-      console.log("[AboutVowzaEditor] Public URL generated:", publicUrl);
+      // Upload to Supabase Storage via the CMS API boundary
+      const publicUrl = await uploadAboutHeroImage(previewFile);
 
       // **CRITICAL: Set the URL immediately**
       setHeroImageUrl(publicUrl);
@@ -148,24 +120,7 @@ export function AboutVowzaEditor({
     try {
       console.log("[AboutVowzaEditor] Removing image from Storage:", heroImageUrl);
 
-      // Extract filename from URL
-      const url = new URL(heroImageUrl);
-      const pathParts = url.pathname.split("/");
-      const filename = pathParts[pathParts.length - 1];
-
-      console.log("[AboutVowzaEditor] Extracted filename:", filename);
-
-      if (filename) {
-        const { error } = await supabase.storage
-          .from("about-us")
-          .remove([filename]);
-
-        if (error) {
-          console.error("[AboutVowzaEditor] Storage remove error:", error);
-          throw error;
-        }
-        console.log("[AboutVowzaEditor] File removed from Storage");
-      }
+      await removeAboutHeroImage(heroImageUrl);
 
       setHeroImageUrl("");
       setPreviewUrl("");
@@ -210,34 +165,18 @@ export function AboutVowzaEditor({
         heroImageUrl: heroImageUrl ? `${heroImageUrl.substring(0, 50)}...` : "null",
       });
 
-      // Update the single About Us record using its fixed UUID
+      // Update the single About Us record via the CMS API boundary
       console.log("[AboutVowzaEditor] About to save with heroImageUrl:", heroImageUrl ? `${heroImageUrl.substring(0, 50)}...` : "NULL");
-      
-      const { data: updatedData, error } = await supabase
-        .from("about_us")
-        .update({
-          title: title.trim(),
-          description: description.trim(),
-          mission: mission.trim(),
-          vision: vision.trim(),
-          hero_image_url: heroImageUrl || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", "00000000-0000-0000-0000-000000000001")
-        .select("id, title, description, mission, vision, hero_image_url, updated_at")
-        .single();
-      
-      console.log("[AboutVowzaEditor] Update response - updatedData:", updatedData ? `ID=${updatedData.id}, hero_image_url=${updatedData.hero_image_url ? updatedData.hero_image_url.substring(0, 50) + "..." : "NULL"}` : "NULL", "error:", error);
 
-      if (error) {
-        console.error("[AboutVowzaEditor] Supabase database error:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        throw error;
-      }
+      const updatedData = await updateAboutContent({
+        title: title.trim(),
+        description: description.trim(),
+        mission: mission.trim(),
+        vision: vision.trim(),
+        heroImageUrl: heroImageUrl || undefined,
+      });
+
+      console.log("[AboutVowzaEditor] Update response - updatedData:", updatedData ? `ID=${updatedData.id}, hero_image_url=${updatedData.hero_image_url ? updatedData.hero_image_url.substring(0, 50) + "..." : "NULL"}` : "NULL");
 
       console.log("[AboutVowzaEditor] Database update successful");
       console.log("[AboutVowzaEditor] Saved record:", {
@@ -245,19 +184,15 @@ export function AboutVowzaEditor({
       });
 
       // VERIFICATION: Perform a fresh SELECT to confirm database persistence
-      const { data: verifyData, error: verifyError } = await supabase
-        .from("about_us")
-        .select("hero_image_url")
-        .eq("id", "00000000-0000-0000-0000-000000000001")
-        .single();
+      const storedHeroImageUrl = await verifyAboutHeroImageUrl();
 
-      if (verifyError) {
-        console.error("[AboutVowzaEditor] Verification query failed:", verifyError);
+      if (storedHeroImageUrl === null && updatedData?.hero_image_url) {
+        console.error("[AboutVowzaEditor] Verification query failed");
       } else {
         console.log("[AboutVowzaEditor] VERIFICATION - Fresh database SELECT:", {
-          hero_image_url: verifyData?.hero_image_url ? `${verifyData.hero_image_url.substring(0, 80)}...` : null,
+          hero_image_url: storedHeroImageUrl ? `${storedHeroImageUrl.substring(0, 80)}...` : null,
         });
-        if (verifyData?.hero_image_url !== updatedData?.hero_image_url) {
+        if (storedHeroImageUrl !== (updatedData?.hero_image_url ?? null)) {
           console.error("[AboutVowzaEditor] MISMATCH: Updated data does not match fresh SELECT!");
         } else {
           console.log("[AboutVowzaEditor] ✓ Confirmed: Database contains the image URL");
@@ -351,7 +286,7 @@ export function AboutVowzaEditor({
           )}
 
           {isUploading && (
-            <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+            <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
               <Loader2 className="w-4 h-4 animate-spin" />
               Uploading image...
             </div>

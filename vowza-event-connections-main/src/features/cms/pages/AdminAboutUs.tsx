@@ -1,19 +1,13 @@
 // ─── Admin: About Us Management ────────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertCircle } from "lucide-react";
-import { AboutVowzaEditor } from "@/components/admin/AboutVowzaEditor";
-
-interface AboutContent {
-  id: string;
-  title: string;
-  description: string;
-  mission: string;
-  vision: string;
-  hero_image_url?: string;
-  updated_at: string;
-}
+import { AboutVowzaEditor } from "../components/AboutVowzaEditor";
+import {
+  fetchAdminAboutContent,
+  ensureDefaultAboutContent,
+  type AboutContent,
+} from "../api/aboutContent";
 
 export default function AdminAboutUs() {
   const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
@@ -25,35 +19,14 @@ export default function AdminAboutUs() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch About Us content
-      const { data: aboutData, error: aboutError } = await supabase
-        .from("about_us")
-        .select("*")
-        .limit(1)
-        .single();
-
-      if (aboutError && aboutError.code !== "PGRST116") {
-        throw aboutError;
-      }
+      // Fetch About Us content via the CMS API boundary
+      const aboutData = await fetchAdminAboutContent();
 
       if (aboutData) {
         setAboutContent(aboutData);
       } else {
         // Create default if doesn't exist
-        const { data: newAbout, error: createError } = await supabase
-          .from("about_us")
-          .insert({
-            id: "00000000-0000-0000-0000-000000000001",
-            title: "Where Talent Meets Celebration",
-            description:
-              "Vowza is the premier platform connecting event organizers with top-tier professionals. Our mission is to make event planning seamless, affordable, and stress-free.",
-            mission: "Our mission is to make event planning simple and accessible for everyone.",
-            vision: "To become the most trusted event services platform in India.",
-          })
-          .select()
-          .single();
-
-        if (createError) throw createError;
+        const newAbout = await ensureDefaultAboutContent();
         if (newAbout) setAboutContent(newAbout);
       }
     } catch (err) {

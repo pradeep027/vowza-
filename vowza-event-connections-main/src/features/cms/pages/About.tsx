@@ -1,18 +1,9 @@
 // ─── Vowza About Us — Premium Editorial Design with Uploadable Hero Image ───
 // Reference-inspired: premium, minimal, editorial, modern
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-interface AboutData {
-  id: string;
-  title: string;
-  description: string;
-  mission: string;
-  vision: string;
-  hero_image_url?: string;
-}
+import { fetchAboutContent, type AboutContent } from "../api/aboutContent";
 
 // Hero Image Container — displays uploaded image or fallback
 const HeroImageContainer = ({ imageUrl }: { imageUrl?: string }) => {
@@ -45,7 +36,7 @@ const HeroImageContainer = ({ imageUrl }: { imageUrl?: string }) => {
 };
 
 export default function About() {
-  const [aboutData, setAboutData] = useState<AboutData | null>(null);
+  const [aboutData, setAboutData] = useState<AboutContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,33 +46,14 @@ export default function About() {
         setIsLoading(true);
         setError(null);
 
-        // Fetch About Us content with hero image URL
-        // First try with hero_image_url, fall back to without it if column doesn't exist
-        let { data: aboutRawData, error: aboutError } = await supabase
-          .from("about_us")
-          .select("id, title, description, mission, vision, hero_image_url")
-          .eq("id", "00000000-0000-0000-0000-000000000001")
-          .single();
+        // Fetch About Us content with hero image URL via the CMS API boundary
+        const data = await fetchAboutContent();
 
-        // If hero_image_url column doesn't exist, try without it
-        if (aboutError && aboutError.message?.includes("does not exist")) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from("about_us")
-            .select("id, title, description, mission, vision")
-            .eq("id", "00000000-0000-0000-0000-000000000001")
-            .single();
-          
-          aboutRawData = fallbackData;
-          aboutError = fallbackError;
-        }
-
-        if (aboutError && aboutError.code !== "PGRST116") throw aboutError;
-
-        if (aboutRawData) {
-          setAboutData(aboutRawData as AboutData);
+        if (data) {
+          setAboutData(data);
           console.log("[About.tsx] RECEIVED DATA from database:", {
-            id: aboutRawData.id,
-            hero_image_url: aboutRawData.hero_image_url ? `${aboutRawData.hero_image_url.substring(0, 100)}...` : "NULL",
+            id: data.id,
+            hero_image_url: data.hero_image_url ? `${data.hero_image_url.substring(0, 100)}...` : "NULL",
           });
         } else {
           console.log("[About.tsx] No About Us data found - query returned no results");
