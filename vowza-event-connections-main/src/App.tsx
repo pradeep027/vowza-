@@ -53,7 +53,7 @@ const AdminPayments        = lazy(() => import("./pages/admin/AdminPayments"));
 const AdminCategories      = lazy(() => import("./pages/admin/AdminCategories"));
 const AdminReviews         = lazy(() => import("./pages/admin/AdminReviews"));
 const AdminAnnouncements   = lazy(() => import("./pages/admin/AdminAnnouncements"));
-const AdminNotifications   = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminNotifications   = lazy(() => import("./features/notifications/pages/AdminNotifications"));
 const AdminAnalytics       = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminCoupons         = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminEventPackages   = lazy(() => import("./pages/admin/AdminEventPackages"));
@@ -73,7 +73,7 @@ const CustomerLayout       = lazy(() => import("./pages/customer/CustomerLayout"
 const DashboardHome        = lazy(() => import("./pages/customer/DashboardHome"));
 const MyBookingsPage       = lazy(() => import("./pages/customer/MyBookingsPage"));
 const WishlistPage         = lazy(() => import("./pages/customer/WishlistPage"));
-const NotificationsPage    = lazy(() => import("./pages/customer/NotificationsPage"));
+const NotificationsPage    = lazy(() => import("./features/notifications/pages/NotificationsPage"));
 const MyProfilePage        = lazy(() => import("./pages/customer/MyProfilePage"));
 const PaymentHistoryPage   = lazy(() => import("./pages/customer/PaymentHistoryPage"));
 const MyReviewsPage        = lazy(() => import("./pages/customer/MyReviewsPage"));
@@ -90,7 +90,7 @@ const VendorPackages       = lazy(() => import("./pages/vendor/VendorPackages"))
 const VendorWallet         = lazy(() => import("./pages/vendor/VendorWallet"));
 const VendorReviews        = lazy(() => import("./pages/vendor/VendorReviews"));
 const VendorMessages       = lazy(() => import("./pages/vendor/VendorMessages"));
-const VendorNotifications  = lazy(() => import("./pages/vendor/VendorNotifications"));
+const VendorNotifications  = lazy(() => import("./features/notifications/pages/VendorNotifications"));
 const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"));
 const VendorCalendar       = lazy(() => import("./pages/vendor/VendorCalendar"));
 const VendorHelpSupport    = lazy(() => import("./pages/vendor/VendorHelpSupport"));

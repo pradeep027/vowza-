@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { NotificationBell } from "@/components/NotificationBell";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { useDashboardLink } from "@/hooks/useDashboardLink";
 import AppLogo from "@/components/AppLogo";
 import { supabase } from "@/integrations/supabase/client";

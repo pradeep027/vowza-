@@ -1,11 +1,16 @@
 // ─── NotificationBell — Real-time notification center ────────────────────────
 // Features: unread badge, mark as read, delete, preferences, realtime updates.
+// Data access goes through the notifications feature API (../api/notificationData).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { NotificationService } from '@/services/notificationService';
+import {
+  getNotificationSettings,
+  saveNotificationSettings,
+  subscribeToNotificationRealtime,
+} from '../api/notificationData';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -87,12 +92,8 @@ export const NotificationBell = () => {
 
   const fetchPrefs = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('notification_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data) setPrefs(data as any);
+    const data = await getNotificationSettings(user.id);
+    if (data) setPrefs(data);
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Realtime subscription ──────────────────────────────────────────────────
@@ -100,15 +101,9 @@ export const NotificationBell = () => {
     if (!user) return;
     fetchAll();
 
-    const channel = supabase
-      .channel(`notifications:${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        const n = payload.new as Notification;
+    const unsubscribe = subscribeToNotificationRealtime(user.id, {
+      onInsert: (payload) => {
+        const n = payload as Notification;
         setNotifications(prev => [n, ...prev]);
         setUnreadCount(c => c + 1);
         // Toast for new notification
@@ -117,30 +112,20 @@ export const NotificationBell = () => {
           duration: 5000,
           icon: getMeta(n.type).icon,
         });
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        const updated = payload.new as Notification;
+      },
+      onUpdate: (payload) => {
+        const updated = payload as Notification;
         setNotifications(prev => prev.map(n => n.id === updated.id ? updated : n));
         setUnreadCount(prev => Math.max(0, prev - (updated.is_read ? 1 : 0)));
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        const deleted = payload.old as { id: string; is_read: boolean };
+      },
+      onDelete: (payload) => {
+        const deleted = payload as { id: string; is_read: boolean };
         setNotifications(prev => prev.filter(n => n.id !== deleted.id));
         if (!deleted.is_read) setUnreadCount(c => Math.max(0, c - 1));
-      })
-      .subscribe();
+      },
+    });
 
-    return () => { supabase.removeChannel(channel); };
+    return unsubscribe;
   }, [user?.id, fetchAll]);
 
   // Load preferences when settings tab is shown
@@ -180,10 +165,7 @@ export const NotificationBell = () => {
   const savePrefs = async () => {
     if (!user) return;
     setLoadingPrefs(true);
-    await supabase
-      .from('notification_settings')
-      .upsert({ user_id: user.id, ...prefs, updated_at: new Date().toISOString() })
-      .eq('user_id', user.id);
+    await saveNotificationSettings(user.id, prefs);
     setLoadingPrefs(false);
     toast.success('Notification preferences saved');
   };

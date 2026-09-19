@@ -1,41 +1,28 @@
 // ─── Admin Notifications ─────────────────────────────────────────────────────
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Bell, Send, Users, UserCheck, User } from 'lucide-react';
-
-type Target = 'all' | 'artists' | 'customers';
+import {
+  getBroadcastUserIds,
+  insertBroadcastNotifications,
+  type BroadcastTarget,
+} from '../api/notificationData';
 
 export default function AdminNotifications() {
   const [title, setTitle]     = useState('');
   const [message, setMessage] = useState('');
-  const [target, setTarget]   = useState<Target>('all');
+  const [target, setTarget]   = useState<BroadcastTarget>('all');
   const [sending, setSending] = useState(false);
 
   const send = async () => {
     if (!title.trim() || !message.trim()) { toast.error('Title and message required'); return; }
     setSending(true);
     try {
-      let userIds: string[] = [];
-
-      if (target === 'all') {
-        const { data } = await supabase.from('profiles').select('id');
-        userIds = (data ?? []).map((u: any) => u.id);
-      } else if (target === 'artists') {
-        const { data } = await supabase.from('provider_profiles').select('user_id');
-        userIds = (data ?? []).map((a: any) => a.user_id).filter(Boolean);
-      } else {
-        const { data: all } = await supabase.from('profiles').select('id');
-        const { data: artists } = await supabase.from('provider_profiles').select('user_id');
-        const artistIds = new Set((artists ?? []).map((a: any) => a.user_id));
-        userIds = (all ?? []).map((u: any) => u.id).filter(id => !artistIds.has(id));
-      }
+      const userIds = await getBroadcastUserIds(target);
 
       if (!userIds.length) { toast.error('No matching users found'); setSending(false); return; }
 
-      const inserts = userIds.map(uid => ({ user_id: uid, title, message, type: 'admin_notification', is_read: false }));
-      const { error } = await supabase.from('notifications' as any).insert(inserts);
-      if (error) throw error;
+      await insertBroadcastNotifications(userIds, title, message);
 
       toast.success(`Notification sent to ${userIds.length} users`);
       setTitle(''); setMessage('');
@@ -56,7 +43,7 @@ export default function AdminNotifications() {
           <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-3">Send To</label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {([['all', Users, 'All Users'], ['artists', UserCheck, 'Artists Only'], ['customers', User, 'Customers Only']] as const).map(([val, Icon, label]) => (
-              <button key={val} onClick={() => setTarget(val as Target)}
+              <button key={val} onClick={() => setTarget(val as BroadcastTarget)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${target === val ? 'border-maroon bg-maroon/5' : 'border-border hover:border-maroon/30'}`}>
                 <Icon className={`w-5 h-5 ${target === val ? 'text-maroon' : 'text-muted-foreground'}`}/>
                 <span className={`text-xs font-semibold ${target === val ? 'text-maroon' : 'text-muted-foreground'}`}>{label}</span>
