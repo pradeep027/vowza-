@@ -9,6 +9,15 @@ on:
 # Phase 1 boundary: quality gate only.
 # No deployment, no secrets, no Supabase access, no Vercel calls, no production mutation.
 # Production deployment remains an explicit, controlled, manual operation.
+#
+# NOTE: This workflow lives at the REPOSITORY ROOT because GitHub Actions only
+# reads .github/workflows/ from the root. The application itself is the nested
+# vowza-event-connections-main/ directory, hence working-directory and
+# cache-dependency-path below.
+
+defaults:
+  run:
+    working-directory: vowza-event-connections-main
 
 jobs:
   quality:
@@ -21,8 +30,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: vowza-event-connections-main/.nvmrc
           cache: npm
+          cache-dependency-path: vowza-event-connections-main/package-lock.json
 
       - name: Install dependencies (deterministic)
         run: npm ci
@@ -49,8 +59,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: vowza-event-connections-main/.nvmrc
           cache: npm
+          cache-dependency-path: vowza-event-connections-main/package-lock.json
 
       - name: Install dependencies (deterministic)
         run: npm ci
