@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationService } from '@/features/notifications/api/notificationService';
+import { getProviderReviewRatings, getVendorReviewsWithCustomers } from '@/features/reviews/api/reviewData'; // Phase 2D-B: reviews API boundary
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type Period = '7d' | '30d' | '90d' | '1y';
@@ -179,9 +180,7 @@ export function useVendorKPIs(vendorId?: string | null) {
         supabase.from('payments' as any)
           .select('id, amount, status, created_at, paid_at, payment_type')
           .eq('provider_id', vendorId),
-        supabase.from('reviews' as any)
-          .select('id, rating')
-          .eq('provider_id', vendorId),
+        getProviderReviewRatings(vendorId), // Phase 2D-B: via reviews API
         supabase.from('profile_views' as any)
           .select('id, created_at')
           .eq('provider_id', vendorId),
@@ -1187,33 +1186,8 @@ export function useVendorReviews(vendorId?: string | null) {
       const empty = { reviews: [] as any[], average: 0, total: 0, breakdown: [5,4,3,2,1].map(s => ({ stars: s, count: 0, percent: 0 })) };
       if (!vendorId) return empty;
 
-      const { data } = await supabase.from('reviews' as any)
-        .select('*')
-        .eq('provider_id', vendorId)
-        .order('created_at', { ascending: false });
-
-      const rows = (data ?? []) as any[];
-      if (rows.length === 0) return empty;
-
-      // Join customer names
-      const custIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))];
-      const map = new Map<string, any>();
-      if (custIds.length > 0) {
-        const { data: profiles } = await supabase.from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', custIds);
-        (profiles ?? []).forEach((p: any) => map.set(p.id, p));
-      }
-
-      const reviews = rows.map(r => ({ ...r, customer: map.get(r.customer_id) ?? null }));
-      const total = reviews.length;
-      const average = Math.round((reviews.reduce((s, r) => s + Number(r.rating ?? 0), 0) / total) * 10) / 10;
-      const breakdown = [5, 4, 3, 2, 1].map(stars => {
-        const count = reviews.filter(r => Number(r.rating) === stars).length;
-        return { stars, count, percent: pct(count, total) };
-      });
-
-      return { reviews, average, total, breakdown };
+      // Data access delegated to the reviews API (Phase 2D-B).
+      return await getVendorReviewsWithCustomers(vendorId);
     },
     enabled: !!vendorId,
     staleTime: 1000 * 60,

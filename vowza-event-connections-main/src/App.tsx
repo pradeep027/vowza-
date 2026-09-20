@@ -76,7 +76,7 @@ const WishlistPage         = lazy(() => import("./pages/customer/WishlistPage"))
 const NotificationsPage    = lazy(() => import("./features/notifications/pages/NotificationsPage"));
 const MyProfilePage        = lazy(() => import("./pages/customer/MyProfilePage"));
 const PaymentHistoryPage   = lazy(() => import("./pages/customer/PaymentHistoryPage"));
-const MyReviewsPage        = lazy(() => import("./pages/customer/MyReviewsPage"));
+const MyReviewsPage        = lazy(() => import("./features/reviews/pages/MyReviewsPage"));
 const AIPlannerListPage    = lazy(() => import("./pages/customer/AIPlannerListPage"));
 const CustomerSettingsPage = lazy(() => import("./pages/customer/SettingsPage"));
 const CustomerHelpSupport  = lazy(() => import("./pages/customer/CustomerHelpSupport"));
@@ -88,7 +88,7 @@ const VendorBookings       = lazy(() => import("./pages/vendor/VendorBookings"))
 const VendorPortfolio      = lazy(() => import("./pages/vendor/VendorPortfolio"));
 const VendorPackages       = lazy(() => import("./pages/vendor/VendorPackages"));
 const VendorWallet         = lazy(() => import("./pages/vendor/VendorWallet"));
-const VendorReviews        = lazy(() => import("./pages/vendor/VendorReviews"));
+const VendorReviews        = lazy(() => import("./features/reviews/pages/VendorReviews"));
 const VendorMessages       = lazy(() => import("./pages/vendor/VendorMessages"));
 const VendorNotifications  = lazy(() => import("./features/notifications/pages/VendorNotifications"));
 const VendorSettings       = lazy(() => import("./pages/vendor/VendorSettings"));

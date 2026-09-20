@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AvailabilityCalendar from '@/components/booking/AvailabilityCalendar';
 import { useArtistAvailabilityManager } from '@/hooks/useAvailability';
+import { getProviderDashboardReviews } from '@/features/reviews/api/reviewData'; // Phase 2D-B: reviews API boundary
 import { toast } from 'sonner';
 import {
   Calendar,
@@ -154,13 +155,8 @@ const ProviderDashboard = () => {
         }
       }
 
-      // Fetch reviews
-      const { data: reviewsData, error: reviewsError } = await supabase
-        .from('reviews')
-        .select('id, rating, review_text, created_at, customer_id')
-        .eq('provider_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Fetch reviews via the reviews API (Phase 2D-B)
+      const { data: reviewsData, error: reviewsError } = await getProviderDashboardReviews(profile.id);
 
       if (!reviewsError && reviewsData) {
         const reviewCustomerIds = reviewsData.map(r => r.customer_id);

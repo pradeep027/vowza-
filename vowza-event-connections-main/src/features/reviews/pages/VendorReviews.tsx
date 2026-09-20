@@ -1,11 +1,11 @@
 // VendorReviews — 100% real reviews from Supabase with reply capability.
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Star, MessageSquare, Send, X } from 'lucide-react';
 import { useVendorId, useVendorRealtime, useVendorReviews } from '@/hooks/useVendorData';
+import { updateVendorReply } from '@/features/reviews/api/reviewData'; // Phase 2D-B: reviews API boundary
 
 export default function VendorReviews() {
   const qc = useQueryClient();
@@ -27,10 +27,8 @@ export default function VendorReviews() {
   const submitReply = async (reviewId: string) => {
     if (!replyText.trim()) { toast.error('Reply cannot be empty'); return; }
     setBusy(true);
-    const { error } = await supabase
-      .from('reviews' as any)
-      .update({ reply: replyText.trim(), replied_at: new Date().toISOString() })
-      .eq('id', reviewId);
+    // Data access via the reviews API (Phase 2D-B); toast/invalidation behavior unchanged.
+    const { error } = await updateVendorReply(reviewId, replyText.trim());
 
     if (error) toast.error(error.message);
     else {

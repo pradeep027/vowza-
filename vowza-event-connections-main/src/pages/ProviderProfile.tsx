@@ -19,6 +19,7 @@ import BookingModal from "@/components/BookingModal";
 import AppLogo from "@/components/AppLogo";
 import { useArtists } from "@/hooks/useArtists";
 import { addFavorite, removeFavorite, isFavorite as checkFavorite } from "@/features/wishlist/api/favoriteData"; // Phase 2D-A: favorites API boundary
+import { getProviderReviewsWithCustomerNames, submitReview as submitReviewApi } from "@/features/reviews/api/reviewData"; // Phase 2D-B: reviews API boundary
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
 import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isDancer, isSinger, isPhotographyOrVideography } from "@/lib/providerCategory";
@@ -185,7 +186,7 @@ const ProviderProfile = () => {
 
       const [portRes, revRes, pkgRes, faqRes, menuRes, rentalRes, poojaRes] = await Promise.allSettled([
         supabase.from("portfolio_items").select("*").eq("provider_id", id).eq("is_published", true).order("created_at", { ascending: false }),
-        supabase.from("reviews").select("id,rating,review_text,created_at,customer_id").eq("provider_id", id).order("created_at", { ascending: false }).limit(15),
+        getProviderReviewsWithCustomerNames(id),
         supabase.from("pricing_packages" as any).select("*").eq("provider_id", id).order("sort_order"),
         supabase.from("provider_faqs" as any).select("*").eq("provider_id", id).order("sort_order"),
         supabase.from("menu_items" as any).select("*").eq("provider_id", id).order("sort_order"),
@@ -201,11 +202,7 @@ const ProviderProfile = () => {
       if (poojaRes.status  === "fulfilled" && poojaRes.value.data) setPoojaServices(poojaRes.value.data);
 
       if (revRes.status === "fulfilled" && revRes.value.data) {
-        const revData = revRes.value.data;
-        const ids = revData.map((r: any) => r.customer_id);
-        const { data: cust } = await supabase.from("profiles").select("id,full_name").in("id", ids);
-        const cm = new Map((cust ?? []).map((c: any) => [c.id, c.full_name]));
-        setReviews(revData.map((r: any) => ({ ...r, customer_name: cm.get(r.customer_id) || "Anonymous" })));
+        setReviews(revRes.value.data);
       }
     } catch (e: any) { toast.error("Failed to load profile"); navigate("/artists"); }
     finally { setIsLoading(false); }
@@ -249,7 +246,7 @@ const ProviderProfile = () => {
     try {
       const { data: bk } = await supabase.from("bookings").select("id").eq("customer_id", user.id).eq("provider_id", provider.id).eq("status", "completed").limit(1).maybeSingle();
       if (!bk) { toast.error("Only available after a completed booking"); return; }
-      const { error } = await supabase.from("reviews").insert({ booking_id: bk.id, customer_id: user.id, provider_id: provider.id, rating: reviewRating, review_text: reviewText.trim() || null });
+      const { error } = await submitReviewApi({ bookingId: bk.id, customerId: user.id, providerId: provider.id, rating: reviewRating, reviewText: reviewText.trim() || null });
       if (error) { toast.error(error.code === "23505" ? "Already reviewed" : "Failed to submit"); return; }
       toast.success("Review submitted!"); setReviewText(""); setReviewRating(5); fetchAll();
     } finally { setSubmittingReview(false); }

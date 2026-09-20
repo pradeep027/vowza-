@@ -1,8 +1,8 @@
 // ─── Admin Reviews ────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Star, Trash2, Eye, EyeOff, RefreshCw, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { getAdminReviewsPage, deleteReview } from '@/features/reviews/api/reviewData'; // Phase 2D-B: reviews API boundary
 
 const PAGE_SIZE = 15;
 
@@ -17,8 +17,8 @@ export default function AdminReviews() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, count, error } = await supabase.from('reviews').select('*', { count: 'exact' })
-        .order('created_at', { ascending: false }).range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1);
+      // Paginated read via the reviews API (Phase 2D-B)
+      const { data, count, error } = await getAdminReviewsPage(page, PAGE_SIZE);
       if (error) throw error;
       setReviews(data ?? []);
       setTotal(count ?? 0);
@@ -33,7 +33,7 @@ export default function AdminReviews() {
 
   const del = async (id: string) => {
     if (!confirm('Delete review?')) return;
-    await supabase.from('reviews').delete().eq('id', id);
+    await deleteReview(id);
     toast.success('Deleted'); load();
   };
 

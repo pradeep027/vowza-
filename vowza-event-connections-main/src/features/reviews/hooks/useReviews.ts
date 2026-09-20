@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getMyReviews } from '@/features/reviews/api/reviewData'; // Phase 2D-B: reviews API boundary
 
 export interface ReviewWithContext {
   id: string;
@@ -37,11 +38,8 @@ export const useReviews = () => {
     setError(null);
 
     try {
-      const { data: reviewsData, error: rErr } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('customer_id', user.id)
-        .order('created_at', { ascending: false });
+      // Primary read via the reviews API (Phase 2D-B); joins remain here.
+      const { data: reviewsData, error: rErr } = await getMyReviews(user.id);
 
       if (rErr) throw rErr;
       if (!reviewsData || reviewsData.length === 0) {

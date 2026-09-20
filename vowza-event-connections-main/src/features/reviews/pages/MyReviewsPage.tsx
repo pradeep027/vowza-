@@ -1,8 +1,9 @@
 // MyReviewsPage — reviews written by the customer.
 // The reviews table has no updated_at column, so reviews are read-only once
 // submitted (editing is intentionally not supported by the schema).
+// Moved to features/reviews/pages (Phase 2D-B) — content unchanged.
 import { motion } from 'framer-motion';
-import { useReviews } from '@/hooks/useReviews';
+import { useReviews } from '@/features/reviews/hooks/useReviews';
 import { Star, MessageSquareText } from 'lucide-react';
 
 export default function MyReviewsPage() {
