@@ -18,6 +18,7 @@ import {
 import BookingModal from "@/components/BookingModal";
 import AppLogo from "@/components/AppLogo";
 import { useArtists } from "@/hooks/useArtists";
+import { addFavorite, removeFavorite, isFavorite as checkFavorite } from "@/features/wishlist/api/favoriteData"; // Phase 2D-A: favorites API boundary
 import { trackProfileView } from "@/hooks/useVendorData";
 import { getCategoryByProfession } from "@/data/categoryConfig";
 import { isPhotographer, isWaterSupplier, isCaterer, isVideographer, isDroneOperator, isDJ, isDecorator, isMakeupArtist, isMehendiArtist, isAnchor, isBanquetHall, isRentalService, isPriest, isBand, isDancer, isSinger, isPhotographyOrVideography } from "@/lib/providerCategory";
@@ -163,8 +164,7 @@ const ProviderProfile = () => {
 
   const checkFav = async () => {
     if (!user || !id) return;
-    const { data } = await supabase.from("favorites" as any).select("id").eq("user_id", user.id).eq("provider_id", id).maybeSingle();
-    setIsFavorite(!!data);
+    setIsFavorite(await checkFavorite(user.id, id));
   };
 
   const fetchAll = async () => {
@@ -214,10 +214,10 @@ const ProviderProfile = () => {
   const toggleFav = async () => {
     if (!user) { toast.error("Login to save"); return; }
     if (isFavorite) {
-      await supabase.from("favorites" as any).delete().eq("user_id", user.id).eq("provider_id", id);
+      await removeFavorite(user.id, id);
       toast.success("Removed from saved"); setIsFavorite(false);
     } else {
-      await supabase.from("favorites" as any).insert({ user_id: user.id, provider_id: id });
+      await addFavorite(user.id, id);
       toast.success("Saved!"); setIsFavorite(true);
     }
   };

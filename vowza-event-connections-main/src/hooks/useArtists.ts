@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { artistCategories } from '@/data/artistCategories';
 import { PUBLIC_PROVIDER_SELECT } from '@/lib/publicColumns';
+import { addFavorite, removeFavorite, getFavoriteProviderIds } from '@/features/wishlist/api/favoriteData';
 
 export interface ArtistFilters {
   category?:   string;
@@ -385,6 +386,8 @@ export function useAvailability(providerId: string, date: Date) {
 }
 
 // ─── Toggle favorite ───────────────────────────────────────────────────────────
+// Data access delegated to the wishlist feature API (Phase 2D-A).
+// TanStack mutation shape and invalidation behavior preserved exactly.
 export function useToggleFavorite() {
   const qc = useQueryClient();
   return useMutation({
@@ -392,9 +395,9 @@ export function useToggleFavorite() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       if (isFavorite) {
-        await supabase.from('favorites' as any).delete().eq('user_id', user.id).eq('provider_id', providerId);
+        await removeFavorite(user.id, providerId);
       } else {
-        await supabase.from('favorites' as any).insert({ user_id: user.id, provider_id: providerId });
+        await addFavorite(user.id, providerId);
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
@@ -402,18 +405,15 @@ export function useToggleFavorite() {
 }
 
 // ─── Fetch favorites ───────────────────────────────────────────────────────────
+// Data access delegated to the wishlist feature API (Phase 2D-A).
+// Hook signature, query key, and staleTime preserved exactly.
 export function useFavorites() {
   return useQuery({
     queryKey: ['favorites'],
     queryFn:  async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('favorites' as any)
-        .select('provider_id')
-        .eq('user_id', user.id);
-      if (error) throw error;
-      return (data ?? []).map((f: any) => f.provider_id as string);
+      return getFavoriteProviderIds(user.id);
     },
     staleTime: 1000 * 60 * 5,
   });
