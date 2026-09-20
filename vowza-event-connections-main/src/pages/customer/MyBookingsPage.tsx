@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBookings } from '@/hooks/useBookings';
 import { supabase } from '@/integrations/supabase/client';
-import { NotificationService } from '@/services/notificationService';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle

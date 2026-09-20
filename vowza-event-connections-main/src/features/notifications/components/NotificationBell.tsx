@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { NotificationService } from '@/services/notificationService';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import {
   getNotificationSettings,
   saveNotificationSettings,

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { NotificationService } from '@/services/notificationService';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import { Button } from '@/components/ui/button';
 import {
   Bell, BellRing, CheckCheck, CalendarCheck, CreditCard, BadgeCheck,

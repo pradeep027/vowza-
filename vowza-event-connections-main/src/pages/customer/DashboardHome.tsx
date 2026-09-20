@@ -7,7 +7,7 @@ import { CalendarCheck, CheckCircle2, Heart, Bell, ArrowRight } from 'lucide-rea
 import { useAuth } from '@/contexts/AuthContext';
 import { useBookings } from '@/hooks/useBookings';
 import { useFavorites } from '@/hooks/useArtists';
-import { NotificationService } from '@/services/notificationService';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import { cn } from '@/lib/utils';
 
 const CARD_VARIANTS = {
