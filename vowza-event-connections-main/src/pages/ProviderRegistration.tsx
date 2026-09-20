@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import { claimProviderRole } from '@/lib/userRoles';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -376,11 +377,10 @@ export default function ProviderRegistration() {
       }
 
       // 7. Send notification
-      await supabase.from('notifications' as any).insert({
-        user_id: user.id, type: 'registration',
+      await NotificationService.createNotification({
+        userId: user.id, type: 'registration',
         title: 'Application Submitted',
         message: 'Your artist application has been submitted and is under review.',
-        is_read: false,
       });
 
       resetRegistration();

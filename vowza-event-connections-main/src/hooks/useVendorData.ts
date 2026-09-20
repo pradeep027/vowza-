@@ -12,6 +12,7 @@ import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type Period = '7d' | '30d' | '90d' | '1y';
@@ -1621,12 +1622,8 @@ export function useVendorBadges(vendorId?: string | null) {
         .eq('provider_id', vendorId)
         .eq('is_read', false);
 
-      // Unread notifications for this auth user
-      const notifsP = supabase
-        .from('notifications' as any)
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
+      // Unread notifications for this auth user (via notification service)
+      const notifsP = NotificationService.getUnreadCount(user.id).then(count => ({ count, error: null }));
 
       // Unread messages: need my booking ids from ALL tables
       const allBookingIds: string[] = [];
@@ -1656,7 +1653,7 @@ export function useVendorBadges(vendorId?: string | null) {
         } catch { /* skip */ }
       }
 
-      const [bRes, iRes, nRes] = await Promise.all([
+      const [bRes, iRes, nCount] = await Promise.all([
         bookingsP, inquiriesP, notifsP,
       ]);
 
@@ -1676,7 +1673,7 @@ export function useVendorBadges(vendorId?: string | null) {
         bookings:      bRes.count ?? 0,
         messages,
         inquiries:     iRes.count ?? 0,
-        notifications: nRes.count ?? 0,
+        notifications: typeof nCount === 'number' ? nCount : (nCount as any)?.count ?? 0,
       };
     },
     enabled: !!vendorId && !!user,
@@ -1696,20 +1693,7 @@ export function useVendorNotifications(limit = 50) {
     queryFn: async () => {
       const empty = { notifications: [] as any[], unread: 0 };
       if (!user) return empty;
-
-      const { data, error } = await supabase
-        .from('notifications' as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      const notifications = (data ?? []) as any[];
-      return {
-        notifications,
-        unread: notifications.filter(n => !n.is_read).length,
-      };
+      return NotificationService.getNotificationsByUser(user.id, { limit });
     },
     enabled: !!user,
     staleTime: 1000 * 10,
@@ -1718,16 +1702,12 @@ export function useVendorNotifications(limit = 50) {
 
 /** Mark a single notification read. */
 export async function markNotificationRead(id: string) {
-  return supabase.from('notifications' as any).update({ is_read: true }).eq('id', id);
+  return NotificationService.markAsRead(id);
 }
 
 /** Mark every notification read for the given user. */
 export async function markAllNotificationsRead(userId: string) {
-  return supabase
-    .from('notifications' as any)
-    .update({ is_read: true })
-    .eq('user_id', userId)
-    .eq('is_read', false);
+  return NotificationService.markAllAsRead(userId);
 }
 
 /** Mark all unread messages in a booking thread as read (not sent by me). */

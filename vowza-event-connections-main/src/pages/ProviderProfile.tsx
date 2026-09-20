@@ -2,6 +2,7 @@
 import { useState, useEffect, memo } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { NotificationService } from "@/features/notifications/api/notificationService";
 import { useAuth } from "@/contexts/AuthContext";
 import { PUBLIC_PROVIDER_SELECT } from "@/lib/publicColumns";
 import { toast } from "sonner";
@@ -668,7 +669,7 @@ const ProviderProfile = () => {
               <button onClick={() => { setReportOpen(false); setReportReason(""); }} className="btn-outline flex-1 justify-center py-2.5 text-sm">Cancel</button>
               <button onClick={async () => {
                 if (!reportReason.trim()) { toast.error("Please provide a reason"); return; }
-                await supabase.from("notifications" as any).insert({ user_id: user?.id, title: "Profile Reported", message: `Profile ${id} reported: ${reportReason}`, type: "report", reference_id: id || null });
+                await NotificationService.createNotification({ userId: user?.id || '', type: 'report', title: 'Profile Reported', message: `Profile ${id} reported: ${reportReason}`, metadata: { bookingId: id } });
                 toast.success("Reported"); setReportOpen(false); setReportReason("");
               }} className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold hover:bg-destructive/90">Submit Report</button>
             </div>

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Plus, Trash2, RefreshCw, Megaphone, Save, X } from 'lucide-react';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 
 export default function AdminAnnouncements() {
   const { user } = useAuth();
@@ -16,10 +17,8 @@ export default function AdminAnnouncements() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('notifications' as any)
-      .select('*').eq('type', 'announcement')
-      .order('created_at', { ascending: false }).limit(30);
-    setAnns(data ?? []);
+    const { data } = await NotificationService.getNotificationsByType('announcement', { limit: 30 });
+    setAnns(data);
     setLoading(false);
   };
 
@@ -31,9 +30,10 @@ export default function AdminAnnouncements() {
     try {
       const { data: users } = await supabase.from('profiles').select('id');
       if (!users?.length) { toast.error('No users to notify'); return; }
-      const inserts = users.map((u: any) => ({ user_id: u.id, title, message, type: 'announcement', is_read: false }));
-      const { error } = await supabase.from('notifications' as any).insert(inserts);
-      if (error) throw error;
+      await NotificationService.bulkCreateNotifications(
+        users.map((u: any) => u.id),
+        { title, message, type: 'announcement' },
+      );
       toast.success(`Announcement sent to ${users.length} users`);
       setTitle(''); setMessage(''); setShowForm(false); load();
     } catch (e: any) { toast.error(e.message); }
@@ -41,7 +41,7 @@ export default function AdminAnnouncements() {
   };
 
   const del = async (id: string) => {
-    await supabase.from('notifications' as any).delete().eq('id', id);
+    await NotificationService.deleteNotification(id);
     toast.success('Deleted'); load();
   };
 

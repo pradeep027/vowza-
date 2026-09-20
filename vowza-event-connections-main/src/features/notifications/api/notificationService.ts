@@ -16,7 +16,16 @@ export type NotificationType =
   | 'profile_updated'
   | 'admin_announcement'
   | 'email_verification'
-  | 'password_reset';
+  | 'password_reset'
+  | 'announcement'
+  | 'admin_action'
+  | 'approval'
+  | 'rejection'
+  | 'report'
+  | 'support'
+  | 'complaint'
+  | 'contact'
+  | 'registration';
 
 interface NotificationData {
   userId: string;
@@ -336,5 +345,94 @@ export const NotificationService = {
         metadata: { bookingId }
       });
     }
+  },
+
+  // ─── Admin / query methods ─────────────────────────────────────────────────
+
+  /**
+   * Query notifications by type(s) with optional pagination.
+   * Preserves exact query semantics from AdminAuditLogs, AdminReports,
+   * AdminSupport, and AdminAnnouncements.
+   */
+  async getNotificationsByType(
+    types: string | string[],
+    options: {
+      limit?: number;
+      page?: number;
+      pageSize?: number;
+      order?: 'asc' | 'desc';
+    } = {},
+  ): Promise<{ data: any[]; count: number }> {
+    const { limit, page, pageSize, order = 'desc' } = options;
+    let query = supabase
+      .from('notifications')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: order === 'asc' });
+
+    // Type filter: single eq or multi in
+    if (Array.isArray(types)) {
+      query = query.in('type', types);
+    } else {
+      query = query.eq('type', types);
+    }
+
+    // Pagination: range takes precedence over limit
+    if (page !== undefined && pageSize !== undefined) {
+      query = query.range(page * pageSize, (page + 1) * pageSize - 1);
+    } else if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+
+    const { data, count, error } = await query;
+    if (error) throw error;
+    return { data: data ?? [], count: count ?? 0 };
+  },
+
+  /** Total notification count (head query). Used by AdminSystemHealth. */
+  async getNotificationCount(): Promise<number> {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true });
+    if (error) throw error;
+    return count ?? 0;
+  },
+
+  /** Bulk-insert notifications for multiple users. Used by AdminAnnouncements. */
+  async bulkCreateNotifications(
+    userIds: string[],
+    data: { title: string; message: string; type: string },
+  ): Promise<void> {
+    const inserts = userIds.map(uid => ({
+      user_id: uid,
+      title: data.title,
+      message: data.message,
+      type: data.type,
+      is_read: false,
+    }));
+    const { error } = await supabase.from('notifications' as any).insert(inserts);
+    if (error) throw error;
+  },
+
+  /**
+   * Get notifications for a specific user with optional limit.
+   * Used by useVendorData's useVendorNotifications hook.
+   */
+  async getNotificationsByUser(
+    userId: string,
+    options: { limit?: number } = {},
+  ): Promise<{ notifications: any[]; unread: number }> {
+    const { limit = 50 } = options;
+    const { data, error } = await supabase
+      .from('notifications' as any)
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    const notifications = (data ?? []) as any[];
+    return {
+      notifications,
+      unread: notifications.filter(n => !n.is_read).length,
+    };
   },
 };

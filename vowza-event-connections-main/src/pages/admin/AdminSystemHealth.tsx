@@ -1,6 +1,7 @@
 // ─── Admin System Health — Production Diagnostics ─────────────────────────────
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 import {
   Activity, Database, Wifi, Server, Cloud, CheckCircle, AlertCircle,
   RefreshCw, Clock, Shield, Users, BookOpen, Bell, MessageSquare,
@@ -166,9 +167,8 @@ export default function AdminSystemHealth() {
 
     // 9. Notifications
     try {
-      const { count, error } = await supabase.from('notifications').select('id', { count: 'exact', head: true });
-      if (error) throw error;
-      updateCheck('notifications', { status: 'ok', detail: `${count ?? 0} notifications` });
+      const count = await NotificationService.getNotificationCount();
+      updateCheck('notifications', { status: 'ok', detail: `${count} notifications` });
     } catch (e: any) { updateCheck('notifications', { status: 'error', error: e.message }); }
 
     // 10. Availability

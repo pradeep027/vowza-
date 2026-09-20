@@ -1,8 +1,8 @@
 // ─── Admin Audit Logs ─────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ClipboardList, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NotificationService } from '@/features/notifications/api/notificationService';
 
 const PAGE_SIZE = 20;
 
@@ -16,16 +16,12 @@ export default function AdminAuditLogs() {
     setLoading(true);
     try {
       // Use notifications table as audit log source (type=admin_action)
-      // If you have a dedicated audit_logs table, swap this query
-      const { data, count, error } = await supabase
-        .from('notifications' as any)
-        .select('*', { count: 'exact' })
-        .in('type', ['admin_action', 'approval', 'rejection', 'announcement', 'report'])
-        .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-      setLogs(data ?? []);
-      setTotal(count ?? 0);
+      const { data, count } = await NotificationService.getNotificationsByType(
+        ['admin_action', 'approval', 'rejection', 'announcement', 'report'],
+        { page, pageSize: PAGE_SIZE },
+      );
+      setLogs(data);
+      setTotal(count);
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   };
@@ -41,15 +37,15 @@ export default function AdminAuditLogs() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-display font-bold text-foreground">Audit Logs</h1><p className="text-sm text-muted-foreground">{total} logged actions</p></div>
-        <button onClick={load} className="p-2 rounded-lg border border-border hover:bg-secondary text-muted-foreground"><RefreshCw className="w-4 h-4"/></button>
+        <button onClick={load} className="p-2 rounded-lg border border-border hover:bg-secondary text-muted-foreground"><RefreshCw className="w-4 h-4" /></button>
       </div>
 
       <div className="bg-white dark:bg-[#1a1a24] rounded-2xl border border-border/60 overflow-hidden">
         {loading ? (
-          <div className="p-6 space-y-3">{Array.from({length:8}).map((_,i)=><div key={i} className="skeleton h-12 rounded"/>)}</div>
+          <div className="p-6 space-y-3">{Array.from({length:8}).map((_,i)=><div key={i} className="skeleton h-12 rounded" />)}</div>
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
-            <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30"/>
+            <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm">No audit logs yet</p>
           </div>
         ) : (
@@ -70,10 +66,10 @@ export default function AdminAuditLogs() {
           </div>
         )}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/60">
-          <p className="text-xs text-muted-foreground">Page {page+1}</p>
+          <p className="text-xs text-muted-foreground">Page {page + 1}</p>
           <div className="flex gap-1">
-            <button disabled={page===0} onClick={() => setPage(p=>p-1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronLeft className="w-4 h-4"/></button>
-            <button disabled={(page+1)*PAGE_SIZE>=total} onClick={() => setPage(p=>p+1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronRight className="w-4 h-4"/></button>
+            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
+            <button disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-border disabled:opacity-40 hover:bg-secondary"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       </div>
