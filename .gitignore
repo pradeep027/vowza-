@@ -1,2 +1,35 @@
+# ─── Dependencies ─────────────────────────────────────────────
+node_modules/
+**/node_modules/
+
+# ─── Build output ─────────────────────────────────────────────
+dist/
+dist-ssr/
+**/dist/
+build/
+
+# ─── Environment & secrets ────────────────────────────────────
+# NOTE: .env is currently still tracked; adding it here prevents
+# NEW env files from being committed. Untrack the existing one only
+# after confirming Vercel dashboard env vars are set (else prod build breaks).
+.env
+.env.*
+!.env.example
+
+# ─── Logs & temp artifacts ────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+test-output.txt
+*.zip
+
+# ─── Editor / OS ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ─── Vercel ───────────────────────────────────────────────────
 .vercel
-.env*.local
