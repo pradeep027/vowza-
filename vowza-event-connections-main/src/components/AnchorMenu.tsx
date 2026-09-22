@@ -24,7 +24,7 @@ export default function AnchorMenu({ provider, profile }: { provider: any; profi
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-anchor-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('anchor_packages' as any).select('*, anchor_gallery(*), anchor_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('anchor_packages').select('*, anchor_gallery(*), anchor_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -263,7 +263,7 @@ function AnchorBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('anchor_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('anchor_bookings').insert({
         package_id: pkg.id,
         provider_id: provider.id,
         customer_id: user.id,
@@ -283,7 +283,7 @@ function AnchorBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'anchor_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

@@ -24,7 +24,7 @@ export default function DancerMenu({ provider, profile }: { provider: any; profi
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-dancer-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('dancer_packages' as any).select('*, dancer_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('dancer_packages').select('*, dancer_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -157,7 +157,7 @@ function DancerBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: boolea
     if (!termsAccepted) { toast.error('Please accept booking terms'); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('dancer_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('dancer_bookings').insert({
         package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
         event_date: eventDate, event_time: eventTime || null,
         event_type: eventType || null,
@@ -175,7 +175,7 @@ function DancerBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: boolea
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'dancer_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

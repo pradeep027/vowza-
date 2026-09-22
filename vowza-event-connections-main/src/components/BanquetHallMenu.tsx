@@ -24,7 +24,7 @@ export default function BanquetHallMenu({ provider, profile }: { provider: any; 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-banquet-halls', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('banquet_halls' as any).select('*, hall_gallery(*), hall_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('banquet_halls').select('*, hall_gallery(*), hall_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -260,7 +260,7 @@ function BanquetBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('banquet_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('banquet_bookings').insert({
         package_id: pkg.id,
         provider_id: provider.id,
         customer_id: user.id,
@@ -282,7 +282,7 @@ function BanquetBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'banquet_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

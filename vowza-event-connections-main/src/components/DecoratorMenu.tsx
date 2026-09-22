@@ -24,7 +24,7 @@ export default function DecoratorMenu({ provider, profile }: { provider: any; pr
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-decorator-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('decorator_packages' as any).select('*, decorator_gallery(*), decorator_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('decorator_packages').select('*, decorator_gallery(*), decorator_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -276,7 +276,7 @@ function DecoratorBookingModal({ isOpen, onClose, pkg, provider, addons }: { isO
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('decorator_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('decorator_bookings').insert({
         package_id: pkg.id,
         provider_id: provider.id,
         customer_id: user.id,
@@ -295,7 +295,7 @@ function DecoratorBookingModal({ isOpen, onClose, pkg, provider, addons }: { isO
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'decorator_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

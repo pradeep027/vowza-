@@ -24,7 +24,7 @@ export default function SingerMenu({ provider, profile }: { provider: any; profi
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-singer-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('singer_packages' as any).select('*, singer_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('singer_packages').select('*, singer_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -141,7 +141,7 @@ function SingerBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: boolea
     if (!termsAccepted) { toast.error('Please accept terms'); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('singer_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('singer_bookings').insert({
         package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
         event_date: eventDate, event_time: eventTime || null, event_type: eventType || null,
         venue: location.venue_name || location.locality || null, city: location.town_city || null,
@@ -150,7 +150,7 @@ function SingerBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: boolea
         advance_amount: advanceAmount, remaining_amount: remaining, status: 'pending',
       }).select('id').single();
       if (error) throw error;
-      await supabase.from('booking_locations' as any).insert({ booking_table: 'singer_bookings', booking_id: booking.id, state: location.state, district: location.district, town_city: location.town_city, exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '), pincode: location.pincode, landmark: location.address_line || null, latitude: location.latitude, longitude: location.longitude });
+      await supabase.from('booking_locations').insert({ booking_table: 'singer_bookings', booking_id: booking.id, state: location.state, district: location.district, town_city: location.town_city, exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '), pincode: location.pincode, landmark: location.address_line || null, latitude: location.latitude, longitude: location.longitude });
       await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
       toast.success('Singer booking request sent!'); onClose(); nav('/booking-success');
     } catch (err: any) { toast.error(err.message || 'Could not create booking'); }

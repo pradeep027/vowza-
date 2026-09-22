@@ -41,7 +41,7 @@ export default function UnifiedPhotographyVideographyMenu({ provider, profile }:
     queryKey: ['public-photography-packages', provider.id],
     queryFn: async () => {
       const r = await supabase
-        .from('photography_packages' as any)
+        .from('photography_packages')
         .select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)')
         .eq('photographer_id', provider.id)
         .eq('is_active', true)
@@ -59,7 +59,7 @@ export default function UnifiedPhotographyVideographyMenu({ provider, profile }:
     queryKey: ['public-videography-packages', provider.id],
     queryFn: async () => {
       const r = await supabase
-        .from('videography_packages' as any)
+        .from('videography_packages')
         .select('*, videography_gallery(*)')
         .eq('provider_id', provider.id)
         .eq('status', 'active')
@@ -75,7 +75,7 @@ export default function UnifiedPhotographyVideographyMenu({ provider, profile }:
     queryKey: ['public-combined-packages', provider.id],
     queryFn: async () => {
       const r = await supabase
-        .from('photography_videography_packages' as any)
+        .from('photography_videography_packages')
         .select('*, photography_videography_package_images(*), photography_videography_package_addons(*)')
         .eq('provider_id', provider.id)
         .eq('is_active', true)

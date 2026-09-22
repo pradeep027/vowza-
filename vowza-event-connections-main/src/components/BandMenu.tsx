@@ -24,7 +24,7 @@ export default function BandMenu({ provider, profile }: { provider: any; profile
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-band-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('band_packages' as any).select('*, band_gallery(*), band_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('band_packages').select('*, band_gallery(*), band_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -192,7 +192,7 @@ function BandBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen: 
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('band_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('band_bookings').insert({
         package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
         event_date: eventDate, event_time: eventTime || null,
         event_type: eventType || pkg.band_category || null,
@@ -206,7 +206,7 @@ function BandBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen: 
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'band_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

@@ -24,7 +24,7 @@ export default function PriestMenu({ provider, profile }: { provider: any; profi
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-priest-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('priest_packages' as any).select('*, priest_gallery(*), priest_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('priest_packages').select('*, priest_gallery(*), priest_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -187,7 +187,7 @@ function PriestBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('priest_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('priest_bookings').insert({
         package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
         event_date: eventDate, event_time: eventTime || null,
         event_type: eventType || pkg.package_type || null,
@@ -201,7 +201,7 @@ function PriestBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'priest_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

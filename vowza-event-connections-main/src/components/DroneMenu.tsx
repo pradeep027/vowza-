@@ -26,7 +26,7 @@ export default function DroneMenu({ provider, profile }: { provider: any; profil
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-drone-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('drone_packages' as any).select('*, drone_gallery(*), drone_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('drone_packages').select('*, drone_gallery(*), drone_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -226,7 +226,7 @@ function DroneBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen:
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('drone_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('drone_bookings').insert({
         package_id: pkg.id,
         provider_id: provider.id,
         customer_id: user.id,
@@ -248,7 +248,7 @@ function DroneBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen:
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'drone_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

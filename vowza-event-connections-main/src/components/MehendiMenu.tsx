@@ -24,7 +24,7 @@ export default function MehendiMenu({ provider, profile }: { provider: any; prof
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-mehendi-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('mehendi_packages' as any).select('*, mehendi_gallery(*), mehendi_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('mehendi_packages').select('*, mehendi_gallery(*), mehendi_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -263,7 +263,7 @@ function MehendiBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('mehendi_bookings' as any).insert({
+      const { data: booking, error } = await supabase.from('mehendi_bookings').insert({
         package_id: pkg.id,
         provider_id: provider.id,
         customer_id: user.id,
@@ -283,7 +283,7 @@ function MehendiBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
       if (error) throw error;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'mehendi_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
