@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
     // ────────────────────────────────────────────────────────────────────────────
 
     // Prepare booking data based on category
-    let bookingData: any = {
+    const bookingData: any = {
       package_id: packageId,
       [providerColumn]: packageProviderId,
       customer_id: userId,

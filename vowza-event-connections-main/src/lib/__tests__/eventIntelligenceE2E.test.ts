@@ -362,7 +362,7 @@ describe('Event Intelligence E2E: Context Memory', () => {
     };
 
     // Generate initial plan
-    let plan = EventIntelligenceOrchestrator.generateFullPlan(context);
+    const plan = EventIntelligenceOrchestrator.generateFullPlan(context);
     expect(plan).toBeDefined();
 
     // Modify context (user provides new info)

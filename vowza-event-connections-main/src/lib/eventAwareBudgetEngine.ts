@@ -365,7 +365,7 @@ export function getActiveCategoriesForEvent(
   // profile (never wedding) so an unrecognised event type can't inject bridal /
   // mehendi / baraat categories into an unrelated event's budget.
   const canonical = normalizeEventType(eventType) as EventCategory;
-  let activations = EVENT_CATEGORY_ACTIVATIONS[canonical]
+  const activations = EVENT_CATEGORY_ACTIVATIONS[canonical]
     || EVENT_CATEGORY_ACTIVATIONS[eventType]
     || GENERIC_ACTIVATIONS;
 

@@ -650,7 +650,7 @@ export function orchestrate(
   
   // ─── PHASE 2A: Extract and merge context intelligently ───────────────────
   const updates = extractContextUpdates(normalizedMessage, ctx);
-  let { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
+  const { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
   
   // ─── PHASE 2A: If ambiguous, include this in the result ──────────────────
   if (ambiguous) {
@@ -687,7 +687,7 @@ export function orchestrate(
 
   // 7. Determine response strategy
   let responseStrategy: ResponseStrategy;
-  let nextQuestion = determineNextQuestion(intent, merged);
+  const nextQuestion = determineNextQuestion(intent, merged);
   
   // PHASE 2A: Record the question if we're about to ask it
   if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan'].includes(intent)) {

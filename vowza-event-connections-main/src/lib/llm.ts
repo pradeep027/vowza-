@@ -220,7 +220,7 @@ async function formatPackageRecommendationResponse(plan: EventBudgetPlan): Promi
   
   // ─── NEW Phase 7E: Admin Package Distinction ────────────────────────────────
   // Check if admin event packages are available for prioritization
-  let displayText = rec.displayText;
+  const displayText = rec.displayText;
   
   // TODO: Fetch admin_event_packages from database
   // For now, we have placeholder support that integrates when admin packages are retrieved

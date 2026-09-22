@@ -97,7 +97,7 @@ export const EventPackageSelector = ({ eventTypeId, eventTypeName }: EventPackag
     if (!selectedPackage) return 0;
 
     // Base package price (already includes discount from database)
-    let price = selectedPackage.final_price;
+    const price = selectedPackage.final_price;
 
     // Subtract optional items that were removed (they're typically not charged if removed)
     // Note: This assumes optional items add to the price. Adjust logic if needed.
