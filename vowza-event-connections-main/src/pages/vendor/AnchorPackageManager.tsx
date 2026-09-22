@@ -7,6 +7,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errorMessage';
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
 const PACKAGE_TYPES = [
@@ -80,7 +81,7 @@ const blank = (): Draft => ({
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function AnchorPackageManager({ provider }: { provider: any }) {
+export default function AnchorPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
@@ -91,7 +92,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['anchor-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('anchor_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
+      const r = await supabase.from('anchor_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -134,10 +135,10 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
 
       let packageId = draft.id;
       if (draft.id) {
-        const r = await supabase.from('anchor_packages' as any).update(payload).eq('id', draft.id).select('id').single();
+        const r = await supabase.from('anchor_packages').update(payload).eq('id', draft.id).select('id').single();
         if (r.error) throw r.error;
       } else {
-        const r = await supabase.from('anchor_packages' as any).insert(payload).select('id').single();
+        const r = await supabase.from('anchor_packages').insert(payload).select('id').single();
         if (r.error) throw r.error;
         packageId = r.data.id;
       }
@@ -148,8 +149,8 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
       setDraft(null);
       setStep(1);
       refresh();
-    } catch (err: any) {
-      toast.error(err.message || 'Could not save package');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Could not save package'));
     } finally {
       setBusy(false);
     }
@@ -157,13 +158,13 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
 
   const uploadMediaForPackage = async (packageId: string, draft: Draft) => {
     // Delete existing media
-    await supabase.from('anchor_addons' as any).delete().eq('package_id', packageId);
-    await supabase.from('anchor_gallery' as any).delete().eq('package_id', packageId);
+    await supabase.from('anchor_addons').delete().eq('package_id', packageId);
+    await supabase.from('anchor_gallery').delete().eq('package_id', packageId);
 
     // Upload addons
     const validAddons = draft.addons.filter(a => a.name.trim());
     if (validAddons.length > 0) {
-      await supabase.from('anchor_addons' as any).insert(validAddons.map((a, i) => ({
+      await supabase.from('anchor_addons').insert(validAddons.map((a, i) => ({
         package_id: packageId,
         name: a.name.trim(),
         price: Number(a.price) || 0,
@@ -179,7 +180,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
       const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
       if (!upErr) {
         const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
-        await supabase.from('anchor_gallery' as any).insert({
+        await supabase.from('anchor_gallery').insert({
           package_id: packageId,
           storage_path: path,
           public_url: url,
@@ -199,7 +200,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
         const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type });
         if (!upErr) {
           const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
-          await supabase.from('anchor_gallery' as any).insert({
+          await supabase.from('anchor_gallery').insert({
             package_id: packageId,
             storage_path: path,
             public_url: url,
@@ -220,7 +221,7 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
         const { error: upErr } = await supabase.storage.from('anchor-media').upload(path, file, { contentType: file.type });
         if (!upErr) {
           const url = supabase.storage.from('anchor-media').getPublicUrl(path).data.publicUrl;
-          await supabase.from('anchor_gallery' as any).insert({
+          await supabase.from('anchor_gallery').insert({
             package_id: packageId,
             storage_path: path,
             public_url: url,
@@ -236,20 +237,20 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
   const editPackage = async (pkg: any) => {
     let addons: Addon[] = [];
     try {
-      const r = await supabase.from('anchor_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order');
+      const r = await supabase.from('anchor_addons').select('name, price, description').eq('package_id', pkg.id).order('sort_order');
       if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' }));
-    } catch (_) {}
+    } catch { /* best-effort media load; keep the form usable if it fails */ }
 
     let galleryUrls: { id: string; url: string; is_cover: boolean }[] = [];
     let videoUrls: { id: string; url: string }[] = [];
     let coverUrl = '';
     try {
-      const r = await supabase.from('anchor_gallery' as any).select('id, public_url, is_cover, media_type').eq('package_id', pkg.id).order('sort_order');
+      const r = await supabase.from('anchor_gallery').select('id, public_url, is_cover, media_type').eq('package_id', pkg.id).order('sort_order');
       const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover }));
       coverUrl = g.find((x: any) => x.is_cover)?.url || '';
       galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type === 'image');
       videoUrls = g.filter((x: any) => x.media_type === 'video').map((x: any) => ({ id: x.id, url: x.url }));
-    } catch (_) {}
+    } catch { /* best-effort media load; keep the form usable if it fails */ }
 
     const coverage = pkg.services_included?.filter((s: string) => ALL_COVERAGE.includes(s)) ?? [];
     const inclusions = pkg.services_included?.filter((s: string) => !ALL_COVERAGE.includes(s) && !ALL_DELIVERABLES.includes(s)) ?? [];
@@ -279,13 +280,13 @@ export default function AnchorPackageManager({ provider }: { provider: any }) {
   };
 
   const toggleStatus = async (pkg: any) => {
-    await supabase.from('anchor_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id);
+    await supabase.from('anchor_packages').update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id);
     refresh();
   };
 
   const removePackage = async (pkg: any) => {
     if (!confirm('Delete this package?')) return;
-    await supabase.from('anchor_packages' as any).delete().eq('id', pkg.id);
+    await supabase.from('anchor_packages').delete().eq('id', pkg.id);
     refresh();
     toast.success('Deleted');
   };

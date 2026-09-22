@@ -16,7 +16,7 @@ const emptyDraft = (): Draft => ({ category_id: '', name: '', description: '', u
 
 const toggle = (values: string[], value: string) => values.includes(value) ? values.filter(item => item !== value) : [...values, value];
 
-export default function WaterProductsManager({ provider }: { provider: any }) {
+export default function WaterProductsManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [editor, setEditor] = useState<Draft | null>(null);
@@ -24,23 +24,23 @@ export default function WaterProductsManager({ provider }: { provider: any }) {
   const [busy, setBusy] = useState(false);
   const [delivery, setDelivery] = useState({ max_delivery_radius_km: '50', free_delivery_radius_km: '5', extra_delivery_charge: '100', delivery_origin_lat: '', delivery_origin_lng: '', same_day_delivery_enabled: false, emergency_delivery_enabled: false, service_areas: '', working_hours: '' });
 
-  const { data: categories = [] } = useQuery({ queryKey: ['water-categories'], queryFn: async () => { const { data, error } = await supabase.from('water_categories' as any).select('*').eq('is_active', true).order('sort_order'); if (error) throw error; return (data ?? []) as any[]; } });
+  const { data: categories = [] } = useQuery({ queryKey: ['water-categories'], queryFn: async () => { const { data, error } = await supabase.from('water_categories').select('*').eq('is_active', true).order('sort_order'); if (error) throw error; return (data ?? []) as any[]; } });
   const { data: products = [], isLoading } = useQuery({ queryKey: ['water-products', provider.id], queryFn: async () => {
-    const { data, error } = await supabase.from('water_products' as any).select('*, water_categories(name,code), water_product_variants(*), water_product_images(*)').eq('provider_id', provider.id).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('water_products').select('*, water_categories(name,code), water_product_variants(*), water_product_images(*)').eq('provider_id', provider.id).order('created_at', { ascending: false });
     if (error) throw error;
     const rows = (data ?? []) as any[];
     const variantIds = rows.flatMap(product => (product.water_product_variants ?? []).map((variant: any) => variant.id));
-    const stock = variantIds.length ? await supabase.from('water_product_stock' as any).select('*').in('variant_id', variantIds) : { data: [] };
+    const stock = variantIds.length ? await supabase.from('water_product_stock').select('*').in('variant_id', variantIds) : { data: [] };
     const stockByVariant = new Map(((stock.data ?? []) as any[]).map(row => [row.variant_id, row]));
     return rows.map(product => ({ ...product, water_product_variants: (product.water_product_variants ?? []).map((variant: any) => ({ ...variant, stock: stockByVariant.get(variant.id)?.quantity_available ?? 0 })) }));
   } });
-  const { data: savedSettings } = useQuery({ queryKey: ['water-delivery-settings', provider.id], queryFn: async () => { const { data, error } = await supabase.from('supplier_delivery_settings' as any).select('*').eq('provider_id', provider.id).maybeSingle(); if (error) throw error; return data as any; } });
+  const { data: savedSettings } = useQuery({ queryKey: ['water-delivery-settings', provider.id], queryFn: async () => { const { data, error } = await supabase.from('supplier_delivery_settings').select('*').eq('provider_id', provider.id).maybeSingle(); if (error) throw error; return data as any; } });
   const { data: analytics = { orders: 0, revenue: 0, bestProduct: '—' } } = useQuery({ queryKey: ['water-product-analytics', provider.id], queryFn: async () => {
-    const { data: orders, error } = await supabase.from('product_orders' as any).select('id,status').eq('provider_id', provider.id).in('status', ['confirmed', 'preparing', 'out_for_delivery', 'delivered']);
+    const { data: orders, error } = await supabase.from('product_orders').select('id,status').eq('provider_id', provider.id).in('status', ['confirmed', 'preparing', 'out_for_delivery', 'delivered']);
     if (error) throw error;
     const ids = (orders ?? []).map((order: any) => order.id);
     if (!ids.length) return { orders: 0, revenue: 0, bestProduct: '—' };
-    const { data: items, error: itemError } = await supabase.from('product_order_items' as any).select('product_name,quantity,line_total').in('order_id', ids);
+    const { data: items, error: itemError } = await supabase.from('product_order_items').select('product_name,quantity,line_total').in('order_id', ids);
     if (itemError) throw itemError;
     const totals = new Map<string, number>();
     let revenue = 0;
@@ -65,7 +65,7 @@ export default function WaterProductsManager({ provider }: { provider: any }) {
       const { data } = supabase.storage.from('water-product-images').getPublicUrl(path);
       rows.push({ product_id: productId, storage_path: path, public_url: data.publicUrl, alt_text: file.name, is_cover: index === 0, sort_order: index });
     }
-    const { error } = await supabase.from('water_product_images' as any).insert(rows);
+    const { error } = await supabase.from('water_product_images').insert(rows);
     if (error) throw error;
   };
 
@@ -75,14 +75,14 @@ export default function WaterProductsManager({ provider }: { provider: any }) {
     setBusy(true);
     try {
       const payload = { provider_id: provider.id, category_id: editor.category_id, name: editor.name.trim(), description: editor.description.trim() || null, unit_type: editor.unit_type, water_quality: editor.water_quality, delivery_options: editor.delivery_options, delivery_time_minutes: Number(editor.delivery_time_minutes) || 30, is_active: editor.is_active, is_visible: editor.is_visible };
-      const result = editor.id ? await supabase.from('water_products' as any).update(payload).eq('id', editor.id).select().single() : await supabase.from('water_products' as any).insert(payload).select().single();
+      const result = editor.id ? await supabase.from('water_products').update(payload).eq('id', editor.id).select().single() : await supabase.from('water_products').insert(payload).select().single();
       if (result.error) throw result.error;
       const productId = result.data.id;
       for (const variant of editor.variants) {
         const variantPayload = { product_id: productId, label: variant.label.trim(), price: Number(variant.price), is_available: variant.is_available };
-        const variantResult = variant.id ? await supabase.from('water_product_variants' as any).update(variantPayload).eq('id', variant.id).select().single() : await supabase.from('water_product_variants' as any).insert(variantPayload).select().single();
+        const variantResult = variant.id ? await supabase.from('water_product_variants').update(variantPayload).eq('id', variant.id).select().single() : await supabase.from('water_product_variants').insert(variantPayload).select().single();
         if (variantResult.error) throw variantResult.error;
-        const { error: stockError } = await supabase.from('water_product_stock' as any).upsert({ variant_id: variantResult.data.id, quantity_available: Number(variant.stock) || 0 }, { onConflict: 'variant_id' });
+        const { error: stockError } = await supabase.from('water_product_stock').upsert({ variant_id: variantResult.data.id, quantity_available: Number(variant.stock) || 0 }, { onConflict: 'variant_id' });
         if (stockError) throw stockError;
       }
       await uploadFiles(productId, editor.files);
@@ -92,15 +92,15 @@ export default function WaterProductsManager({ provider }: { provider: any }) {
   };
 
   const duplicate = async (product: any) => {
-    const { data: clone, error } = await supabase.from('water_products' as any).insert({ provider_id: provider.id, category_id: product.category_id, name: `${product.name} (Copy)`, description: product.description, unit_type: product.unit_type, water_quality: product.water_quality, delivery_options: product.delivery_options, delivery_time_minutes: product.delivery_time_minutes, is_active: false, is_visible: false }).select().single();
+    const { data: clone, error } = await supabase.from('water_products').insert({ provider_id: provider.id, category_id: product.category_id, name: `${product.name} (Copy)`, description: product.description, unit_type: product.unit_type, water_quality: product.water_quality, delivery_options: product.delivery_options, delivery_time_minutes: product.delivery_time_minutes, is_active: false, is_visible: false }).select().single();
     if (error) { toast.error(error.message); return; }
     const variants = (product.water_product_variants ?? []).map((variant: any) => ({ product_id: clone.id, label: variant.label, price: variant.price, is_available: false }));
-    if (variants.length) await supabase.from('water_product_variants' as any).insert(variants);
+    if (variants.length) await supabase.from('water_product_variants').insert(variants);
     toast.success('Draft product duplicated'); refresh();
   };
 
-  const remove = async (id: string) => { if (!confirm('Delete this product and its variants? Existing orders are preserved.')) return; const { error } = await supabase.from('water_products' as any).delete().eq('id', id); if (error) toast.error(error.message); else { toast.success('Product deleted'); refresh(); } };
-  const saveSettings = async () => { setBusy(true); const { error } = await supabase.from('supplier_delivery_settings' as any).upsert({ provider_id: provider.id, max_delivery_radius_km: Number(delivery.max_delivery_radius_km), free_delivery_radius_km: Number(delivery.free_delivery_radius_km), extra_delivery_charge: Number(delivery.extra_delivery_charge), delivery_origin_lat: delivery.delivery_origin_lat ? Number(delivery.delivery_origin_lat) : null, delivery_origin_lng: delivery.delivery_origin_lng ? Number(delivery.delivery_origin_lng) : null, same_day_delivery_enabled: delivery.same_day_delivery_enabled, emergency_delivery_enabled: delivery.emergency_delivery_enabled, service_areas: delivery.service_areas.split(',').map(area => area.trim()).filter(Boolean), working_hours: { display: delivery.working_hours.trim() } }, { onConflict: 'provider_id' }); setBusy(false); if (error) toast.error(error.message); else { toast.success('Delivery settings saved'); setSettingsOpen(false); qc.invalidateQueries({ queryKey: ['water-delivery-settings', provider.id] }); } };
+  const remove = async (id: string) => { if (!confirm('Delete this product and its variants? Existing orders are preserved.')) return; const { error } = await supabase.from('water_products').delete().eq('id', id); if (error) toast.error(error.message); else { toast.success('Product deleted'); refresh(); } };
+  const saveSettings = async () => { setBusy(true); const { error } = await supabase.from('supplier_delivery_settings').upsert({ provider_id: provider.id, max_delivery_radius_km: Number(delivery.max_delivery_radius_km), free_delivery_radius_km: Number(delivery.free_delivery_radius_km), extra_delivery_charge: Number(delivery.extra_delivery_charge), delivery_origin_lat: delivery.delivery_origin_lat ? Number(delivery.delivery_origin_lat) : null, delivery_origin_lng: delivery.delivery_origin_lng ? Number(delivery.delivery_origin_lng) : null, same_day_delivery_enabled: delivery.same_day_delivery_enabled, emergency_delivery_enabled: delivery.emergency_delivery_enabled, service_areas: delivery.service_areas.split(',').map(area => area.trim()).filter(Boolean), working_hours: { display: delivery.working_hours.trim() } }, { onConflict: 'provider_id' }); setBusy(false); if (error) toast.error(error.message); else { toast.success('Delivery settings saved'); setSettingsOpen(false); qc.invalidateQueries({ queryKey: ['water-delivery-settings', provider.id] }); } };
   const addFiles = (files: FileList | File[]) => setEditor(current => current ? { ...current, files: [...current.files, ...Array.from(files).filter(file => file.type.startsWith('image/'))] } : current);
 
   return <div className="max-w-[1200px] space-y-6">

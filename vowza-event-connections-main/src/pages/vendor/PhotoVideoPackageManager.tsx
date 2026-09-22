@@ -118,7 +118,7 @@ const blank = (): Draft => ({
 const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py-2.5 text-sm text-[#3d1924] outline-none transition placeholder:text-stone-400 focus:border-[#8b1538] focus:ring-2 focus:ring-[#8b1538]/15';
 
 /* ─── Main Component ────────────────────────────────────────────────────── */
-export default function PhotoVideoPackageManager({ provider }: { provider: any }) {
+export default function PhotoVideoPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
