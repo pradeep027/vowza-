@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { artistCategories } from '@/data/artistCategories';
 import { PUBLIC_PROVIDER_SELECT } from '@/lib/publicColumns';
 import { addFavorite, removeFavorite, getFavoriteProviderIds } from '@/features/wishlist/api/favoriteData';
+import type { Tables } from '@/integrations/supabase/types';
 
 export interface ArtistFilters {
   category?:   string;
@@ -59,6 +60,17 @@ export interface Artist {
   subcategory:        string;
   vendor_details:     Record<string, any>;
 }
+
+// Runtime row shapes for the two marketplace queries. provider_profiles is
+// fetched through a widened builder (see the TS2589 note inside useArtists), so
+// its result is cast to this row type for typed field access. The three
+// service_* columns exist at runtime but are absent from the generated types.
+type ProviderRow = Tables<'provider_profiles'> & {
+  service_city?:  string | null;
+  service_state?: string | null;
+  service_area?:  string | null;
+};
+type ProfileRow = Pick<Tables<'profiles'>, 'id' | 'full_name' | 'avatar_url' | 'city' | 'state' | 'area'>;
 
 // ─── Category label/icon from local definition (no extra DB call) ──────────────
 function getCategoryMeta(professionType: string): { name: string; icon: string } {
@@ -211,41 +223,41 @@ export function useArtists(filters: ArtistFilters = {}, enabled = true) {
       const profileMap = new Map((profilesData ?? []).map(p => [p.id, p]));
 
       // Step 3 — Map to Artist interface
-      let artists: Artist[] = providers.map((p: any) => {
-        const profile  = profileMap.get(p.user_id) ?? {};
+      let artists: Artist[] = (providers as ProviderRow[]).map((p) => {
+        const profile  = (profileMap.get(p.user_id) ?? {}) as Partial<ProfileRow>;
         const catMeta  = getCategoryMeta(p.profession);
         return {
           id:                 p.id,
           user_id:            p.user_id,
-          full_name:          (profile as any).full_name ?? 'Unknown Artist',
+          full_name:          profile.full_name ?? 'Unknown Artist',
           stage_name:         p.stage_name ?? '',
           profession:         p.profession,
           category_name:      catMeta.name,
           category_icon:      catMeta.icon,
-          city:               (p as any).service_city || (profile as any).city  || '',
-          state:              (p as any).service_state || (profile as any).state || '',
-          area:               (p as any).service_area  || (profile as any).area  || '',
+          city:               p.service_city  || profile.city  || '',
+          state:              p.service_state || profile.state || '',
+          area:               p.service_area  || profile.area  || '',
           experience_years:   p.experience_years ?? 0,
           price_min:          p.price_min  ?? 0,
           price_max:          p.price_max  ?? 0,
           bio:                p.bio        ?? '',
           specialties:        Array.isArray(p.specialties) ? p.specialties : [],
           languages:          Array.isArray(p.languages)   ? p.languages   : [],
-          avatar_url:         (profile as any).avatar_url  ?? '',
+          avatar_url:         profile.avatar_url  ?? '',
           cover_image_url:    p.cover_image_url            ?? '',
-          gallery_urls:       Array.isArray((p as any).gallery_urls) ? (p as any).gallery_urls : [],
+          gallery_urls:       Array.isArray(p.gallery_urls) ? p.gallery_urls : [],
           average_rating:     p.average_rating  ?? 0,
           total_reviews:      p.total_reviews   ?? 0,
           total_bookings:     p.total_bookings  ?? 0,
           is_verified:        p.is_verified     ?? false,
           is_available:       p.is_available    !== false,
-          is_featured:        (p as any).is_featured    ?? false,
-          instant_booking:    (p as any).instant_booking ?? false,
+          is_featured:        p.is_featured    ?? false,
+          instant_booking:    p.instant_booking ?? false,
           verification_status: p.verification_status ?? 'pending',
-          whatsapp:           (p as any).whatsapp ?? '',
-          service_radius:     (p as any).service_radius ?? 50,
-          subcategory:        (p as any).subcategory ?? '',
-          vendor_details:     (p as any).vendor_details ?? (p as any).category_details ?? {},
+          whatsapp:           p.whatsapp ?? '',
+          service_radius:     p.service_radius ?? 50,
+          subcategory:        p.subcategory ?? '',
+          vendor_details:     (p.vendor_details ?? p.category_details ?? {}) as Record<string, any>,
         };
       });
 
