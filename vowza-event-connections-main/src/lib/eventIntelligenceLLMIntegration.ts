@@ -85,7 +85,7 @@ export async function generateEventPlanWithVendors(
     }
 
     // 3. Retrieve matching vendors from marketplace (Phase 5 integration)
-    let vendorSuggestions = [];
+    const vendorSuggestions = [];
     try {
       for (const service of plan.services) {
         if (service.status === 'required') {

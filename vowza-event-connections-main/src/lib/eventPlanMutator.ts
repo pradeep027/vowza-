@@ -106,7 +106,7 @@ export function removeService(
   const newAllocations = plan.allocations.filter((_, i) => i !== allocationIdx);
 
   // Redistribute freed budget proportionally to remaining services
-  let totalRemainingBudget = newAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
+  const totalRemainingBudget = newAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
   if (totalRemainingBudget === 0) {
     // Edge case: only one service. Don't redistribute.
     return {

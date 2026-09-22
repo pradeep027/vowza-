@@ -104,7 +104,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
   /* ─── Edit existing package ────────────────────────────────────────────── */
   const edit = async (pkg: any) => {
     // Load menu sections and addons from their respective tables
-    let menuSections: MenuSection[] = [];
+    const menuSections: MenuSection[] = [];
     let addons: Addon[] = [];
     let plateIncludes: PlateInclude[] = [...DEFAULT_PLATE_INCLUDES];
 

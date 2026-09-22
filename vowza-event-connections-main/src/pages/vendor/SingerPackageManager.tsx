@@ -272,7 +272,7 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
         </div>
       </div>);
     
-    case 6: // Add-ons (formerly case 7)
+    case 6: { // Add-ons (formerly case 7)
       const addAddon=(name?:string)=>{setDraft({...draft,addons:[...draft.addons,{name:name||'',price:'',description:''}]});};
       const removeAddon=(i:number)=>{setDraft({...draft,addons:draft.addons.filter((_,idx)=>idx!==i)});};
       const updateAddon=(i:number,field:keyof Addon,value:string)=>{const a=[...draft.addons];a[i]={...a[i],[field]:value};setDraft({...draft,addons:a});};
@@ -297,7 +297,8 @@ export default function SingerPackageManager({ provider }: { provider: any }) {
             </div>))}</div>}
         </div>
       </div>);
-    
+    }
+
     case 7: // Preview & Save (formerly case 8)
       return(<div className="space-y-4">
         <div className="rounded-2xl border border-[#eadfcf] bg-[#fff9f9] p-5">
