@@ -517,9 +517,9 @@ async function enrichVendors(vendors: RetrievedVendor[]): Promise<RetrievedVendo
   const ids = vendors.map(v => v.provider_id);
 
   const [pkgRes, menuRes, faqRes] = await Promise.allSettled([
-    supabase.from('pricing_packages' as any).select('provider_id, name, price, description, duration, features').in('provider_id', ids).eq('is_active', true).order('sort_order').limit(ids.length * 4),
-    supabase.from('menu_items' as any).select('provider_id, dish_name, category, price_per_plate, description').in('provider_id', ids).eq('is_available', true).order('sort_order').limit(ids.length * 8),
-    supabase.from('provider_faqs' as any).select('provider_id, question, answer').in('provider_id', ids).order('sort_order').limit(ids.length * 4),
+    supabase.from('pricing_packages').select('provider_id, name, price, description, duration, features').in('provider_id', ids).eq('is_active', true).order('sort_order').limit(ids.length * 4),
+    supabase.from('menu_items').select('provider_id, dish_name, category, price_per_plate, description').in('provider_id', ids).eq('is_available', true).order('sort_order').limit(ids.length * 8),
+    supabase.from('provider_faqs').select('provider_id, question, answer').in('provider_id', ids).order('sort_order').limit(ids.length * 4),
   ]);
 
   const pkgMap   = new Map<string, RetrievedPackage[]>();

@@ -14,7 +14,7 @@ export default function AdminCategories() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('artist_categories' as any).select('*').order('sort_order');
+    const { data, error } = await supabase.from('artist_categories').select('*').order('sort_order');
     if (!error) setCats((data ?? []) as Category[]);
     else toast.error('Failed to load categories');
     setLoading(false);
@@ -26,10 +26,10 @@ export default function AdminCategories() {
     if (!editing?.name || !editing?.profession_type) { toast.error('Name and profession type required'); return; }
     try {
       if (isNew) {
-        const { error } = await supabase.from('artist_categories' as any).insert({ ...editing, is_active: true, sort_order: cats.length + 1 });
+        const { error } = await supabase.from('artist_categories').insert({ ...editing, is_active: true, sort_order: cats.length + 1 });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('artist_categories' as any).update(editing).eq('id', editing.id);
+        const { error } = await supabase.from('artist_categories').update(editing).eq('id', editing.id);
         if (error) throw error;
       }
       toast.success(isNew ? 'Category created' : 'Category updated');
@@ -39,12 +39,12 @@ export default function AdminCategories() {
 
   const del = async (id: string) => {
     if (!confirm('Delete category?')) return;
-    await supabase.from('artist_categories' as any).delete().eq('id', id);
+    await supabase.from('artist_categories').delete().eq('id', id);
     toast.success('Deleted'); load();
   };
 
   const toggle = async (id: string, active: boolean) => {
-    await supabase.from('artist_categories' as any).update({ is_active: !active }).eq('id', id);
+    await supabase.from('artist_categories').update({ is_active: !active }).eq('id', id);
     load();
   };
 

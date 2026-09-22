@@ -144,8 +144,8 @@ export default function VendorPackages() {
     };
 
     const { error } = form.id
-      ? await supabase.from('pricing_packages' as any).update(payload).eq('id', form.id)
-      : await supabase.from('pricing_packages' as any).insert(payload);
+      ? await supabase.from('pricing_packages').update(payload).eq('id', form.id)
+      : await supabase.from('pricing_packages').insert(payload);
 
     if (error) toast.error(error.message);
     else {
@@ -159,7 +159,7 @@ export default function VendorPackages() {
 
   const remove = async (id: string) => {
     if (!confirm('Delete this package? Existing bookings are not affected.')) return;
-    const { error } = await supabase.from('pricing_packages' as any).delete().eq('id', id);
+    const { error } = await supabase.from('pricing_packages').delete().eq('id', id);
     if (error) { toast.error(error.message); return; }
     toast.success('Package deleted');
     qc.invalidateQueries({ queryKey: ['vendor-packages'] });

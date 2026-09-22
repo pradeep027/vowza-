@@ -18,7 +18,7 @@ export default function AdminAIPlanner() {
     (async () => {
       try {
         const { data } = await supabase
-          .from('ai_conversations' as any)
+          .from('ai_conversations')
           .select('id, user_id, created_at, message_count')
           .order('created_at', { ascending: false })
           .limit(20);

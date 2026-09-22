@@ -71,7 +71,7 @@ export default function VendorBookings() {
     if (!vendorId) return;
     (async () => {
       const { data } = await supabase
-        .from('reschedule_requests' as any)
+        .from('reschedule_requests')
         .select('*')
         .eq('provider_id', vendorId)
         .eq('status', 'pending')
@@ -85,7 +85,7 @@ export default function VendorBookings() {
     if (!vendorId) return;
     const ch = supabase.channel(`vendor-reschedule-${vendorId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reschedule_requests' }, () => {
-        supabase.from('reschedule_requests' as any).select('*').eq('provider_id', vendorId).eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data); });
+        supabase.from('reschedule_requests').select('*').eq('provider_id', vendorId).eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data); });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -103,7 +103,7 @@ export default function VendorBookings() {
       if (bookErr) throw bookErr;
 
       // 2. Mark reschedule request as approved
-      const { error: reqErr } = await supabase.from('reschedule_requests' as any).update({
+      const { error: reqErr } = await supabase.from('reschedule_requests').update({
         status: 'approved',
         decided_by: user?.id,
         decided_at: new Date().toISOString(),
@@ -112,7 +112,7 @@ export default function VendorBookings() {
       if (reqErr) throw reqErr;
 
       // 3. Notify customer
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: req.customer_id,
         title: 'Reschedule Approved',
         message: `Your reschedule request was approved! New date: ${new Date(req.requested_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${req.requested_time ? ` at ${req.requested_time}` : ''}.`,
@@ -136,7 +136,7 @@ export default function VendorBookings() {
       const refundAmt = req.refund_eligible ? Math.round(Number(req.original_amount_paid) * 0.8) : 0;
 
       // Mark request as declined + process refund
-      const { error: reqErr } = await supabase.from('reschedule_requests' as any).update({
+      const { error: reqErr } = await supabase.from('reschedule_requests').update({
         status: 'declined',
         decided_by: user?.id,
         decided_at: new Date().toISOString(),
@@ -152,7 +152,7 @@ export default function VendorBookings() {
       const refundMsg = refundAmt > 0
         ? ` A refund of ₹${refundAmt.toLocaleString('en-IN')} (80%) has been processed.`
         : '';
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: req.customer_id,
         title: 'Reschedule Declined',
         message: `Your reschedule request was declined by the artist. The original booking date remains.${refundMsg}`,
@@ -203,7 +203,7 @@ export default function VendorBookings() {
       if (cancelErr) throw cancelErr;
 
       // 2. Record vendor cancellation with penalty
-      await supabase.from('vendor_cancellations' as any).insert({
+      await supabase.from('vendor_cancellations').insert({
         booking_id: b.id,
         booking_table: table,
         vendor_id: vendorId,
@@ -218,7 +218,7 @@ export default function VendorBookings() {
       });
 
       // 3. Notify customer
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: b.customer_id,
         title: 'Booking Cancelled by Artist',
         message: `Your booking has been cancelled by the artist. ${customerRefund > 0 ? `Full refund of ₹${customerRefund.toLocaleString('en-IN')} has been processed.` : 'No advance was paid.'}`,
@@ -375,7 +375,7 @@ export default function VendorBookings() {
 
       // Notify customer: booking accepted, pay advance
       if (booking.customer_id) {
-        await supabase.from('notifications' as any).insert({
+        await supabase.from('notifications').insert({
           user_id: booking.customer_id,
           title: 'Booking Accepted — Pay Advance',
           message: `Your booking has been accepted! Please pay the 20% advance (₹${advanceAmount.toLocaleString('en-IN')}) within 24 hours to confirm. Your payment will be securely held by Vowza until the service is completed.`,
@@ -395,7 +395,7 @@ export default function VendorBookings() {
       if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
 
       if (booking.customer_id) {
-        await supabase.from('notifications' as any).insert({
+        await supabase.from('notifications').insert({
           user_id: booking.customer_id,
           title: 'Booking Declined',
           message: 'Your booking request could not be accepted. Please explore other artists.',

@@ -74,7 +74,7 @@ export async function getProviderDashboardReviews(providerId: string) {
 /** KPI rating read (useVendorData). Returns the raw result for Promise.all destructure. */
 export async function getProviderReviewRatings(providerId: string) {
   return await supabase
-    .from('reviews' as any)
+    .from('reviews')
     .select('id, rating')
     .eq('provider_id', providerId);
 }
@@ -83,7 +83,7 @@ export async function getProviderReviewRatings(providerId: string) {
 export async function getVendorReviewsWithCustomers(vendorId: string) {
   const empty = { reviews: [] as any[], average: 0, total: 0, breakdown: [5,4,3,2,1].map(s => ({ stars: s, count: 0, percent: 0 })) };
 
-  const { data } = await supabase.from('reviews' as any)
+  const { data } = await supabase.from('reviews')
     .select('*')
     .eq('provider_id', vendorId)
     .order('created_at', { ascending: false });
@@ -117,7 +117,7 @@ export async function getVendorReviewsWithCustomers(vendorId: string) {
 /** Vendor reply UPDATE (VendorReviews). Returns {error} for existing toast semantics. */
 export async function updateVendorReply(reviewId: string, reply: string) {
   return await supabase
-    .from('reviews' as any)
+    .from('reviews')
     .update({ reply, replied_at: new Date().toISOString() })
     .eq('id', reviewId);
 }

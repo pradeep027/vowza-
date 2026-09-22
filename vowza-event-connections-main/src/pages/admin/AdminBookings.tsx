@@ -42,7 +42,7 @@ export default function AdminBookings() {
     (async () => {
       setLoadingReschedules(true);
       const { data } = await supabase
-        .from('reschedule_requests' as any)
+        .from('reschedule_requests')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);

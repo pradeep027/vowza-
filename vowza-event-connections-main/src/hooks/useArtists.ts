@@ -355,7 +355,7 @@ export function useCategories() {
     queryFn:  async () => {
       // Try the view with counts first; fall back to table if view doesn't exist yet
       const { data, error } = await supabase
-        .from('category_provider_counts' as any)
+        .from('category_provider_counts')
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
@@ -363,7 +363,7 @@ export function useCategories() {
       if (error) {
         // Fallback: plain table without counts
         const { data: fallback, error: err2 } = await supabase
-          .from('artist_categories' as any)
+          .from('artist_categories')
           .select('*')
           .eq('is_active', true)
           .order('sort_order');

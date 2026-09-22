@@ -40,7 +40,7 @@ export default function VendorMessages() {
   useEffect(() => {
     if (!selected || !user || selected.unread === 0) return;
     (async () => {
-      await supabase.from('messages' as any)
+      await supabase.from('messages')
         .update({ is_read: true })
         .eq('booking_id', selected.bookingId)
         .neq('sender_id', user.id)
@@ -58,7 +58,7 @@ export default function VendorMessages() {
   const send = async () => {
     if (!draft.trim() || !selected || !user) return;
     setSending(true);
-    const { error } = await supabase.from('messages' as any).insert({
+    const { error } = await supabase.from('messages').insert({
       booking_id: selected.bookingId,
       sender_id:  user.id,
       content:    draft.trim(),

@@ -7,11 +7,11 @@ export default function PhotographerPackages({ provider, profile }: { provider: 
  const [cartCount, setCartCount] = useState(0);
  useEffect(() => {
   if (!user) return;
-  supabase.from('photography_carts' as any).select('id, photography_cart_items(id)').eq('customer_id', user.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle().then(({ data }) => {
+  supabase.from('photography_carts').select('id, photography_cart_items(id)').eq('customer_id', user.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle().then(({ data }) => {
     setCartCount(data?.photography_cart_items?.length ?? 0);
   });
  }, [user, provider.id, busy]);
- const { data: rows = [], isLoading } = useQuery({ queryKey: ['public-photography-packages', provider.id], queryFn: async () => { const r = await supabase.from('photography_packages' as any).select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)').eq('photographer_id', provider.id).eq('is_active', true).eq('is_visible', true).eq('status', 'published').order('created_at'); if (r.error) throw r.error; return r.data ?? []; } });
+ const { data: rows = [], isLoading } = useQuery({ queryKey: ['public-photography-packages', provider.id], queryFn: async () => { const r = await supabase.from('photography_packages').select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)').eq('photographer_id', provider.id).eq('is_active', true).eq('is_visible', true).eq('status', 'published').order('created_at'); if (r.error) throw r.error; return r.data ?? []; } });
  useEffect(() => { const c = supabase.channel(`public-photography-${provider.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_packages', filter: `photographer_id=eq.${provider.id}` }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_package_images' }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).on('postgres_changes', { event: '*', schema: 'public', table: 'photography_albums' }, () => qc.invalidateQueries({ queryKey: ['public-photography-packages', provider.id] })).subscribe(); return () => { supabase.removeChannel(c); }; }, [provider.id]);
  const choose = (p: any) => selection[p.id] ?? { addons: [], albumId: null }; const setChoose = (p: any, value: Selection) => setSelection(s => ({ ...s, [p.id]: value }));
  const add = async (p: any, checkout = false) => {
@@ -22,7 +22,7 @@ export default function PhotographerPackages({ provider, profile }: { provider: 
   if (checkout) {
     // BOOK NOW: Clear existing cart items first, then add only this package
     const { data: existingCart } = await supabase
-      .from('photography_carts' as any)
+      .from('photography_carts')
       .select('id')
       .eq('customer_id', user.id)
       .eq('photographer_id', provider.id)
@@ -31,7 +31,7 @@ export default function PhotographerPackages({ provider, profile }: { provider: 
 
     if (existingCart) {
       // Delete all items from existing cart
-      await supabase.from('photography_cart_items' as any).delete().eq('cart_id', existingCart.id);
+      await supabase.from('photography_cart_items').delete().eq('cart_id', existingCart.id);
     }
   }
 
@@ -52,7 +52,7 @@ export default function PhotographerPackages({ provider, profile }: { provider: 
  return <div className="space-y-5"><div><h2 className="text-xl font-bold">Photography Packages</h2><p className="text-sm text-muted-foreground">Choose coverage, then add optional albums and extras before booking.</p></div><div className="grid gap-4 md:grid-cols-2">{rows.map((p: any) => <Card key={p.id} p={p} value={choose(p)} setValue={(v: Selection) => setChoose(p, v)} view={() => setDetail(p)} add={() => add(p)} book={() => add(p, true)} busy={busy === p.id} />)}</div>{cartCount > 0 && (
   <div className="sticky bottom-4 z-40 flex justify-center">
     <button onClick={async () => {
-      const { data } = await supabase.from('photography_carts' as any).select('id').eq('customer_id', user!.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle();
+      const { data } = await supabase.from('photography_carts').select('id').eq('customer_id', user!.id).eq('photographer_id', provider.id).eq('status', 'active').maybeSingle();
       if (data) {
         sessionStorage.setItem('vowza_photography_checkout', JSON.stringify({ cartId: data.id, providerName: profile.full_name }));
         nav('/checkout?photography=1');

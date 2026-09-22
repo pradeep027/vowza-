@@ -130,7 +130,7 @@ const AdminDashboard = () => {
   const fetchCategories = async () => {
     try {
       const { data } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .select('*')
         .order('sort_order');
       
@@ -150,7 +150,7 @@ const AdminDashboard = () => {
 
     try {
       const { error } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .insert({
           name: newCategory.name,
           profession_type: newCategory.profession_type,
@@ -172,7 +172,7 @@ const AdminDashboard = () => {
   const handleDeleteCategory = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .delete()
         .eq('id', id);
 
@@ -188,7 +188,7 @@ const AdminDashboard = () => {
   const fetchAnalytics = async () => {
     try {
       const { data } = await supabase
-        .from('platform_analytics' as any)
+        .from('platform_analytics')
         .select('*')
         .order('date', { ascending: false })
         .limit(30);
@@ -204,7 +204,7 @@ const AdminDashboard = () => {
   const fetchCommissions = async () => {
     try {
       const { data } = await supabase
-        .from('commission_tracking' as any)
+        .from('commission_tracking')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
