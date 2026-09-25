@@ -79,6 +79,56 @@ hazard is only ever between C and B — never between A and B.
    **must** return 403. Until that has actually returned 403, the hole is not
    closed, whatever the migration output said.
 
+### `PHASE_provider_column_lockdown.sql`
+
+Phase 2 of two for **P0-2 (provider self-approval)**. Revokes `authenticated`'s
+table-wide `UPDATE` on `public.provider_profiles` and grants it back on only the
+benign, vendor-editable columns, so a signed-in vendor can no longer PATCH
+`verification_status`, `is_verified`, `is_published`, `is_featured`, `verified_*`,
+`rejection_reason`, `is_bank_verified`, the KYC/liveness columns, or the reputation
+counters directly.
+
+| Phase | What | Where it lives | State |
+|---|---|---|---|
+| 1 | Add `admin_set_provider_verification` + `provider_resubmit_for_review` RPCs and the trust-clamp / bank-reverify triggers | `supabase/migrations/20261204000000_provider_verification_authority.sql` | in the normal migration path (additive, safe anytime) |
+| 2a | Frontend routes admin approve/reject/suspend and vendor resubmit through the RPCs, and stops writing `is_bank_verified` | `src/services/approvalService.ts`, `src/pages/AdminDashboard.tsx`, `src/pages/VendorEditProfile.tsx`, `src/hooks/useVendorData.ts` | in the working tree |
+| 2b | Revoke the column `UPDATE` and grant the benign allowlist | **this folder** | withheld |
+
+Applying 2b before phase 1 is live **and** the phase-2a frontend is the served
+bundle **breaks admin approval, vendor resubmit, and bank-detail saves**: the old
+bundle PATCHes these columns directly, and 2b is precisely what starts returning 403
+for those PATCHes. Phase 1 is additive and harmless on its own; the ordering hazard
+is only ever between 2b and 2a.
+
+#### Promoting it
+
+1. Apply phase 1 and confirm `admin_set_provider_verification`,
+   `provider_resubmit_for_review` and both `provider_profiles_*` triggers exist.
+2. Deploy the phase-2a frontend to Vercel.
+3. In a **fresh private window** on https://vowza.co.in, exercise an admin
+   approve/reject and a vendor resubmit, then confirm the RPC path is the one
+   running:
+
+   ```sql
+   select occurred_at, action, outcome, detail
+     from vowza_audit.privileged_actions
+    where action in ('admin_set_provider_verification','provider_resubmit_for_review')
+    order by occurred_at desc
+    limit 5;
+   ```
+
+   An `outcome='applied'` row is the only positive proof the new path is live. A
+   cached or failed build would leave the old direct-PATCH bundle serving, and
+   pushing 2b on top of that is the failure this arrangement exists to prevent.
+4. Only then: `git mv` it into `supabase/migrations/` as
+   `<next-timestamp>_provider_column_lockdown.sql`, and push. Its own `$catalog$`
+   and `$probe$` blocks re-prove the lockdown at apply time and abort if it is wrong.
+5. Run the negative probe from the file header — as an ordinary logged-in vendor,
+   `PATCH /rest/v1/provider_profiles?id=eq.<own id>` with
+   `{"verification_status":"approved"}` **must** return 403, while a PATCH of
+   `{"bio":"..."}` **must** return 200. Until that 403 is observed, the hole is not
+   closed, whatever the migration output said.
+
 ## Adding a file here
 
 Name it `PHASE_<x>_<slug>.sql`, **without** a timestamp prefix, so that it is
