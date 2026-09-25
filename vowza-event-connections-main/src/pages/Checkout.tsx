@@ -126,28 +126,50 @@ const Checkout = () => {
 
     for (const item of scopedItems) {
       try {
-        const baseAmount = item.price;
-        const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
-        const remaining = baseAmount - advanceAmount;
-        const { data: booking, error } = await supabase.from(item.bookingTable as any).insert({
-          package_id: item.packageId, provider_id: item.providerId, customer_id: user.id,
-          event_date: eventDate, event_time: eventTime || null, event_type: eventType || null,
-          venue: location.venue_name || location.locality || null, city: location.town_city || null,
-          special_requirements: specialRequirements || null,
-          base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
-          advance_amount: advanceAmount, remaining_amount: remaining, status: 'pending',
-        }).select('id').single();
-        if (error) throw new Error(`${item.packageName}: ${error.message}`);
+        let bookingId: string;
+        if (item.bookingTable === 'band_bookings') {
+          // Band pilot: booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_band_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package +
+          // addon rows and forces customer_id = auth.uid(). This closes the
+          // cart creation path, matching BandMenu "Book Now". (P0-1 Step 3.)
+          const { data: newId, error } = await supabase.rpc('create_band_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_addon_ids: [],
+            p_special_requirements: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else {
+          const baseAmount = item.price;
+          const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
+          const remaining = baseAmount - advanceAmount;
+          const { data: booking, error } = await supabase.from(item.bookingTable as any).insert({
+            package_id: item.packageId, provider_id: item.providerId, customer_id: user.id,
+            event_date: eventDate, event_time: eventTime || null, event_type: eventType || null,
+            venue: location.venue_name || location.locality || null, city: location.town_city || null,
+            special_requirements: specialRequirements || null,
+            base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
+            advance_amount: advanceAmount, remaining_amount: remaining, status: 'pending',
+          }).select('id').single();
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = booking.id;
+        }
 
         await supabase.from('booking_locations' as any).insert({
-          booking_table: item.bookingTable, booking_id: booking.id,
+          booking_table: item.bookingTable, booking_id: bookingId,
           state: location.state, district: location.district, town_city: location.town_city,
           exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
           pincode: location.pincode, landmark: location.address_line || null,
           latitude: location.latitude, longitude: location.longitude,
         });
 
-        await NotificationService.notifyBookingReceived(user.id, item.providerId, booking.id);
+        await NotificationService.notifyBookingReceived(user.id, item.providerId, bookingId);
         successCount++;
       } catch (err: any) { errors.push(err.message || `Failed to book ${item.packageName}`); }
     }

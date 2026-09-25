@@ -353,25 +353,41 @@ export default function VendorBookings() {
       : booking._source === 'dancer' ? 'dancer_bookings'
       : 'bookings';
     const total = Number(booking.amount ?? booking.total_amount ?? 0);
-    const advanceAmount = Math.round(total * 0.2);
-    const remainingAmount = total - advanceAmount;
 
     if (newStatus === 'confirmed') {
       // ACCEPT: set status to 'accepted' uniformly across all tables
       const dbStatus = 'accepted';
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const updatePayload: any = {
-        status: dbStatus,
-        accepted_at: new Date().toISOString(),
-        advance_amount: advanceAmount,
-        remaining_amount: remainingAmount,
-        payment_deadline: deadline,
-        calendar_locked: false, // Not locked until advance paid
-      };
-      if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
 
-      const { error } = await supabase.from(table as any).update(updatePayload).eq('id', booking.id);
-      if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+      // Band pilot: the advance/remaining are financial truth and must not be
+      // computed or PATCHed from the browser. Route the whole accept through the
+      // server-authoritative RPC, which re-derives them from the STORED total
+      // and verifies this vendor owns the booking. (P0-1 Step 2.)
+      let advanceAmount = Math.round(total * 0.2);
+      if (table === 'band_bookings') {
+        const { data, error } = await supabase.rpc('accept_band_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        // Trust the server-derived advance for the notification copy, not a
+        // client recompute.
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else {
+        const remainingAmount = total - advanceAmount;
+        const updatePayload: any = {
+          status: dbStatus,
+          accepted_at: new Date().toISOString(),
+          advance_amount: advanceAmount,
+          remaining_amount: remainingAmount,
+          payment_deadline: deadline,
+          calendar_locked: false, // Not locked until advance paid
+        };
+        if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
+
+        const { error } = await supabase.from(table as any).update(updatePayload).eq('id', booking.id);
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+      }
 
       // Notify customer: booking accepted, pay advance
       if (booking.customer_id) {
