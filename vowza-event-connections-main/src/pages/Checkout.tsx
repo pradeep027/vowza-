@@ -145,6 +145,16 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'catering_bookings') {
+          // Catering pilot (P0-1): catering is priced PER PLATE and needs a guest
+          // count to derive the total — a value the generic cart item does not
+          // carry. Creating a catering booking with client-supplied amounts is
+          // also forbidden. Route catering through the dedicated "Book Now" flow
+          // (CateringBookingModal -> CateringCartPage -> create_catering_booking),
+          // which collects the guest count and derives every amount server-side.
+          // (The generic INSERT below never worked for catering anyway: it writes
+          // event_time / special_requirements, which catering_bookings lacks.)
+          throw new Error(`${item.packageName}: Please use "Book Now" on the catering package — per-plate catering can't be priced from the cart.`);
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
