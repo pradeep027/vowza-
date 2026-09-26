@@ -177,6 +177,30 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'decorator_bookings') {
+          // Decorator (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_decorator_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DecoratorMenu "Book Now". The generic cart item carries no theme or
+          // addon selection, so theme_preference/addons are omitted (both are
+          // descriptive only — not pricing inputs; the decorator total is
+          // package_price + addons regardless). NOTE: the old generic INSERT below
+          // never worked for decorator anyway — it writes special_requirements, a
+          // column decorator_bookings lacks (it has special_instructions).
+          const { data: newId, error } = await supabase.rpc('create_decorator_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_theme_preference: null,
+            p_addon_ids: [],
+            p_special_instructions: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
