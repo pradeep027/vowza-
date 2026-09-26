@@ -385,6 +385,18 @@ export default function VendorBookings() {
         if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
         const serverAdvance = Number((data as any)?.advance_amount);
         if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'anchor_bookings') {
+        // Anchor (P0-1): same posture as band/catering — advance/remaining are
+        // financial truth and must not be computed or PATCHed from the browser.
+        // accept_anchor_booking re-derives them from the STORED total (flat 20%)
+        // and verifies this vendor owns the booking before flipping it to
+        // accepted. (P0-1 Step 5.)
+        const { data, error } = await supabase.rpc('accept_anchor_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
       } else {
         const remainingAmount = total - advanceAmount;
         const updatePayload: any = {
