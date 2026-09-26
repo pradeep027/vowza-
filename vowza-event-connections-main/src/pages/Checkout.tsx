@@ -201,6 +201,32 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'dancer_bookings') {
+          // Dancer (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_dancer_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package (advance
+          // from the package's advance_percentage) + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DancerMenu "Book Now". The generic cart item carries no dancer count,
+          // duration or addon selection, so those are omitted — number_of_dancers /
+          // performance_duration / dance_type fall back to the package defaults
+          // server-side (all descriptive only — not pricing inputs; the dancer
+          // total is package_price + addons regardless). The old generic INSERT
+          // below used a flat ADVANCE_PERCENT = 20, ignoring advance_percentage.
+          const { data: newId, error } = await supabase.rpc('create_dancer_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_number_of_dancers: null,
+            p_performance_duration: null,
+            p_addon_ids: [],
+            p_special_requirements: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);

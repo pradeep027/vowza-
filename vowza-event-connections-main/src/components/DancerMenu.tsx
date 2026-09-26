@@ -157,22 +157,27 @@ function DancerBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: boolea
     if (!termsAccepted) { toast.error('Please accept booking terms'); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('dancer_bookings').insert({
-        package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
-        event_date: eventDate, event_time: eventTime || null,
-        event_type: eventType || null,
-        venue: location.venue_name || location.locality || null,
-        city: location.town_city || null,
-        dance_type: pkg.dance_type || null,
-        number_of_dancers: Number(numberOfDancers) || 1,
-        performance_duration: performanceDuration || null,
-        special_requirements: specialRequirements || null,
-        selected_addon_ids: [],
-        base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
-        advance_amount: advanceAmount, remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // P0-1 (dancer): booking financials are server-authoritative. Pass
+      // identifiers / selections / descriptive fields ONLY; create_dancer_booking
+      // derives base/addons/total/advance/remaining from the trusted package
+      // (advance from the package's advance_percentage) and forces
+      // customer_id = auth.uid(). No amount crosses the trust boundary. The
+      // baseAmount / advanceAmount / remaining consts above remain ONLY for the
+      // review + success-screen display; they are never sent as booking amounts.
+      const { data: newBookingId, error } = await supabase.rpc('create_dancer_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_number_of_dancers: Number(numberOfDancers) || 1,
+        p_performance_duration: performanceDuration || null,
+        p_addon_ids: [],
+        p_special_requirements: specialRequirements || null,
+      });
       if (error) throw error;
+      const booking = { id: newBookingId as string };
 
       // Save structured location
       await supabase.from('booking_locations').insert({
