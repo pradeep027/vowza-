@@ -199,32 +199,33 @@ export default function CateringCartPage() {
       const { data: existing } = await supabase.from('catering_bookings' as any).select('id').eq('package_id', pkg.id).eq('customer_id', user.id).eq('event_date', event.eventDate).neq('status', 'cancelled');
       if (existing && existing.length > 0) { toast.error('You already have a booking for this package on this date'); setBusy(false); return; }
 
-      // ─── CREATE BOOKING WITH VALIDATED VENDOR ID ────────────────────────
-      // ✅ provider_id and package_id are now validated before database INSERT
-      const { data: booking, error } = await supabase.from('catering_bookings' as any).insert({
-        package_id: pkg.id,  // ✅ Real UUID from pricing_packages, validated
-        provider_id: provider.id,  // ✅ Real UUID from provider_profiles, validated
-        customer_id: user.id,
-        event_type: event.eventType || null,
-        event_date: event.eventDate,
-        guest_count: guestCount,
-        meal_type: event.duration || null,
-        venue: [event.venueName, event.venueAddress, event.city, event.state, event.pincode].filter(Boolean).join(', '),
-        special_requests: [specialRequests, dietaryPrefs.length ? `Dietary: ${dietaryPrefs.join(', ')}` : ''].filter(Boolean).join(' | ') || null,
-        selected_addon_ids: selectedAddonIds,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: grandTotal,
-        status: 'pending',
-      }).select('id').single();
+      // ─── CREATE BOOKING (server-authoritative financials) ───────────────
+      // P0-1: booking financial truth must NOT come from the browser. Pass only
+      // identifiers / selections / the guest COUNT (an order quantity) and
+      // descriptive fields; the create_catering_booking SECURITY DEFINER RPC
+      // fetches the authoritative per-plate price + addon prices, derives
+      // base/addons/total server-side, and forces customer_id = auth.uid().
+      // No amount (base_amount/addons_amount/total_amount) crosses the boundary.
+      const { data: newBookingId, error } = await supabase.rpc('create_catering_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: event.eventDate,
+        p_guest_count: guestCount,
+        p_event_type: event.eventType || null,
+        p_meal_type: event.duration || null,
+        p_venue: [event.venueName, event.venueAddress, event.city, event.state, event.pincode].filter(Boolean).join(', ') || null,
+        p_city: null,
+        p_special_requests: [specialRequests, dietaryPrefs.length ? `Dietary: ${dietaryPrefs.join(', ')}` : ''].filter(Boolean).join(' | ') || null,
+        p_addon_ids: selectedAddonIds,
+      });
 
       if (error) throw error;
+      const bookingId = newBookingId as string;
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       sessionStorage.removeItem('vowza_catering_cart');
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id,
+        bookingId,
         artistName: provider.business_name || provider.contact_person || 'Caterer',
         eventDate: event.eventDate,
         eventTime: event.eventTime,
