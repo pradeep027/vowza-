@@ -399,9 +399,9 @@ export function useAIChat() {
           } else if (syncResult.outcome === 'failed') {
             console.warn('[Vowza Planner] Event State sync failed:', syncResult.error);
           }
-          if (syncResult.state && syncResult.changes.length > 0) {
+          if (syncResult.persisted && syncResult.state && syncResult.changes.length > 0) {
             // Retention is best-effort and never blocks the visible chat turn.
-            // The Edge Function independently filters fields and verifies auth.
+            // Only the Supabase-persisted state is eligible; Hindsight is not a fallback source of truth.
             void retainPlannerMemory(userText, syncResult.state, syncResult.changes, currentConvId);
           }
         }

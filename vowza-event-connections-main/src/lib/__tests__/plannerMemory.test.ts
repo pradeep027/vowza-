@@ -144,6 +144,17 @@ describe('Planner persistent memory adapter', () => {
     expect(buildRetentionRecord(eventState(), ['budget.total'], 'What do you remember about my event?', CONVERSATION_ID)).toBeNull();
   });
 
+  it('retains a date when the user states it as day followed by month', () => {
+    const state = eventState({ schedule: { eventDate: '2027-03-21', durationDays: 2 } });
+    const record = buildRetentionRecord(
+      state,
+      ['schedule.eventDate'],
+      'The wedding will be on 21 March 2027.',
+      CONVERSATION_ID,
+    );
+    expect(record?.content).toContain('Event date: 2027-03-21.');
+  });
+
   it('scrubs sensitive substrings even when they appear inside allowed state fields', () => {
     const state = eventState({
       location: { city: 'Hyderabad +91 98765 43210', area: 'email a@example.com' },

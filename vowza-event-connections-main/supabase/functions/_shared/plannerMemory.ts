@@ -291,7 +291,9 @@ function explicitFieldMention(field: string, userMessage: string): boolean {
       return /\b(?:near|area|locality|in)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/.test(text);
     case 'schedule.eventDate':
       return /\b(?:date|on|by|during|in)\s+(?:\d{1,2}[/-]\d{1,2}|\d{4}|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|next\s+month|next\s+year)\b/i.test(text)
-        || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text);
+        || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text)
+        || /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(text)
+        || /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\b/i.test(text);
     case 'schedule.durationDays':
       return /\b\d+\s*[- ]?days?\b/i.test(text);
     case 'guests.count':
