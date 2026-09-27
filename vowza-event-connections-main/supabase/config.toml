@@ -21,3 +21,6 @@ verify_jwt = false
 # if anyone ever changes it.
 [functions.admin-user-roles]
 verify_jwt = true
+
+[functions.planner-memory]
+verify_jwt = true

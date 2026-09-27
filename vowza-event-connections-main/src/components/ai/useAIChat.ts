@@ -29,6 +29,7 @@ import { useDashboardLink } from '@/hooks/useDashboardLink';
 // Phase 1/2: Event State layer — additive sync only. The regex extraction,
 // prompts, and context_summary persistence below are untouched.
 import { syncEventStateFromTurn, restoreEventState, getCachedEventState } from '@/lib/eventStateBridge';
+import { retainPlannerMemory } from '@/lib/plannerMemoryClient';
 
 // ─── sessionStorage keys ─────────────────────────────────────────────────────
 const CTX_KEY  = 'vowza_ai_context';
@@ -344,6 +345,7 @@ export function useAIChat() {
         context: currentContext,
         currentPlan: planRef.current, // NEW: Phase 2A - pass current plan
         eventState: convIdRef.current ? getCachedEventState(convIdRef.current) : undefined, // Phase 2
+        conversationId: user && currentConvId ? currentConvId : undefined,
         onChunk: ({ delta, done }) => {
           if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
           if (!done) {
@@ -396,6 +398,11 @@ export function useAIChat() {
             console.warn('[Vowza Planner] Event State NOT saved to database (kept in session memory only):', syncResult.error);
           } else if (syncResult.outcome === 'failed') {
             console.warn('[Vowza Planner] Event State sync failed:', syncResult.error);
+          }
+          if (syncResult.state && syncResult.changes.length > 0) {
+            // Retention is best-effort and never blocks the visible chat turn.
+            // The Edge Function independently filters fields and verifies auth.
+            void retainPlannerMemory(userText, syncResult.state, syncResult.changes, currentConvId);
           }
         }
 
@@ -454,8 +461,8 @@ export function useAIChat() {
 
   // ── Clear ─────────────────────────────────────────────────────────────────────
   // "New Chat" must start with ZERO memory — no leftover event type, city,
-  // budget, guest count, etc. from the previous conversation. That memory is
-  // scoped to a single conversation only; it is never carried into a new one.
+  // budget, guest count, etc. in this tab. Relevant persistent details may be
+  // recalled from the authenticated user's Hindsight bank by a later planning request.
   const clearChat = useCallback(() => {
     messagesRef.current = [];
     setMessages([]);
