@@ -140,3 +140,31 @@ Run the following with the real authenticated runtime configuration:
 ## 11. Conclusion
 
 The Hindsight integration and event-scoped source paths are present, type-safe, buildable, and covered by the configured automated suite. Runtime acceptance and production verification remain **unverified/blocked** until the real authenticated Supabase/Hindsight environment is connected. This report does not claim production readiness or successful cross-session/user-isolation behavior without that evidence.
+
+# FINAL RUNTIME VERIFICATION
+
+| Test | Status | Evidence |
+|------|--------|----------|
+| Authenticated retain | BLOCKED | No authenticated Supabase/Hindsight runtime configuration is available in the active Sandbox. |
+| Authenticated recall | BLOCKED | No authenticated Supabase/Hindsight runtime configuration is available in the active Sandbox. |
+| Cross-session recall | BLOCKED | A real session boundary and authenticated account are unavailable. |
+| User A/B isolation | BLOCKED | Two real authenticated accounts are unavailable; no simulation was used. |
+| Event A/B isolation | BLOCKED | Real owned events and live Edge Function/Hindsight invocation are unavailable. |
+| Current Event State precedence | BLOCKED | Live Planner plus recall conflict test was not executed. Static merge logic is documented above, but this is not runtime evidence. |
+| Graceful Hindsight failure | BLOCKED | A controlled test-environment provider failure was not executed. Static fallback paths are documented above. |
+| Browser acceptance | BLOCKED | Browser login, authenticated Planner flow, network inspection, and console inspection were unavailable. |
+| Production Edge Function | BLOCKED | Supabase CLI authentication/project verification was unavailable; no deployment was attempted. |
+| Before/after demonstration | BLOCKED | No real pre/post persistent-memory sessions were executed. |
+| npm test | PASS | Configured Vitest suite: 7 files and 65 tests passed. |
+| Typecheck | PASS | `npm run typecheck` exited with code 0. |
+| Build | PASS | `npm run build` exited with code 0. |
+| git diff --check | PASS | No whitespace errors. |
+
+## Final environment and git status
+
+- Runtime environment: **Sandbox available; authenticated Windows runtime unavailable**.
+- Production Edge Function: **BLOCKED / not verified**.
+- No screenshots were captured because the browser acceptance test was blocked.
+- No secrets, access tokens, passwords, private user data, or fabricated responses were used.
+- Documentation-only commit added on the feature branch: `3618810 docs: record Hindsight verification status`.
+- Branch: `feat/hindsight-persistent-memory`, synchronized with `origin/feat/hindsight-persistent-memory`.
