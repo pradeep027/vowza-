@@ -252,6 +252,34 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'drone_bookings') {
+          // Drone (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_drone_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DroneMenu "Book Now". The generic cart item carries no coverage/indoor-
+          // outdoor/permission/addon selection, so those are omitted (all descriptive
+          // only — not pricing inputs; the drone total is chosen base + addons
+          // regardless). Advance/remaining are derived at accept (flat 20%), not
+          // stored at creation. NOTE: the old generic INSERT below never worked for
+          // drone anyway — it writes special_requirements, a column drone_bookings
+          // lacks (it has special_requests).
+          const { data: newId, error } = await supabase.rpc('create_drone_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_coverage_duration: null,
+            p_indoor_outdoor: null,
+            p_drone_permission_available: null,
+            p_restricted_area: null,
+            p_special_requests: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
