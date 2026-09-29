@@ -53,7 +53,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function authenticate(req: Request): Promise<{ id: string; ownsConversation: (id: string) => Promise<boolean> } | null> {
+async function authenticate(req: Request): Promise<{ id: string; ownsConversation: (id: string) => Promise<boolean>; ownsEvent: (id: string) => Promise<boolean> } | null> {
   const authorization = req.headers.get("Authorization");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -73,6 +73,16 @@ async function authenticate(req: Request): Promise<{ id: string; ownsConversatio
         .select("id")
         .eq("id", conversationId)
         .eq("user_id", user.id)
+        .maybeSingle();
+      return !error && Boolean(data);
+    },
+    ownsEvent: async (eventId: string) => {
+      if (!/^[0-9a-f-]{36}$/i.test(eventId)) return false;
+      const { data, error } = await supabase
+        .from('event_states')
+        .select('event_id')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
         .maybeSingle();
       return !error && Boolean(data);
     },
@@ -117,6 +127,9 @@ serve(async (req) => {
       const message = typeof body.message === "string" ? body.message.slice(0, 2_000) : "";
       if (!message.trim()) return json({ error: "A planning query is required" }, 400);
       const context: PlannerMemoryContext = normalizePlannerMemoryContext(body.context);
+      if (!context.eventId || !await user.ownsEvent(context.eventId)) {
+        return json({ success: true, memories: [], context: {} });
+      }
       try {
         const result = await client.recall(
           bankId,
@@ -126,7 +139,7 @@ serve(async (req) => {
             budget: "low",
             preferObservations: true,
             includeEntities: false,
-            tags: ["vowza-planner"],
+            tags: ["vowza-planner", `vowza-event-${context.eventId}`],
             tagsMatch: "all_strict",
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
           },
@@ -147,6 +160,10 @@ serve(async (req) => {
     const changedFields = Array.isArray(body.changedFields)
       ? body.changedFields.filter((value): value is string => typeof value === "string").slice(0, 40)
       : [];
+    const stateEventId = isRecord(body.state) && typeof body.state.eventId === "string" ? body.state.eventId : "";
+    if (!stateEventId || !await user.ownsEvent(stateEventId)) {
+      return json({ success: true, retained: false });
+    }
     const record = buildRetentionRecord(body.state, changedFields, userMessage, conversationId);
     if (!record) return json({ success: true, retained: false });
 

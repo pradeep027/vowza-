@@ -14,9 +14,17 @@ export type RiskLevel   = "low" | "medium" | "high" | "critical";
 
 // ─── Planning context ─────────────────────────────────────────────────────────
 export interface PlannerContext {
+  /** Stable internal event scope; labels are never the canonical identity. */
+  eventId?:             string;
+  /** User-facing event wording used only for scope resolution/display. */
+  eventLabel?:          string;
   eventType?:           EventCategory;
   city?:                string;
   budget?:              number;
+  /** Services explicitly requested by the user; never broaden implicitly. */
+  requestedServices?:   string[];
+  /** User-confirmed budgets for a specific service, keyed by profession. */
+  serviceBudgets?:      Record<string, number>;
   guestCount?:          number;
   eventDate?:           string;
   durationDays?:        number;

@@ -373,12 +373,19 @@ function buildContextSummary(ctx: PlannerContext): string {
 // follow-up appended AFTER the plan (see nextSoftFollowUp / withFollowUp).
 function determineNextQuestion(
   intent: Intent,
-  ctx: PlannerContext
+  ctx: PlannerContext,
+  professions: string[] = []
 ): string | null {
-  // Discovery is useful without a city. The retriever searches the public,
-  // verified marketplace first and ranks any city/budget context when present.
-  // Do not gate a specific category request behind an unnecessary question.
-  if (intent === 'find_vendors') return null;
+  if (intent === 'find_vendors' && professions.length > 0) {
+    if (!ctx.eventType) return 'Is this for a wedding, reception, birthday, or another event?';
+    if (!ctx.city) return 'Which city will the event be in?';
+    if (!ctx.guestCount) return 'Roughly how many guests are you expecting?';
+    const hasServiceBudget = professions.some((profession) => Boolean(ctx.serviceBudgets?.[profession]));
+    if (!hasServiceBudget) {
+      const label = professions.map((profession) => profession.replace(/_/g, ' ')).join(' and ');
+      return `Do you have a ${label} budget in mind, or should I suggest an allocation from your total budget?`;
+    }
+  }
 
   return null;
 }
@@ -548,7 +555,20 @@ export function extractContextUpdates(
 
   // Budget
   const budget = extractBudget(message);
-  if (budget) updates.budget = budget;
+  const messageProfessions = detectProfessions(message);
+  const isServiceBudget = Boolean(budget && messageProfessions.length > 0
+    && /budget|under|below|within|spend|cost|price/i.test(l));
+  if (budget && !isServiceBudget) updates.budget = budget;
+  if (isServiceBudget && budget) {
+    updates.serviceBudgets = {
+      ...(ctx.serviceBudgets ?? {}),
+      ...Object.fromEntries(messageProfessions.map((profession) => [profession, budget])),
+    };
+  }
+  if (messageProfessions.length > 0
+    && /find|show|search|recommend|suggest|list|profile|vendor|provider|need|hire|looking for|want/i.test(l)) {
+    updates.requestedServices = [...new Set([...(ctx.requestedServices ?? []), ...messageProfessions])];
+  }
 
   // Guest count — supports both "500 guests" and "guest count to 500"
   const gm = message.match(/(\d+)\s*(?:guests?|people|pax|persons?|attendees?|heads?)/i)
@@ -650,7 +670,8 @@ export function orchestrate(
   
   // ─── PHASE 2A: Extract and merge context intelligently ───────────────────
   const updates = extractContextUpdates(normalizedMessage, ctx);
-  const { merged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
+  const { merged: initialMerged, ambiguous } = mergeContextIntelligently(ctx, updates, normalizedMessage);
+  let merged = initialMerged;
   
   // ─── PHASE 2A: If ambiguous, include this in the result ──────────────────
   if (ambiguous) {
@@ -687,10 +708,10 @@ export function orchestrate(
 
   // 7. Determine response strategy
   let responseStrategy: ResponseStrategy;
-  const nextQuestion = determineNextQuestion(intent, merged);
+  const nextQuestion = determineNextQuestion(intent, merged, professions);
   
   // PHASE 2A: Record the question if we're about to ask it
-  if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan'].includes(intent)) {
+  if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan','find_vendors'].includes(intent)) {
     if (!hasAskedQuestion(merged, nextQuestion)) {
       merged = recordAskedQuestion(merged, nextQuestion);
     }
@@ -698,7 +719,7 @@ export function orchestrate(
 
   if (intent === 'greeting') {
     responseStrategy = 'stream_general';
-  } else if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan'].includes(intent)) {
+  } else if (nextQuestion && ['plan_event','budget_breakdown','timeline','checklist','food_plan','find_vendors'].includes(intent)) {
     responseStrategy = 'ask_question';
   } else if (needsRetrieval) {
     responseStrategy = 'stream_with_rag';

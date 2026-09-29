@@ -45,6 +45,7 @@ import { formatAdminPackageRecommendation, formatAdminVsCustomComparison, should
 import { checkVendorAvailability, getAvailableSlots, formatAvailabilityStatus, buildLiveAvailabilityContext, createHold, formatBookingWithHold } from './realTimeAvailability'; // NEW Phase 7F
 import { buildMemoryContext } from './eventMemory'; // Phase 2: compact conversation memory
 import type { EventState } from './eventState'; // Phase 2
+import { eventStateToPlannerContext } from './eventStateProjection';
 import { recallPlannerMemory } from './plannerMemoryClient';
 import {
   asksAboutPlannerMemory,
@@ -89,11 +90,13 @@ const MEMORY_EVENT_TYPES = new Set<EventCategory>([
 
 function toPlannerMemoryContext(context: PlannerContext): PlannerMemoryContext {
   return {
+    eventId: context.eventId, eventLabel: context.eventLabel,
     eventType: context.eventType, city: context.city, locality: context.locality,
     budget: context.budget, guestCount: context.guestCount, eventDate: context.eventDate,
     durationDays: context.durationDays, luxuryLevel: context.luxuryLevel,
     theme: context.theme, colorPalette: context.colorPalette, styleVibe: context.styleVibe,
     foodPreference: context.foodPreference, serviceStyle: context.serviceStyle,
+    requestedServices: context.requestedServices, serviceBudgets: context.serviceBudgets,
   };
 }
 
@@ -101,6 +104,8 @@ function mergeRecalledContext(current: PlannerContext, recalled: PlannerMemoryCo
   const merged = mergePlannerMemoryContext(toPlannerMemoryContext(current), recalled);
   return {
     ...current,
+    eventId: current.eventId ?? merged.eventId,
+    eventLabel: current.eventLabel ?? merged.eventLabel,
     eventType: merged.eventType && MEMORY_EVENT_TYPES.has(merged.eventType as EventCategory)
       ? merged.eventType as EventCategory
       : current.eventType,
@@ -116,6 +121,8 @@ function mergeRecalledContext(current: PlannerContext, recalled: PlannerMemoryCo
     styleVibe: (merged.styleVibe as PlannerContext['styleVibe']) ?? current.styleVibe,
     foodPreference: (merged.foodPreference as PlannerContext['foodPreference']) ?? current.foodPreference,
     serviceStyle: (merged.serviceStyle as PlannerContext['serviceStyle']) ?? current.serviceStyle,
+    requestedServices: current.requestedServices ?? merged.requestedServices,
+    serviceBudgets: current.serviceBudgets ?? merged.serviceBudgets,
   };
 }
 
@@ -464,7 +471,12 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
   }
   
   // Use the updated context from orchestration
-  const baseContext = orch.updatedContext || context;
+  const baseContext = opts.eventState
+    ? {
+        ...eventStateToPlannerContext(opts.eventState),
+        ...extractContextUpdates(message, eventStateToPlannerContext(opts.eventState)),
+      }
+    : (orch.updatedContext || context);
   const shouldRecall = Boolean(opts.conversationId)
     && shouldRecallPlannerMemory(message, orch.intent, toPlannerMemoryContext(baseContext));
   const memoryRecall = shouldRecall && opts.conversationId
@@ -479,6 +491,22 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     const answer = formatMemoryAnswer(contextToUse, persistentMemories);
     await streamDeterministic(answer, onChunk);
     return { fullText: answer, aiResponse: { type: 'text', text: answer }, updatedContext: contextToUse };
+  }
+
+  // Category searches are conversational: collect only the missing details
+  // needed for a grounded search, one question at a time. This prevents a
+  // request such as "I need photography" from triggering unrelated categories
+  // or a broad marketplace query before the event context is known.
+  if (orch.shouldAskNext) {
+    const question = orch.shouldAskNext;
+    await streamDeterministic(question, onChunk);
+    return {
+      fullText: question,
+      aiResponse: { type: 'question', text: question },
+      updatedContext: contextToUse,
+      generatedPlan: undefined,
+      recommendedPackages: [],
+    };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -768,14 +796,16 @@ export async function sendMessage(opts: SendOptions): Promise<SendResult> {
     // ─── PHASE 5: Match real vendors to the plan ──────────────────────────────
     let vendorMatches = [];
     let vendorText = '';
-    try {
-      // Retrieve vendors from database for this event type and city
+    // A general plan must not silently broaden into every marketplace category.
+    // Match live vendors only when the user explicitly requested services.
+    if ((updatedContext.requestedServices?.length ?? 0) > 0) try {
+      // Retrieve vendors only for services explicitly requested by the user.
       const ragResult = await retrieveVendors(
-        `${generatedPlan.eventType} ${generatedPlan.city} vendors`,
+        `${updatedContext.requestedServices!.join(' ')} ${generatedPlan.city} vendors`,
         updatedContext,
         20,  // Get more vendors for better matching
         {
-          professions: [],
+          professions: updatedContext.requestedServices,
           city: generatedPlan.city,
           priceMax: Math.max(...generatedPlan.allocations.map(a => a.allocatedAmount)),
         }

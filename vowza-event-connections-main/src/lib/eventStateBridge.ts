@@ -20,10 +20,13 @@ import {
   applyContextUpdate,
   emptyEventState,
   diffEventStates,
+  structuredCloneState,
 } from './eventState';
 import { applyTurnToEventState } from './eventMemory';
+import { extractEventLabel } from './eventScope';
 import {
   getEventState,
+  listEventStatesForUser,
   saveEventState,
 } from './eventStateRepository';
 
@@ -49,18 +52,31 @@ export function getCachedEventState(conversationId: string | null): EventState |
 export async function restoreEventState(
   conversationId: string,
   userId: string | null,
+  eventId?: string,
 ): Promise<EventState> {
   const cached = eventStateCache.get(conversationId);
-  if (cached) return cached;
+  if (cached && (!eventId || cached.eventId === eventId)) return cached;
   if (!userId) {
     const fresh = emptyEventState(conversationId);
     cacheSet(conversationId, fresh);
     return fresh;
   }
-  const persisted = await getEventState(conversationId, userId);
+  const persisted = await getEventState(conversationId, userId, eventId);
   const state = persisted ?? emptyEventState(conversationId);
   cacheSet(conversationId, state);
   return state;
+}
+
+/** Load canonical event scopes for explicit cross-conversation resolution. */
+export async function listUserEventStates(userId: string): Promise<EventState[]> {
+  return listEventStatesForUser(userId);
+}
+
+/** Activate a resolved event in the current conversation cache. */
+export function activateEventStateForConversation(conversationId: string, state: EventState): EventState {
+  const active = { ...structuredCloneState(state), conversationId };
+  cacheSet(conversationId, active);
+  return active;
 }
 
 // ─── Sync: project a PlannerContext update into Event State and persist ──────
@@ -107,7 +123,12 @@ export async function syncEventStateFromTurn(
     const prev = eventStateCache.get(conversationId) ?? await restoreEventState(conversationId, userId);
 
     // Empty message → no vocabulary, no cultural facts, pure context merge.
-    const { state: next, changes } = applyTurnToEventState(prev, userMessage, updates);
+    const scopedUpdates: PlannerContext = {
+      ...updates,
+      eventId: updates.eventId ?? prev.eventId ?? crypto.randomUUID(),
+      eventLabel: extractEventLabel(userMessage) ?? updates.eventLabel ?? prev.eventLabel ?? updates.eventType,
+    };
+    const { state: next, changes } = applyTurnToEventState(prev, userMessage, scopedUpdates);
 
     // `changes` is the authoritative no-op signal: every real modification
     // (context merge, vocabulary, cultural facts) records a change entry, so

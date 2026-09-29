@@ -24,6 +24,7 @@ const sb = supabase as unknown as { from: (table: string) => any };
 export interface EventStateRow {
   id:              string;
   conversation_id: string;
+  event_id?:       string;
   user_id:         string;
   state:           unknown;      // JSONB — validated with isValidEventState()
   version:         number;
@@ -45,6 +46,7 @@ export interface EventStateVersionRow {
 // Keyed by conversationId. Never leaves the tab — identical spirit to the
 // sessionStorage fallback the chat uses for anonymous users.
 const memoryStates = new Map<string, EventState>();
+const memoryStatesByEvent = new Map<string, EventState>();
 const memoryVersions = new Map<string, Array<{ version: number; state: EventState; createdAt: string }>>();
 let memoryModeAnnounced = false;
 
@@ -71,29 +73,48 @@ function isConfigured(): boolean {
 export async function getEventState(
   conversationId: string,
   userId: string,
+  eventId?: string,
 ): Promise<EventState | null> {
-  if (!isConfigured() || !userId) return memoryStates.get(conversationId) ?? null;
+  if (!isConfigured() || !userId) return (eventId ? memoryStatesByEvent.get(eventId) : memoryStates.get(conversationId)) ?? null;
 
-  const { data, error } = await sb
+  let query = sb
     .from('event_states')
     .select('*')
-    .eq('conversation_id', conversationId)
-    .eq('user_id', userId)
-    .maybeSingle();
+    .eq('user_id', userId);
+  query = eventId ? query.eq('event_id', eventId) : query.eq('conversation_id', conversationId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     // Missing table / migration not yet applied → degrade to memory (logged).
     logFallback(`getEventState failed (falling back to memory): ${error.message}`);
-    return memoryStates.get(conversationId) ?? null;
+    return (eventId ? memoryStatesByEvent.get(eventId) : memoryStates.get(conversationId)) ?? null;
   }
   const row = data as EventStateRow | null;
-  if (!row) return memoryStates.get(conversationId) ?? null;
+  if (!row) return (eventId ? memoryStatesByEvent.get(eventId) : memoryStates.get(conversationId)) ?? null;
 
   if (!isValidEventState(row.state)) {
     console.warn('[EventStateRepository] Stored state failed validation — starting fresh for this thread.');
     return null;
   }
-  return { ...row.state, conversationId };
+  return { ...row.state, conversationId, eventId: (row as EventStateRow & { event_id?: string }).event_id ?? (row.state as EventState).eventId ?? null };
+}
+
+export async function getEventStateByEventId(eventId: string, userId: string): Promise<EventState | null> {
+  return getEventState('', userId, eventId);
+}
+
+export async function listEventStatesForUser(userId: string): Promise<EventState[]> {
+  if (!isConfigured() || !userId) return [...memoryStatesByEvent.values()];
+  const { data, error } = await sb.from('event_states').select('*').eq('user_id', userId);
+  if (error) {
+    logFallback(`listEventStatesForUser failed (memory only): ${error.message}`);
+    return [...memoryStatesByEvent.values()];
+  }
+  return ((data as EventStateRow[]) ?? []).map((row) => ({
+    ...(row.state as EventState),
+    conversationId: row.conversation_id,
+    eventId: (row as EventStateRow & { event_id?: string }).event_id ?? (row.state as EventState).eventId ?? null,
+  })).filter(isValidEventState);
 }
 
 // ─── Write: upsert the Event State for a conversation ────────────────────────
@@ -106,7 +127,12 @@ export async function saveEventState(
   userId: string,
   state: EventState,
 ): Promise<number | null> {
-  const stamped: EventState = { ...state, conversationId, updatedAt: new Date().toISOString() };
+  const stamped: EventState = {
+    ...state,
+    conversationId,
+    eventId: state.eventId ?? crypto.randomUUID(),
+    updatedAt: new Date().toISOString(),
+  };
 
   if (!isConfigured() || !userId) {
     persistToMemory(conversationId, stamped);
@@ -115,12 +141,12 @@ export async function saveEventState(
 
   // Read the current row first: we need its id and version to append history
   // correctly. (event_states has at most one row per conversation — UNIQUE.)
-  const existing = await sb
+  let existingQuery = sb
     .from('event_states')
     .select('id, version, state')
-    .eq('conversation_id', conversationId)
-    .eq('user_id', userId)
-    .maybeSingle();
+    .eq('user_id', userId);
+  existingQuery = existingQuery.eq('event_id', stamped.eventId);
+  const existing = await existingQuery.maybeSingle();
 
   if (existing.error) {
     logFallback(`saveEventState lookup failed (NOT persisted, memory only): ${existing.error.message}`);
@@ -145,6 +171,7 @@ export async function saveEventState(
   } else {
     const insert = {
       conversation_id: conversationId,
+      event_id: stamped.eventId,
       user_id:         userId,
       state:           stamped,
       version:         nextVersion,
@@ -211,7 +238,9 @@ export async function listEventStateVersions(
 
 // ─── Delete (conversation teardown — normally unnecessary: ON DELETE CASCADE) ─
 export async function deleteEventState(conversationId: string, userId: string): Promise<void> {
+  const previous = memoryStates.get(conversationId);
   memoryStates.delete(conversationId);
+  if (previous?.eventId) memoryStatesByEvent.delete(previous.eventId);
   memoryVersions.delete(conversationId);
   if (!isConfigured() || !userId) return;
   const { error } = await sb
@@ -226,6 +255,7 @@ export async function deleteEventState(conversationId: string, userId: string): 
 function persistToMemory(conversationId: string, state: EventState): void {
   const prev = memoryStates.get(conversationId);
   memoryStates.set(conversationId, state);
+  if (state.eventId) memoryStatesByEvent.set(state.eventId, state);
   if (prev) {
     const list = memoryVersions.get(conversationId) ?? [];
     list.unshift({ version: (list[0]?.version ?? 0) + 1, state: prev, createdAt: new Date().toISOString() });

@@ -1,4 +1,6 @@
 export interface PlannerMemoryContext {
+  eventId?: string;
+  eventLabel?: string;
   eventType?: string;
   city?: string;
   locality?: string;
@@ -12,6 +14,8 @@ export interface PlannerMemoryContext {
   styleVibe?: string;
   foodPreference?: string;
   serviceStyle?: string;
+  requestedServices?: string[];
+  serviceBudgets?: Record<string, number>;
 }
 
 export interface MemoryRecallItem {
@@ -29,6 +33,8 @@ export interface MemoryRetentionRecord {
 }
 
 interface EventStateSnapshot {
+  eventId?: unknown;
+  eventLabel?: unknown;
   eventType?: unknown;
   location?: { city?: unknown; area?: unknown };
   schedule?: { eventDate?: unknown; durationDays?: unknown };
@@ -41,6 +47,7 @@ interface EventStateSnapshot {
     foodPreference?: unknown;
     serviceStyle?: unknown;
   };
+  requirements?: { serviceBudgets?: unknown };
   updatedAt?: unknown;
 }
 
@@ -72,6 +79,7 @@ const ALLOWED_RETENTION_FIELDS = new Set([
   'style.vibe',
   'style.foodPreference',
   'style.serviceStyle',
+  'requirements.serviceBudgets',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,10 +98,30 @@ function positiveNumber(value: unknown, integer = false): number | undefined {
   return value;
 }
 
+function validEventId(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : undefined;
+}
+
 function metadataNumber(value: string | undefined, integer = false): number | undefined {
   if (!value) return undefined;
   const parsed = Number(value);
   return positiveNumber(parsed, integer);
+}
+
+function parseServiceBudgets(value: string | undefined): Record<string, number> | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    if (!isRecord(parsed)) return undefined;
+    const budgets = Object.fromEntries(Object.entries(parsed)
+      .filter(([key, amount]) => /^[a-z][a-z0-9_ -]{1,60}$/i.test(key) && positiveNumber(amount))
+      .map(([key, amount]) => [key, positiveNumber(amount)!]));
+    return Object.keys(budgets).length ? budgets : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Stable Hindsight scope derived only from Supabase's authenticated UUID. */
@@ -120,6 +148,8 @@ export function sanitizeRecallQuery(value: string): string {
 export function buildRecallQuery(message: string, context: PlannerMemoryContext): string {
   const parts = [sanitizeRecallQuery(message)];
   const details = [
+    context.eventId && `event scope ${context.eventId}`,
+    context.eventLabel && `event label ${context.eventLabel}`,
     context.eventType && `event type ${context.eventType}`,
     context.city && `city ${context.city}`,
     context.locality && `locality ${context.locality}`,
@@ -137,6 +167,12 @@ export function buildRecallQuery(message: string, context: PlannerMemoryContext)
 export function plannerContextFromMetadata(metadata: Record<string, string> | null | undefined): PlannerMemoryContext {
   if (!metadata || metadata.vowza_source !== 'planner-event-state') return {};
   const context: PlannerMemoryContext = {};
+  const eventId = validEventId(metadata.vowza_event_id);
+  if (eventId) context.eventId = eventId;
+  const eventLabel = cleanText(metadata.vowza_event_label, 100);
+  if (eventLabel) context.eventLabel = eventLabel;
+  const serviceBudgets = parseServiceBudgets(metadata.vowza_service_budgets);
+  if (serviceBudgets) context.serviceBudgets = serviceBudgets;
   const eventType = cleanText(metadata.vowza_event_type, 40);
   if (eventType && EVENT_TYPES.has(eventType)) context.eventType = eventType;
   const city = cleanText(metadata.vowza_city, 80);
@@ -170,6 +206,10 @@ export function plannerContextFromMetadata(metadata: Record<string, string> | nu
 export function normalizePlannerMemoryContext(value: unknown): PlannerMemoryContext {
   if (!isRecord(value)) return {};
   const context: PlannerMemoryContext = {};
+  const eventId = validEventId(value.eventId);
+  if (eventId) context.eventId = eventId;
+  const eventLabel = cleanText(value.eventLabel, 100);
+  if (eventLabel) context.eventLabel = eventLabel;
   const eventType = cleanText(value.eventType, 40);
   if (eventType && EVENT_TYPES.has(eventType)) context.eventType = eventType;
   const city = cleanText(value.city, 80);
@@ -209,12 +249,19 @@ export function summarizeRecallResults(
 } {
   const relevant = items.filter((item) => typeof item.text === 'string' && item.text.trim());
   const vowzaItems = relevant.filter((item) => item.metadata?.vowza_source === 'planner-event-state');
+  const requestedEventId = currentContext.eventId;
+  // Event-specific facts are never eligible without a resolved scope. A
+  // user-level bank may contain many events, so event type/city matching is
+  // only a secondary compatibility check after this identity filter.
+  const scopedVowzaItems = requestedEventId
+    ? vowzaItems.filter((item) => item.metadata?.vowza_event_id === requestedEventId)
+    : [];
   const timestamp = (item: MemoryRecallItem) => {
     const raw = item.metadata?.vowza_updated_at;
     const parsed = typeof raw === 'string' ? Date.parse(raw) : Number.NaN;
     return Number.isFinite(parsed) ? parsed : null;
   };
-  const orderedVowzaItems = [...vowzaItems].sort((a, b) => (timestamp(b) ?? 0) - (timestamp(a) ?? 0));
+  const orderedVowzaItems = [...scopedVowzaItems].sort((a, b) => (timestamp(b) ?? 0) - (timestamp(a) ?? 0));
   const newestVowzaItem = orderedVowzaItems[0];
   const anchorContext = plannerContextFromMetadata(newestVowzaItem?.metadata);
   const anchorIsCompatible = (!currentContext.eventType || !anchorContext.eventType || currentContext.eventType === anchorContext.eventType)
@@ -233,7 +280,7 @@ export function summarizeRecallResults(
     : compatibleItems.filter((item) => timestamp(item) === newestCompatibleTimestamp);
   const memoryItems = latestVowzaItems.length
     ? latestVowzaItems
-    : vowzaItems.length ? [] : relevant.slice(0, 1);
+    : scopedVowzaItems.length ? [] : [];
   let mergedContext: PlannerMemoryContext = {};
   for (const item of compatibleItems) {
     const snapshotContext = plannerContextFromMetadata(item.metadata);
@@ -300,6 +347,8 @@ function explicitFieldMention(field: string, userMessage: string): boolean {
       return /\b(?:\d[\d,]*\s*(?:guests?|people|attendees?)|(?:guests?|people|attendees?)\s*(?:about|around|approximately|of)?\s*\d[\d,]*)\b/i.test(text);
     case 'budget.total':
       return /(?:₹|\b(?:rs\.?|inr|budget|spend|cost)\b|\b\d+(?:\.\d+)?\s*(?:lakh|lac|crore|cr|k)\b)/i.test(text);
+    case 'requirements.serviceBudgets':
+      return /\b(?:photograph|cater|decorat|dj|makeup|videograph|venue|budget|spend|cost|price)\w*\b/i.test(text);
     case 'budget.luxuryLevel':
       return /\b(?:budget[- ]friendly|standard|premium|luxury|high[- ]end|economical)\b/i.test(text);
     case 'style.theme':
@@ -332,6 +381,11 @@ export function buildRetentionRecord(
 
   const state = stateInput as EventStateSnapshot;
   const context: PlannerMemoryContext = {};
+  const eventId = validEventId(state.eventId);
+  if (!eventId) return null;
+  context.eventId = eventId;
+  const eventLabel = cleanText(state.eventLabel, 100);
+  if (eventLabel) context.eventLabel = eventLabel;
   const eventType = cleanText(state.eventType, 40);
   if (eventType && EVENT_TYPES.has(eventType)) context.eventType = eventType;
   const location = isRecord(state.location) ? state.location : {};
@@ -363,8 +417,17 @@ export function buildRetentionRecord(
   if (foodPreference && ['veg', 'non-veg', 'both'].includes(foodPreference)) context.foodPreference = foodPreference;
   const serviceStyle = cleanText(style.serviceStyle, 20);
   if (serviceStyle && ['buffet', 'table_service'].includes(serviceStyle)) context.serviceStyle = serviceStyle;
+  const requirements = isRecord(state.requirements) ? state.requirements : {};
+  if (isRecord(requirements.serviceBudgets)) {
+    const budgets = Object.fromEntries(Object.entries(requirements.serviceBudgets)
+      .filter(([key, value]) => /^[a-z][a-z0-9_ -]{1,60}$/i.test(key) && positiveNumber(value))
+      .map(([key, value]) => [key, positiveNumber(value)!]));
+    if (Object.keys(budgets).length) context.serviceBudgets = budgets;
+  }
 
   const lines = [
+    context.eventId && `Event scope: ${context.eventId}.`,
+    context.eventLabel && `Event label: ${context.eventLabel}.`,
     context.eventType && `Event type: ${context.eventType}.`,
     city && `Event city: ${city}.`,
     area && `Event area: ${area}.`,
@@ -378,6 +441,7 @@ export function buildRetentionRecord(
     context.styleVibe && `Preferred style: ${context.styleVibe}.`,
     context.foodPreference && `Food preference: ${context.foodPreference}.`,
     context.serviceStyle && `Preferred food service: ${context.serviceStyle}.`,
+    context.serviceBudgets && `Confirmed service budgets: ${Object.entries(context.serviceBudgets).map(([service, amount]) => `${service} INR ${amount}`).join('; ')}.`,
   ].filter((line): line is string => Boolean(line));
   if (!lines.length) return null;
 
@@ -387,9 +451,11 @@ export function buildRetentionRecord(
     : new Date().toISOString();
   const metadata: Record<string, string> = {
     vowza_source: 'planner-event-state',
+    vowza_event_id: context.eventId!,
     vowza_conversation_id: conversationId,
     vowza_updated_at: timestamp,
   };
+  if (context.eventLabel) metadata.vowza_event_label = context.eventLabel;
   if (context.eventType) metadata.vowza_event_type = context.eventType;
   if (city) metadata.vowza_city = city;
   if (area) metadata.vowza_area = area;
@@ -403,13 +469,14 @@ export function buildRetentionRecord(
   if (context.styleVibe) metadata.vowza_style_vibe = context.styleVibe;
   if (context.foodPreference) metadata.vowza_food_preference = context.foodPreference;
   if (context.serviceStyle) metadata.vowza_service_style = context.serviceStyle;
+  if (context.serviceBudgets) metadata.vowza_service_budgets = JSON.stringify(context.serviceBudgets);
 
   return {
     content: `Current user-provided event planning context. Newer explicit user corrections supersede older values. ${lines.join(' ')}`,
     context: 'Vowza AI Planner event planning',
     timestamp,
-    documentId: conversationId,
-    tags: ['vowza-planner'],
+    documentId: `${context.eventId}:${conversationId}`,
+    tags: ['vowza-planner', `vowza-event-${context.eventId}`],
     metadata,
   };
 }

@@ -11,6 +11,8 @@ export interface PlannerMemoryRecall {
 
 function toMemoryContext(context: PlannerContext): PlannerMemoryContext {
   return {
+    eventId: context.eventId,
+    eventLabel: context.eventLabel,
     eventType: context.eventType,
     city: context.city,
     locality: context.locality,
@@ -32,6 +34,8 @@ function safeEventStateSnapshot(state: EventState): Record<string, unknown> {
   // details, special requirements, vendor IDs, and the state change history
   // never leave the existing Vowza Event State store.
   return {
+    eventId: state.eventId,
+    eventLabel: state.eventLabel,
     eventType: state.eventType,
     location: { city: state.location.city, area: state.location.area },
     schedule: { eventDate: state.schedule.eventDate, durationDays: state.schedule.durationDays },
@@ -44,6 +48,7 @@ function safeEventStateSnapshot(state: EventState): Record<string, unknown> {
       foodPreference: state.style.foodPreference,
       serviceStyle: state.style.serviceStyle,
     },
+    requirements: { serviceBudgets: state.requirements.serviceBudgets },
     updatedAt: state.updatedAt,
   };
 }

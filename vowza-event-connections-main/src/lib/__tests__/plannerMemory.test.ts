@@ -13,9 +13,13 @@ import {
 const CONVERSATION_ID = '00000000-0000-4000-8000-000000000002';
 const USER_A = '00000000-0000-4000-8000-000000000001';
 const USER_B = '00000000-0000-4000-8000-000000000003';
+const EVENT_A = '00000000-0000-4000-8000-000000000010';
+const EVENT_B = '00000000-0000-4000-8000-000000000011';
 
 function eventState(overrides: Record<string, unknown> = {}) {
   return {
+    eventId: EVENT_A,
+    eventLabel: 'sister wedding',
     eventType: 'wedding',
     location: { city: 'Hyderabad', area: 'Banjara Hills' },
     schedule: { eventDate: '2027-02-21', durationDays: 2 },
@@ -80,28 +84,28 @@ describe('Planner persistent memory adapter', () => {
   it('uses the newest snapshot so older cross-conversation values do not resurface', () => {
     const result = summarizeRecallResults([
       { text: 'Older budget INR 500000.', metadata: {
-        vowza_source: 'planner-event-state', vowza_event_type: 'wedding', vowza_city: 'Hyderabad',
+        vowza_source: 'planner-event-state', vowza_event_id: EVENT_A, vowza_event_type: 'wedding', vowza_city: 'Hyderabad',
         vowza_guest_count: '500', vowza_budget_inr: '500000', vowza_updated_at: '2026-09-01T12:00:00.000Z',
       } },
       { text: 'Current budget INR 700000.', metadata: {
-        vowza_source: 'planner-event-state', vowza_event_type: 'wedding',
+        vowza_source: 'planner-event-state', vowza_event_id: EVENT_A, vowza_event_type: 'wedding',
         vowza_budget_inr: '700000', vowza_updated_at: '2026-09-20T12:00:00.000Z',
       } },
-    ]);
-    expect(result.context).toEqual({ eventType: 'wedding', city: 'Hyderabad', guestCount: 500, budget: 700_000 });
+    ], { eventId: EVENT_A });
+    expect(result.context).toEqual({ eventId: EVENT_A, eventType: 'wedding', city: 'Hyderabad', guestCount: 500, budget: 700_000 });
     expect(result.memories).toEqual(['Current budget INR 700000.']);
 
     const scoped = summarizeRecallResults([
       { text: 'New birthday event in Mumbai.', metadata: {
-        vowza_source: 'planner-event-state', vowza_event_type: 'birthday', vowza_city: 'Mumbai',
+        vowza_source: 'planner-event-state', vowza_event_id: EVENT_B, vowza_event_type: 'birthday', vowza_city: 'Mumbai',
         vowza_updated_at: '2026-09-25T12:00:00.000Z',
       } },
       { text: 'Wedding in Hyderabad.', metadata: {
-        vowza_source: 'planner-event-state', vowza_event_type: 'wedding', vowza_city: 'Hyderabad',
+        vowza_source: 'planner-event-state', vowza_event_id: EVENT_A, vowza_event_type: 'wedding', vowza_city: 'Hyderabad',
         vowza_updated_at: '2026-09-20T12:00:00.000Z',
       } },
-    ], { eventType: 'wedding' });
-    expect(scoped.context).toEqual({ eventType: 'wedding', city: 'Hyderabad' });
+    ], { eventId: EVENT_A, eventType: 'wedding' });
+    expect(scoped.context).toEqual({ eventId: EVENT_A, eventType: 'wedding', city: 'Hyderabad' });
     expect(scoped.memories).toEqual(['Wedding in Hyderabad.']);
   });
 
@@ -134,8 +138,8 @@ describe('Planner persistent memory adapter', () => {
       vowza_budget_inr: '700000',
       vowza_city: 'Hyderabad',
     });
-    expect(record?.documentId).toBe(CONVERSATION_ID);
-    expect(record?.tags).toEqual(['vowza-planner']);
+    expect(record?.documentId).toBe(`${EVENT_A}:${CONVERSATION_ID}`);
+    expect(record?.tags).toEqual(['vowza-planner', `vowza-event-${EVENT_A}`]);
   });
 
   it('does not retain generic requests, memory-derived details, or sensitive-only changes', () => {

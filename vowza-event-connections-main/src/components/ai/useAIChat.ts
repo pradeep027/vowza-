@@ -28,8 +28,10 @@ import type { ConversationRow } from '@/lib/conversationTypes';
 import { useDashboardLink } from '@/hooks/useDashboardLink';
 // Phase 1/2: Event State layer — additive sync only. The regex extraction,
 // prompts, and context_summary persistence below are untouched.
-import { syncEventStateFromTurn, restoreEventState, getCachedEventState } from '@/lib/eventStateBridge';
+import { syncEventStateFromTurn, restoreEventState, getCachedEventState, listUserEventStates, activateEventStateForConversation } from '@/lib/eventStateBridge';
 import { retainPlannerMemory } from '@/lib/plannerMemoryClient';
+import { eventStateToPlannerContext } from '@/lib/eventStateProjection';
+import { candidateFromEventState, resolveEventScope } from '@/lib/eventScope';
 
 // ─── sessionStorage keys ─────────────────────────────────────────────────────
 const CTX_KEY  = 'vowza_ai_context';
@@ -119,9 +121,16 @@ export function useAIChat() {
         setMessages(msgs);
         setHistoryLoading(false);
       });
-      // Phase 2: warm the Event State cache for this thread (used by the
-      // memory context and future UI). Conversation-scoped — no leakage.
-      if (user?.id) restoreEventState(storedId, user.id);
+      // Canonical Event State replaces any stale browser/context_summary data.
+      if (user?.id) {
+        restoreEventState(storedId, user.id).then((state) => {
+          const canonical = eventStateToPlannerContext(state);
+          if (!state.eventId) return;
+          contextRef.current = canonical;
+          setContext(canonical);
+          saveContext(canonical);
+        });
+      }
     }
   }, [user?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -142,10 +151,21 @@ export function useAIChat() {
     convIdRef.current = conv.id;
     setConversationId(conv.id);
     saveConvId(conv.id);
-    // Phase 2: restore this conversation's own Event State (cache keyed by
-    // conversationId — switching threads never mixes states).
-    if (user?.id) restoreEventState(conv.id, user.id);
-    if (conv.context_summary) {
+    // Clear before restore so the previous event's fields cannot survive a
+    // conversation switch while the canonical row is loading.
+    contextRef.current = {};
+    setContext({});
+    saveContext({});
+    if (user?.id) {
+      const state = await restoreEventState(conv.id, user.id);
+      const canonical = eventStateToPlannerContext(state);
+      if (state.eventId) {
+        contextRef.current = canonical;
+        setContext(canonical);
+        saveContext(canonical);
+      }
+    }
+    if (!getCachedEventState(conv.id)?.eventId && conv.context_summary) {
       contextRef.current = conv.context_summary;
       setContext(conv.context_summary);
       saveContext(conv.context_summary);
@@ -267,8 +287,40 @@ export function useAIChat() {
 
     // Use refs to get current values — avoids stale closure bug
     const currentMessages = messagesRef.current;
-    const currentContext  = contextRef.current;
+    let currentContext  = contextRef.current;
     let   currentConvId   = convIdRef.current;
+    let currentEventState = currentConvId ? getCachedEventState(currentConvId) : null;
+
+    // Resolve references such as "my sister's wedding" against canonical
+    // event identities, never by overwriting the active event's label/type.
+    if (user && currentConvId) {
+      const states = await listUserEventStates(user.id);
+      const candidates = states.map(candidateFromEventState).filter((item): item is NonNullable<typeof item> => Boolean(item));
+      const resolution = resolveEventScope(
+        userText,
+        currentEventState ? candidateFromEventState(currentEventState) : null,
+        candidates,
+      );
+      if (resolution.kind === 'ambiguous') {
+        const clarification: ChatMessage = {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          text: resolution.question,
+          response: { type: 'question', text: resolution.question },
+          timestamp: new Date(),
+        };
+        messagesRef.current = [...messagesRef.current, clarification];
+        setMessages(messagesRef.current);
+        return;
+      }
+      if (resolution.kind === 'resolved' && resolution.candidate.eventId !== currentEventState?.eventId) {
+        currentEventState = activateEventStateForConversation(currentConvId, resolution.candidate.state);
+        currentContext = eventStateToPlannerContext(currentEventState);
+        contextRef.current = currentContext;
+        setContext(currentContext);
+        saveContext(currentContext);
+      }
+    }
 
     // Navigation shortcut — handle before touching DB
     const navPath = (() => {
@@ -344,7 +396,7 @@ export function useAIChat() {
         history: currentMessages,
         context: currentContext,
         currentPlan: planRef.current, // NEW: Phase 2A - pass current plan
-        eventState: convIdRef.current ? getCachedEventState(convIdRef.current) : undefined, // Phase 2
+        eventState: currentEventState ?? (convIdRef.current ? getCachedEventState(convIdRef.current) : undefined),
         conversationId: user && currentConvId ? currentConvId : undefined,
         onChunk: ({ delta, done }) => {
           if (abortRef.current || requestEpochRef.current !== requestEpoch) return;
@@ -388,7 +440,6 @@ export function useAIChat() {
         if (currentConvId && user) {
           saveMessage(currentConvId, user.id, 'assistant', finalText, res.aiResponse);
           touchConversation(currentConvId);
-          updateConversation(currentConvId, { context_summary: res.updatedContext });
           // Phase 2: apply the turn to Event State (user wording + explicit
           // facts + latest-value-wins corrections) and AWAIT persistence so
           // the outcome is known. Failures never break the chat — they are
@@ -404,12 +455,17 @@ export function useAIChat() {
             // Only the Supabase-persisted state is eligible; Hindsight is not a fallback source of truth.
             void retainPlannerMemory(userText, syncResult.state, syncResult.changes, currentConvId);
           }
+
+          if (syncResult.state) {
+            finalContext = eventStateToPlannerContext(syncResult.state);
+            updateConversation(currentConvId, { context_summary: finalContext });
+          }
         }
 
         // Update context ref and state
-        contextRef.current = res.updatedContext;
-        setContext(res.updatedContext);
-        saveContext(res.updatedContext);
+        contextRef.current = finalContext;
+        setContext(finalContext);
+        saveContext(finalContext);
       });
 
     } catch (err: any) {
