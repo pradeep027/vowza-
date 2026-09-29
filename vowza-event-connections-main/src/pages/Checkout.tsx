@@ -455,6 +455,34 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'banquet_bookings') {
+          // Banquet (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_banquet_booking RPC re-fetches
+          // the hall price (hall_rental_price), sums any addon prices, HONORS the
+          // hall's advance_percentage (NOT the flat ADVANCE_PERCENT the generic
+          // else below used), derives every charge and forces customer_id =
+          // auth.uid(). This closes the cart creation path, matching
+          // BanquetHallMenu "Book Now". It ALSO fixes a pre-existing BUG: the
+          // generic else derived the base charge from item.price, which for banquet
+          // resolved to Number(pkg.package_price || pkg.price || 0) = 0
+          // (banquet_halls has NEITHER column — its price is hall_rental_price), so
+          // the cart created zero-value banquet bookings. event_type is descriptive
+          // (no hall fallback at insert); guest_count is a free-text range label,
+          // not a price. The cart has no banquet addon/guest picker (p_addon_ids
+          // omitted → 0 addons; p_guest_count null).
+          const { data: newId, error } = await supabase.rpc('create_banquet_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_guest_count: null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
