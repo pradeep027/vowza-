@@ -227,6 +227,31 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'dj_bookings') {
+          // DJ (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_dj_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DJMenu "Book Now". The generic cart item carries no expected_audience,
+          // song requests or addon selection, so those are omitted (expected_audience
+          // is descriptive only — not a pricing input; the DJ total is package_price
+          // + addons regardless). Advance/remaining are derived at accept (flat 20%),
+          // not stored at creation. The old generic INSERT below used a flat
+          // ADVANCE_PERCENT = 20 with client-supplied amounts.
+          const { data: newId, error } = await supabase.rpc('create_dj_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_expected_audience: null,
+            p_song_requests: null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
