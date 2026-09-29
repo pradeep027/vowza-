@@ -329,6 +329,32 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'priest_bookings') {
+          // Priest (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_priest_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package (advance
+          // from the package's advance_percentage) + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // PriestMenu "Book Now". The generic cart item carries no addon selection,
+          // so p_addon_ids is omitted (the priest total is service_price + addons
+          // regardless; event_type/venue/city are descriptive only — not pricing
+          // inputs). Advance/remaining ARE stored at creation (HONOR the package's
+          // advance_percentage, NOT flat 20%). event_type falls back to the
+          // package_type server-side. NOTE: the old generic INSERT below never worked
+          // for priest anyway — it writes special_requirements, a column
+          // priest_bookings lacks (it has special_instructions).
+          const { data: newId, error } = await supabase.rpc('create_priest_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);

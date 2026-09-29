@@ -187,18 +187,22 @@ function PriestBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('priest_bookings').insert({
-        package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
-        event_date: eventDate, event_time: eventTime || null,
-        event_type: eventType || pkg.package_type || null,
-        venue: location.venue_name || location.locality || null, city: location.town_city || null,
-        selected_addon_ids: selectedAddonIds,
-        special_instructions: specialInstructions || null,
-        base_amount: baseAmount, addons_amount: addonsAmount,
-        total_amount: total, advance_amount: advanceAmount, remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // Financial values (base/addons/total/advance/remaining) and customer_id are
+      // derived SERVER-SIDE by create_priest_booking. The browser sends ONLY
+      // identifiers / selections / descriptive fields — never an amount. event_type
+      // falls back to the package_type server-side (was eventType || pkg.package_type).
+      const { data: newId, error } = await supabase.rpc('create_priest_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_special_instructions: specialInstructions || null,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const booking = { id: newId as string };
 
       // Save structured location
       await supabase.from('booking_locations').insert({
