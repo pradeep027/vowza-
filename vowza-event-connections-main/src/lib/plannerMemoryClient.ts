@@ -26,6 +26,7 @@ function toMemoryContext(context: PlannerContext): PlannerMemoryContext {
     styleVibe: context.styleVibe,
     foodPreference: context.foodPreference,
     serviceStyle: context.serviceStyle,
+    requestedServices: context.requestedServices,
   };
 }
 
@@ -49,6 +50,7 @@ function safeEventStateSnapshot(state: EventState): Record<string, unknown> {
       serviceStyle: state.style.serviceStyle,
     },
     requirements: { serviceBudgets: state.requirements.serviceBudgets },
+    requestedServices: state.requestedServices,
     updatedAt: state.updatedAt,
   };
 }

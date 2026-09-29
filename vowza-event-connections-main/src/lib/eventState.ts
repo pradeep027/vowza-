@@ -36,6 +36,8 @@ export interface EventState {
   eventId: string | null;
   /** User-facing scope label/aliases are metadata, not identity. */
   eventLabel: string | null;
+  /** Services explicitly discussed for this event. */
+  requestedServices?: string[];
 
   // ── Event identity ─────────────────────────────────────────────────────────
   /** Canonical event category (PlannerContext vocabulary) or null. */
@@ -141,6 +143,7 @@ export function emptyEventState(conversationId: string | null = null, eventId: s
     conversationId,
     eventId,
     eventLabel: null,
+    requestedServices: [],
     eventType: null,
     eventTypeRaw: null,
     religion: null,
@@ -202,6 +205,9 @@ export function mapContextToEventState(
   base.conversationId = base.conversationId ?? conversationId;
   if (ctx.eventId !== undefined) base.eventId = ctx.eventId;
   if (ctx.eventLabel !== undefined) base.eventLabel = ctx.eventLabel;
+  if (ctx.requestedServices !== undefined) {
+    base.requestedServices = [...new Set([...(base.requestedServices ?? []), ...ctx.requestedServices])];
+  }
 
   if (ctx.eventType !== undefined) {
     base.eventType = set('eventType', base.eventType, ctx.eventType);
@@ -316,6 +322,7 @@ export function diffEventStates(a: EventState, b: EventState): FieldChange[] {
     ['style.serviceStyle', a.style.serviceStyle, b.style.serviceStyle],
     ['requirements.specialRequirements', a.requirements.specialRequirements, b.requirements.specialRequirements],
     ['requirements.serviceBudgets', a.requirements.serviceBudgets, b.requirements.serviceBudgets],
+    ['requestedServices', a.requestedServices, b.requestedServices],
   ];
   for (const [field, prevVal, nextVal] of paths) {
     const equal = typeof prevVal === 'object' || typeof nextVal === 'object'

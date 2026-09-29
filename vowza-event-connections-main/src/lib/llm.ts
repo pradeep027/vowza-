@@ -450,7 +450,10 @@ function buildDeterministicResponse(
 
 // ─── Main sendMessage (NEW Phase 2A with plan generation) ──────────────────────
 export async function sendMessage(opts: SendOptions): Promise<SendResult> {
-  const { message, history, context, onChunk, currentPlan } = opts;
+  const { message, history, context, onChunk } = opts;
+  const currentPlan = opts.currentPlan?.eventId && opts.currentPlan.eventId === context.eventId
+    ? opts.currentPlan
+    : undefined;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const useEdge = import.meta.env.VITE_USE_AI_PROXY !== 'false';
 

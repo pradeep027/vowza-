@@ -31,7 +31,8 @@ import { useDashboardLink } from '@/hooks/useDashboardLink';
 import { syncEventStateFromTurn, restoreEventState, getCachedEventState, listUserEventStates, activateEventStateForConversation } from '@/lib/eventStateBridge';
 import { retainPlannerMemory } from '@/lib/plannerMemoryClient';
 import { eventStateToPlannerContext } from '@/lib/eventStateProjection';
-import { candidateFromEventState, resolveEventScope } from '@/lib/eventScope';
+import { emptyEventState } from '@/lib/eventState';
+import { candidateFromEventState, resolveEventScope, shouldCreateNewEventScope } from '@/lib/eventScope';
 
 // ─── sessionStorage keys ─────────────────────────────────────────────────────
 const CTX_KEY  = 'vowza_ai_context';
@@ -296,12 +297,23 @@ export function useAIChat() {
     if (user && currentConvId) {
       const states = await listUserEventStates(user.id);
       const candidates = states.map(candidateFromEventState).filter((item): item is NonNullable<typeof item> => Boolean(item));
-      const resolution = resolveEventScope(
-        userText,
-        currentEventState ? candidateFromEventState(currentEventState) : null,
-        candidates,
-      );
-      if (resolution.kind === 'ambiguous') {
+      const startsNewEvent = shouldCreateNewEventScope(userText, candidates);
+      const resolution = startsNewEvent
+        ? { kind: 'new' as const }
+        : resolveEventScope(
+            userText,
+            currentEventState ? candidateFromEventState(currentEventState) : null,
+            candidates,
+          );
+      if (resolution.kind === 'new') {
+        currentEventState = emptyEventState(currentConvId, crypto.randomUUID());
+        currentContext = eventStateToPlannerContext(currentEventState);
+        contextRef.current = currentContext;
+        setContext(currentContext);
+        saveContext(currentContext);
+        planRef.current = null;
+        setCurrentPlan(null);
+      } else if (resolution.kind === 'ambiguous') {
         const clarification: ChatMessage = {
           id: `a-${Date.now()}`,
           role: 'assistant',
@@ -319,6 +331,8 @@ export function useAIChat() {
         contextRef.current = currentContext;
         setContext(currentContext);
         saveContext(currentContext);
+        planRef.current = null;
+        setCurrentPlan(null);
       }
     }
 
@@ -395,7 +409,7 @@ export function useAIChat() {
         message: userText,
         history: currentMessages,
         context: currentContext,
-        currentPlan: planRef.current, // NEW: Phase 2A - pass current plan
+        currentPlan: planRef.current?.eventId === currentContext.eventId ? planRef.current : undefined,
         eventState: currentEventState ?? (convIdRef.current ? getCachedEventState(convIdRef.current) : undefined),
         conversationId: user && currentConvId ? currentConvId : undefined,
         onChunk: ({ delta, done }) => {

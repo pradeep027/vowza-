@@ -28,7 +28,7 @@ export function eventStateToPlannerContext(state: EventState | null | undefined)
     serviceStyle: state.style.serviceStyle ?? undefined,
     specialRequirements: state.requirements.specialRequirements ?? undefined,
     serviceBudgets: { ...state.requirements.serviceBudgets },
-    requestedServices: undefined,
+    requestedServices: state.requestedServices ? [...state.requestedServices] : undefined,
     confirmedFields: [...state.confirmedFields],
   };
 }

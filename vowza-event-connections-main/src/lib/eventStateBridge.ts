@@ -1,88 +1,104 @@
-// ─── Event State Bridge — Phase 1 orchestration ──────────────────────────────
-//
-// Connects the chat pipeline to the Event State layer WITHOUT changing any
-// existing behaviour:
-//   • The regex extraction system (aiOrchestrator) stays the sole source of
-//     structured updates — the bridge only PROJECTS its output into Event
-//     State. No prompts or extraction logic are modified.
-//   • context_summary persistence (PlannerContext on ai_conversations) is
-//     untouched and continues to drive the current planning engine.
-//   • Event State sync is fire-and-forget from the chat's perspective: any
-//     failure is logged and swallowed so the conversation never breaks.
-//
-// Concurrency model: a per-tab cache holds the latest known state per
-// conversation, so merges always build on the newest state without a read
-// round-trip per message. The repository is the durability layer.
-
+// ─── Event State Bridge — event-scoped orchestration ─────────────────────────
 import type { PlannerContext } from './aiPlannerTypes';
 import type { EventState, FieldChange } from './eventState';
-import {
-  applyContextUpdate,
-  emptyEventState,
-  diffEventStates,
-  structuredCloneState,
-} from './eventState';
+import { emptyEventState, diffEventStates, structuredCloneState } from './eventState';
 import { applyTurnToEventState } from './eventMemory';
 import { extractEventLabel } from './eventScope';
 import {
   getEventState,
+  listEventStatesForConversation as loadEventStatesForConversation,
   listEventStatesForUser,
   saveEventState,
 } from './eventStateRepository';
 
-// ─── Per-tab cache of latest Event State per conversation ────────────────────
-const eventStateCache = new Map<string, EventState>();
+// Each conversation owns independent event documents. activeEventIds is the
+// conversational focus; switching it never mutates another event document.
+const eventStateCache = new Map<string, Map<string, EventState>>();
+const activeEventIds = new Map<string, string>();
 const CACHE_LIMIT = 20;
 
-function cacheSet(conversationId: string, state: EventState): void {
-  eventStateCache.set(conversationId, state);
+function cacheSet(conversationId: string, state: EventState, activate = true): void {
+  if (!state.eventId) return;
+  const events = eventStateCache.get(conversationId) ?? new Map<string, EventState>();
+  events.set(state.eventId, state);
+  eventStateCache.set(conversationId, events);
+  if (activate) activeEventIds.set(conversationId, state.eventId);
   if (eventStateCache.size > CACHE_LIMIT) {
     const oldest = eventStateCache.keys().next().value;
-    if (oldest) eventStateCache.delete(oldest);
+    if (oldest && oldest !== conversationId) {
+      eventStateCache.delete(oldest);
+      activeEventIds.delete(oldest);
+    }
   }
 }
 
-/** Synchronously read the cached state (no I/O). Used by UI affordances. */
-export function getCachedEventState(conversationId: string | null): EventState | null {
+export function getCachedEventState(conversationId: string | null, eventId?: string | null): EventState | null {
   if (!conversationId) return null;
-  return eventStateCache.get(conversationId) ?? null;
+  const events = eventStateCache.get(conversationId);
+  const id = eventId ?? activeEventIds.get(conversationId);
+  return id ? events?.get(id) ?? null : events?.values().next().value ?? null;
 }
 
-// ─── Restore: load Event State when a conversation is opened ─────────────────
+export function getActiveEventId(conversationId: string | null): string | null {
+  return conversationId ? activeEventIds.get(conversationId) ?? null : null;
+}
+
 export async function restoreEventState(
   conversationId: string,
   userId: string | null,
   eventId?: string,
 ): Promise<EventState> {
-  const cached = eventStateCache.get(conversationId);
+  const cached = getCachedEventState(conversationId, eventId);
   if (cached && (!eventId || cached.eventId === eventId)) return cached;
   if (!userId) {
-    const fresh = emptyEventState(conversationId);
+    const fresh = emptyEventState(conversationId, eventId ?? crypto.randomUUID());
     cacheSet(conversationId, fresh);
     return fresh;
   }
+
+  if (!eventId) {
+    const persistedStates = await loadEventStatesForConversation(conversationId, userId);
+    persistedStates.forEach((state) => cacheSet(conversationId, state, false));
+    const activeId = activeEventIds.get(conversationId);
+    const state = (activeId && getCachedEventState(conversationId, activeId))
+      ?? [...persistedStates].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+      ?? emptyEventState(conversationId, crypto.randomUUID());
+    cacheSet(conversationId, state);
+    return state;
+  }
+
   const persisted = await getEventState(conversationId, userId, eventId);
-  const state = persisted ?? emptyEventState(conversationId);
+  const state = persisted ?? emptyEventState(conversationId, eventId);
   cacheSet(conversationId, state);
   return state;
 }
 
-/** Load canonical event scopes for explicit cross-conversation resolution. */
+export async function listEventStatesForConversation(conversationId: string, userId: string): Promise<EventState[]> {
+  const states = await loadEventStatesForConversation(conversationId, userId);
+  states.forEach((state) => cacheSet(conversationId, state, false));
+  return states;
+}
+
+/** Load event scopes for explicit cross-conversation resolution. */
 export async function listUserEventStates(userId: string): Promise<EventState[]> {
   return listEventStatesForUser(userId);
 }
 
-/** Activate a resolved event in the current conversation cache. */
 export function activateEventStateForConversation(conversationId: string, state: EventState): EventState {
   const active = { ...structuredCloneState(state), conversationId };
-  cacheSet(conversationId, active);
+  cacheSet(conversationId, active, true);
   return active;
 }
 
-// ─── Sync: project a PlannerContext update into Event State and persist ──────
-// Legacy entry point kept for compatibility — callers who only have the
-// merged PlannerContext. Persistence failures are OBSERVABLE (see
-// EventStateSyncResult.persisted) but never break the chat.
+export interface EventStateSyncResult {
+  state: EventState | null;
+  changes: FieldChange[];
+  persisted: boolean;
+  persistedToMemoryOnly: boolean;
+  outcome: 'persisted' | 'persistedToMemoryOnly' | 'skipped' | 'failed';
+  error?: string;
+}
+
 export async function syncEventStateFromContext(
   conversationId: string,
   userId: string | null,
@@ -92,27 +108,6 @@ export async function syncEventStateFromContext(
   return result.state;
 }
 
-// ─── Sync: apply a full conversation turn (Phase 2) ──────────────────────────
-// Flow: user message + orchestrator updates → Event State merge (latest-wins,
-// vocabulary + explicit cultural facts) → persist via repository.
-//
-// Reliability contract:
-//   • The outcome is RETURNED (persisted / memory-only / skipped / failed)
-//     so callers know — and can surface — what actually happened.
-//   • Persistence failures never throw into the chat; they are logged and
-//     reported in the result. The UI must not claim "saved" on failure.
-export interface EventStateSyncResult {
-  state: EventState | null;
-  changes: FieldChange[];
-  /** Did the new state reach the event_states table? */
-  persisted: boolean;
-  /** true → memory-only fallback (anonymous or persistence failed). */
-  persistedToMemoryOnly: boolean;
-  /** 'skipped' = nothing changed this turn (nothing to persist). */
-  outcome: 'persisted' | 'persistedToMemoryOnly' | 'skipped' | 'failed';
-  error?: string;
-}
-
 export async function syncEventStateFromTurn(
   conversationId: string,
   userId: string | null,
@@ -120,9 +115,9 @@ export async function syncEventStateFromTurn(
   updates: PlannerContext,
 ): Promise<EventStateSyncResult> {
   try {
-    const prev = eventStateCache.get(conversationId) ?? await restoreEventState(conversationId, userId);
-
-    // Empty message → no vocabulary, no cultural facts, pure context merge.
+    const requestedEventId = updates.eventId ?? getActiveEventId(conversationId) ?? undefined;
+    const prev = (requestedEventId && getCachedEventState(conversationId, requestedEventId))
+      ?? await restoreEventState(conversationId, userId, requestedEventId);
     const scopedUpdates: PlannerContext = {
       ...updates,
       eventId: updates.eventId ?? prev.eventId ?? crypto.randomUUID(),
@@ -130,9 +125,6 @@ export async function syncEventStateFromTurn(
     };
     const { state: next, changes } = applyTurnToEventState(prev, userMessage, scopedUpdates);
 
-    // `changes` is the authoritative no-op signal: every real modification
-    // (context merge, vocabulary, cultural facts) records a change entry, so
-    // an empty log means nothing actually changed — skip persistence.
     if (changes.length === 0) {
       cacheSet(conversationId, next);
       return { state: next, changes, persisted: false, persistedToMemoryOnly: false, outcome: 'skipped' };
@@ -141,8 +133,6 @@ export async function syncEventStateFromTurn(
     if (userId) {
       const version = await saveEventState(conversationId, userId, next);
       if (version === null) {
-        // Repository already logged the specific reason. The state lives on
-        // in the per-tab cache so the conversation continues seamlessly.
         cacheSet(conversationId, next);
         return {
           state: next, changes, persisted: false, persistedToMemoryOnly: true,
@@ -154,29 +144,27 @@ export async function syncEventStateFromTurn(
       return { state: next, changes, persisted: true, persistedToMemoryOnly: false, outcome: 'persisted' };
     }
 
-    // Anonymous session: in-tab memory only (by design — RLS requires a user).
     cacheSet(conversationId, next);
     return { state: next, changes, persisted: false, persistedToMemoryOnly: true, outcome: 'persistedToMemoryOnly' };
   } catch (err) {
-    // Never let Event State issues break the chat — but make them observable.
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[EventStateBridge] sync failed (chat continues normally):', msg);
     return { state: null, changes: [], persisted: false, persistedToMemoryOnly: false, outcome: 'failed', error: msg };
   }
 }
 
-// ─── Diff helper for future UI (Phase 2 memory panel) ────────────────────────
 export function describeStateChanges(before: EventState, after: EventState): string[] {
-  return diffEventStates(before, after).map(
-    c => `${c.field}: ${String(c.previous ?? '—')} → ${String(c.next ?? '—')}`,
-  );
+  return diffEventStates(before, after).map(c => `${c.field}: ${String(c.previous ?? '—')} → ${String(c.next ?? '—')}`);
 }
 
-// ─── Teardown: clear per-tab state (New Chat) ────────────────────────────────
 export function resetEventStateForConversation(conversationId: string | null): void {
-  if (conversationId) eventStateCache.delete(conversationId);
+  if (conversationId) {
+    eventStateCache.delete(conversationId);
+    activeEventIds.delete(conversationId);
+  }
 }
 
 export function resetAllEventStateMemory(): void {
   eventStateCache.clear();
+  activeEventIds.clear();
 }

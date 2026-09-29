@@ -48,6 +48,7 @@ interface EventStateSnapshot {
     serviceStyle?: unknown;
   };
   requirements?: { serviceBudgets?: unknown };
+  requestedServices?: unknown;
   updatedAt?: unknown;
 }
 
@@ -173,6 +174,12 @@ export function plannerContextFromMetadata(metadata: Record<string, string> | nu
   if (eventLabel) context.eventLabel = eventLabel;
   const serviceBudgets = parseServiceBudgets(metadata.vowza_service_budgets);
   if (serviceBudgets) context.serviceBudgets = serviceBudgets;
+  if (metadata.vowza_requested_services) {
+    try {
+      const parsed = JSON.parse(metadata.vowza_requested_services);
+      if (Array.isArray(parsed)) context.requestedServices = parsed.filter((value): value is string => typeof value === 'string').slice(0, 20);
+    } catch { /* ignore malformed optional metadata */ }
+  }
   const eventType = cleanText(metadata.vowza_event_type, 40);
   if (eventType && EVENT_TYPES.has(eventType)) context.eventType = eventType;
   const city = cleanText(metadata.vowza_city, 80);
@@ -418,6 +425,9 @@ export function buildRetentionRecord(
   const serviceStyle = cleanText(style.serviceStyle, 20);
   if (serviceStyle && ['buffet', 'table_service'].includes(serviceStyle)) context.serviceStyle = serviceStyle;
   const requirements = isRecord(state.requirements) ? state.requirements : {};
+  if (Array.isArray(state.requestedServices)) {
+    context.requestedServices = state.requestedServices.filter((value): value is string => typeof value === 'string').slice(0, 20);
+  }
   if (isRecord(requirements.serviceBudgets)) {
     const budgets = Object.fromEntries(Object.entries(requirements.serviceBudgets)
       .filter(([key, value]) => /^[a-z][a-z0-9_ -]{1,60}$/i.test(key) && positiveNumber(value))
@@ -442,6 +452,7 @@ export function buildRetentionRecord(
     context.foodPreference && `Food preference: ${context.foodPreference}.`,
     context.serviceStyle && `Preferred food service: ${context.serviceStyle}.`,
     context.serviceBudgets && `Confirmed service budgets: ${Object.entries(context.serviceBudgets).map(([service, amount]) => `${service} INR ${amount}`).join('; ')}.`,
+    context.requestedServices?.length && `Discussed services: ${context.requestedServices.join(', ')}.`,
   ].filter((line): line is string => Boolean(line));
   if (!lines.length) return null;
 
@@ -470,6 +481,7 @@ export function buildRetentionRecord(
   if (context.foodPreference) metadata.vowza_food_preference = context.foodPreference;
   if (context.serviceStyle) metadata.vowza_service_style = context.serviceStyle;
   if (context.serviceBudgets) metadata.vowza_service_budgets = JSON.stringify(context.serviceBudgets);
+  if (context.requestedServices?.length) metadata.vowza_requested_services = JSON.stringify(context.requestedServices);
 
   return {
     content: `Current user-provided event planning context. Newer explicit user corrections supersede older values. ${lines.join(' ')}`,

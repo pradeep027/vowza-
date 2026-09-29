@@ -47,6 +47,7 @@ export interface EventStateVersionRow {
 // sessionStorage fallback the chat uses for anonymous users.
 const memoryStates = new Map<string, EventState>();
 const memoryStatesByEvent = new Map<string, EventState>();
+const memoryStatesByConversation = new Map<string, Map<string, EventState>>();
 const memoryVersions = new Map<string, Array<{ version: number; state: EventState; createdAt: string }>>();
 let memoryModeAnnounced = false;
 
@@ -81,7 +82,9 @@ export async function getEventState(
     .from('event_states')
     .select('*')
     .eq('user_id', userId);
-  query = eventId ? query.eq('event_id', eventId) : query.eq('conversation_id', conversationId);
+  query = eventId
+    ? query.eq('event_id', eventId)
+    : query.eq('conversation_id', conversationId).order('updated_at', { ascending: false }).limit(1);
   const { data, error } = await query.maybeSingle();
 
   if (error) {
@@ -101,6 +104,27 @@ export async function getEventState(
 
 export async function getEventStateByEventId(eventId: string, userId: string): Promise<EventState | null> {
   return getEventState('', userId, eventId);
+}
+
+export async function listEventStatesForConversation(conversationId: string, userId: string): Promise<EventState[]> {
+  if (!isConfigured() || !userId) {
+    return [...(memoryStatesByConversation.get(conversationId)?.values() ?? [])];
+  }
+  const { data, error } = await sb
+    .from('event_states')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('conversation_id', conversationId)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    logFallback(`listEventStatesForConversation failed (memory only): ${error.message}`);
+    return [...(memoryStatesByConversation.get(conversationId)?.values() ?? [])];
+  }
+  return ((data as EventStateRow[]) ?? []).map((row) => ({
+    ...(row.state as EventState),
+    conversationId: row.conversation_id,
+    eventId: (row as EventStateRow & { event_id?: string }).event_id ?? (row.state as EventState).eventId ?? null,
+  })).filter(isValidEventState);
 }
 
 export async function listEventStatesForUser(userId: string): Promise<EventState[]> {
@@ -239,8 +263,13 @@ export async function listEventStateVersions(
 // ─── Delete (conversation teardown — normally unnecessary: ON DELETE CASCADE) ─
 export async function deleteEventState(conversationId: string, userId: string): Promise<void> {
   const previous = memoryStates.get(conversationId);
+  const scopedStates = memoryStatesByConversation.get(conversationId);
   memoryStates.delete(conversationId);
+  memoryStatesByConversation.delete(conversationId);
   if (previous?.eventId) memoryStatesByEvent.delete(previous.eventId);
+  scopedStates?.forEach((state) => {
+    if (state.eventId) memoryStatesByEvent.delete(state.eventId);
+  });
   memoryVersions.delete(conversationId);
   if (!isConfigured() || !userId) return;
   const { error } = await sb
@@ -255,7 +284,12 @@ export async function deleteEventState(conversationId: string, userId: string): 
 function persistToMemory(conversationId: string, state: EventState): void {
   const prev = memoryStates.get(conversationId);
   memoryStates.set(conversationId, state);
-  if (state.eventId) memoryStatesByEvent.set(state.eventId, state);
+  if (state.eventId) {
+    memoryStatesByEvent.set(state.eventId, state);
+    const byEvent = memoryStatesByConversation.get(conversationId) ?? new Map<string, EventState>();
+    byEvent.set(state.eventId, state);
+    memoryStatesByConversation.set(conversationId, byEvent);
+  }
   if (prev) {
     const list = memoryVersions.get(conversationId) ?? [];
     list.unshift({ version: (list[0]?.version ?? 0) + 1, state: prev, createdAt: new Date().toISOString() });

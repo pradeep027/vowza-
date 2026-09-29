@@ -97,7 +97,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-import { syncEventStateFromTurn, restoreEventState, resetAllEventStateMemory } from '../eventStateBridge';
+import { syncEventStateFromTurn, restoreEventState, listEventStatesForConversation, getActiveEventId, resetAllEventStateMemory } from '../eventStateBridge';
 import {
   saveEventState, getEventState, listEventStateVersions, deleteEventState,
 } from '../eventStateRepository';
@@ -152,6 +152,33 @@ describe('Bridge (Phase 2) — persistence outcomes', () => {
 });
 
 describe('Bridge (Phase 2) — conversation isolation', () => {
+  it('keeps wedding and reception independent inside one conversation while switching focus', async () => {
+    const weddingId = '11111111-1111-4111-8111-111111111111';
+    const receptionId = '22222222-2222-4222-8222-222222222222';
+    await syncEventStateFromTurn('conv-multi', USER, "I'm planning my sister's wedding in Hyderabad", {
+      eventId: weddingId, eventLabel: "sister's wedding", eventType: 'wedding', city: 'Hyderabad', guestCount: 500, budget: 1_000_000,
+    });
+    await syncEventStateFromTurn('conv-multi', USER, 'I am also planning a reception in Hyderabad', {
+      eventId: receptionId, eventLabel: 'reception', eventType: 'reception', city: 'Hyderabad',
+    });
+    await syncEventStateFromTurn('conv-multi', USER, '200 guests and a total budget of ₹4 lakh', {
+      eventId: receptionId, guestCount: 200, budget: 400_000,
+    });
+
+    const wedding = await restoreEventState('conv-multi', USER, weddingId);
+    const reception = await restoreEventState('conv-multi', USER, receptionId);
+    expect(wedding.eventType).toBe('wedding');
+    expect(wedding.guests.count).toBe(500);
+    expect(wedding.budget.total).toBe(1_000_000);
+    expect(reception.eventType).toBe('reception');
+    expect(reception.guests.count).toBe(200);
+    expect(reception.budget.total).toBe(400_000);
+    expect(getActiveEventId('conv-multi')).toBe(receptionId);
+
+    const all = await listEventStatesForConversation('conv-multi', USER);
+    expect(all.map(state => state.eventId).sort()).toEqual([receptionId, weddingId].sort());
+  });
+
   it('two conversations never share Event State', async () => {
     await syncEventStateFromTurn('conv-A', USER, 'wedding in Hyderabad', { eventType: 'wedding', city: 'Hyderabad' });
     await syncEventStateFromTurn('conv-B', USER, 'birthday in Bengaluru', { eventType: 'birthday', city: 'Bengaluru' });
