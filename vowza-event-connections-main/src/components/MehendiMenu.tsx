@@ -263,38 +263,40 @@ function MehendiBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('mehendi_bookings').insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
-        customer_id: user.id,
-        event_date: eventDate,
-        event_time: eventTime || null,
-        venue: location.venue_name || location.locality || null,
-        city: location.town_city || null,
-        event_type: eventType || null,
-        num_clients: Number(numberOfClients) || 1,
-        selected_addon_ids: selectedAddonIds,
-        special_requirements: [designPreference && `Design: ${designPreference}`, specialRequests].filter(Boolean).join('\n') || null,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: total,
-        status: 'pending',
-      }).select('id').single();
+      // SECURITY (P0-1): financials are derived server-side. The browser passes
+      // ONLY identifiers/selections/descriptive fields to create_mehendi_booking
+      // (SECURITY DEFINER); it forces customer_id = auth.uid(), reads the trusted
+      // package price + addon prices, and derives base/addons/total. num_clients is
+      // descriptive only (never a pricing multiplier). No client amount is trusted.
+      const specialRequirements =
+        [designPreference && `Design: ${designPreference}`, specialRequests].filter(Boolean).join('\n') || null;
+      const { data: newBookingId, error } = await supabase.rpc('create_mehendi_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_num_clients: Number(numberOfClients) || 1,
+        p_special_requirements: specialRequirements,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const bookingId = newBookingId as unknown as string;
 
       // Save structured location
       await supabase.from('booking_locations').insert({
-        booking_table: 'mehendi_bookings', booking_id: booking.id,
+        booking_table: 'mehendi_bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
         pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id,
+        bookingId: bookingId,
         artistName: provider.business_name || provider.contact_person || 'Mehendi Artist',
         eventDate, eventTime,
         venue: location.venue_name || location.locality || 'TBD',
