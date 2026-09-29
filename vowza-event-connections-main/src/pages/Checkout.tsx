@@ -280,6 +280,31 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'makeup_bookings') {
+          // Makeup (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_makeup_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // MakeupMenu "Book Now". The generic cart item carries no addon selection,
+          // so p_addon_ids is omitted (the makeup total is package_price + addons
+          // regardless; event_type/venue/city are descriptive only — not pricing
+          // inputs). Advance/remaining are derived at ACCEPT from the package's
+          // advance_percentage (NOT flat 20%), not stored at creation. Unlike drone,
+          // the old generic INSERT below DID work for makeup (makeup_bookings has
+          // special_requirements), but it wrote client amounts + a flat 20% advance,
+          // ignoring the package's advance_percentage — the hole this closes.
+          const { data: newId, error } = await supabase.rpc('create_makeup_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
