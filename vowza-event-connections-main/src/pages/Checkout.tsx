@@ -426,6 +426,35 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'water_bookings') {
+          // Water (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_water_booking RPC re-fetches
+          // the package price (base_price), sums any addon prices, HONORS the
+          // package's advance_percentage (NOT flat 20% — the generic else below
+          // used flat ADVANCE_PERCENT), derives every amount and forces customer_id
+          // = auth.uid(). This closes the cart creation path, matching
+          // WaterSupplyMenu "Book Now". It ALSO fixes a pre-existing BUG: the
+          // generic else derived the base charge from item.price, which for water
+          // resolved to Number(pkg.package_price || pkg.price || 0) = 0
+          // (water_packages has NEITHER column — its price is base_price), so the
+          // cart created zero-value water bookings. event_type falls back to
+          // package_type SERVER-SIDE; delivery_time / delivery_address / city /
+          // quantity_required / special_instructions are descriptive only. The cart
+          // has no water addon/quantity picker (p_addon_ids omitted → 0 addons;
+          // p_quantity_required null — it is a free-text delivery note, not a price).
+          const { data: newId, error } = await supabase.rpc('create_water_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_delivery_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+            p_city: location.town_city || null,
+            p_quantity_required: null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
