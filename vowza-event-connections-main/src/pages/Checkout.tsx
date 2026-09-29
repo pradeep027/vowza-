@@ -355,6 +355,33 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'rental_bookings') {
+          // Rental (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_rental_booking RPC re-fetches the
+          // package price, RE-MULTIPLIES base = price x server-clamped quantity, sums
+          // the addon prices, derives every amount and forces customer_id = auth.uid().
+          // This closes the cart creation path, matching RentalMenu "Book Now". The
+          // generic cart item carries no quantity (defaults to 1 server-side), no addon
+          // selection (p_addon_ids omitted) and no rental_duration; event_type /
+          // delivery/city are descriptive only — not pricing inputs. Advance/remaining
+          // ARE stored at creation (HONOR the package's advance_percentage, NOT flat
+          // 20%). NOTE: the old generic INSERT below never worked for rental anyway —
+          // it writes special_requirements + venue, columns rental_bookings lacks (it
+          // has special_instructions + delivery_address/city).
+          const { data: newId, error } = await supabase.rpc('create_rental_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_rental_duration: null,
+            p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+            p_city: location.town_city || null,
+            p_quantity_required: 1,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);

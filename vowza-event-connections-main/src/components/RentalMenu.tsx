@@ -251,27 +251,25 @@ function RentalBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('rental_bookings').insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
-        customer_id: user.id,
-        event_date: eventDate,
-        event_time: eventTime || null,
-        event_type: eventType || null,
-        rental_duration: rentalDuration || null,
-        delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
-        city: location.town_city || null,
-        quantity_required: qty,
-        selected_addon_ids: selectedAddonIds,
-        special_instructions: specialInstructions || null,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: total,
-        advance_amount: advanceAmount,
-        remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // SECURITY FIX (P0-1): create via the server-authoritative RPC. The browser
+      // sends ONLY identifiers / selections / descriptive fields plus the requested
+      // quantity; the server re-fetches the package price, RE-MULTIPLIES base =
+      // price x server-clamped quantity, sums the addon prices, derives every amount,
+      // and forces customer_id = auth.uid(). No amount crosses the trust boundary.
+      const { data: newId, error } = await supabase.rpc('create_rental_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_rental_duration: rentalDuration || null,
+        p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+        p_city: location.town_city || null,
+        p_quantity_required: qty,
+        p_special_instructions: specialInstructions || null,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const booking = { id: newId as string };
 
       // Save structured location
       await supabase.from('booking_locations').insert({

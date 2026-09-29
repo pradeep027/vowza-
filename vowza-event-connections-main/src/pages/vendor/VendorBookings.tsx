@@ -487,6 +487,20 @@ export default function VendorBookings() {
         if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
         const serverAdvance = Number((data as any)?.advance_amount);
         if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'rental_bookings') {
+        // Rental (P0-1): same posture as dancer/makeup/mehendi/priest — advance/
+        // remaining are financial truth and must not be computed or PATCHed from the
+        // browser. accept_rental_booking re-derives them from the STORED total using
+        // the package's authoritative advance_percentage (HONORS advance_percentage,
+        // NOT a flat 20% — the old generic PATCH below used a flat 20%) and verifies
+        // this vendor owns the booking before flipping it to accepted. The stored total
+        // already reflects the server-clamped quantity multiplier (base = price x qty).
+        const { data, error } = await supabase.rpc('accept_rental_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
       } else {
         const remainingAmount = total - advanceAmount;
         const updatePayload: any = {
