@@ -403,6 +403,29 @@ const Checkout = () => {
           });
           if (error) throw new Error(`${item.packageName}: ${error.message}`);
           bookingId = newId as string;
+        } else if (item.bookingTable === 'videography_bookings') {
+          // Videography (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_videography_booking RPC
+          // re-fetches the package price (starting_price || package_price), sums
+          // any addon prices, HONORS the package's advance_percentage (NOT flat
+          // 20% — the generic else below used flat ADVANCE_PERCENT), derives every
+          // amount and forces customer_id = auth.uid(). This closes the cart
+          // creation path (fed by both VideographyMenu "Add to Cart" and the
+          // UnifiedPhotographyVideographyMenu cart), matching VideographyMenu
+          // "Book Now". No addon UI today (p_addon_ids omitted → 0 addons);
+          // event_type / venue / city / special_requirements are descriptive only.
+          const { data: newId, error } = await supabase.rpc('create_videography_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
         } else {
           const baseAmount = item.price;
           const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
