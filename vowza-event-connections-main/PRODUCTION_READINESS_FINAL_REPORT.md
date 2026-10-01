@@ -1,8 +1,29 @@
 # Vowza — Production Readiness Final Report
 
-**Branch:** `chore/production-readiness-baseline` · **Base:** `main` · **Status:** hardening complete, pending deploy-ordered promotion of parked lockdowns.
+**Branch:** `chore/production-readiness-baseline` · **Base:** `main` · **Status:** hardening complete; apply-path migrations + 4 edge functions **DEPLOYED to prod**; GitHub history reconciled & pushed; parked lockdowns still deliberately un-promoted pending deploy-ordered live verification.
 
 This report consolidates the autonomous production-readiness execution (Phases A–P). It is the authoritative summary of what was hardened, what remains deliberately **parked** behind deploy ordering, and the known residual risks. It supplements — it does **not** replace — `PRODUCTION_READINESS_STATUS.md`.
+
+---
+
+## 0. Deployment & reconciliation status update (2026-10-02)
+
+Since the Phase-P consolidation below was written, the gated deployment and GitHub-history work advanced. This section is the current truth; §1–§7 remain the historical A–P record.
+
+**Reconciliation work (DONE, pushed):**
+- `main` was merged into this branch (merge `c054491`) to carry the Hindsight planner feature (`planner-memory` edge fn, `eventScope`, `event_scope_identity` migration, 3 test files) that landed on `main` via PR #26. Conflict-free.
+- A **duplicate migration version** `20261204000000` (shared by `provider_verification_authority.sql` and `event_scope_identity.sql`) was de-collided in commit `332c1a7`. Push-lineage evidence proved production recorded `20261204000000` = **`provider_verification_authority.sql`** (in every prod-push ancestor), while `event_scope_identity.sql` (main-only, never a push ancestor) was **never applied**. The applied migration keeps its version untouched; the unapplied `event_scope_identity.sql` was re-timestamped to **`20261204000001`** (pure rename, no SQL change) — unique, still ordered after its creator `20261203000000_event_states.sql`. Zero duplicate versions remain in the apply path.
+- Four migration-apply robustness fixes (`2e54d2f`, `70efc80`, `0e5be09`, `de58f1d`) that remove a `SET LOCAL ROLE` push-session artifact (spurious `42501` under the `db push` login role) are included; probes now drive `auth.uid()` via `request.jwt.claims`.
+
+**Apply-path migrations (DEPLOYED):** `supabase db push` has been run against prod (ref `vavfeataqwwbpjonknne`); `supabase migration list` confirms remote-applied through `20261251000000` (all of 204..251). This means the Phase B–F server-authoritative RPCs/triggers, the **P0-L** legacy-RPC lockdown (`20261246000000`), the **self-booking RPC-path guard** (`20261247000000`), the `add_artist` price authority (`20261248000000`), the `dancer_bookings`/generic UPDATE policies (`20261249000000`/`20261250000000`), and the executable probes (`20261251000000`) are now **live in production** — their §5 status advances from `PENDING-DEPLOYMENT` to **LIVE**. The executable probes applied clean (no `PROBE_FAIL`), which is the live-DB proof §5 flagged as `REQUIRES-LIVE-VERIFICATION`.
+
+**Edge functions (DEPLOYED):** 4 hardened functions deployed — `create-booking` v5 (410 stub), `verify-document` v9 (auth gate + `advisory:true`), `ai-chat` v18 (rate-limited), `send-service-start-otp` v6. No new secrets required. `delete-account` is invoked by the deployed bundle but **not deployed** → latent 404 (pre-existing `main`-side gap, out of hardening scope).
+
+**Live boundary smoke (GREEN):** non-mutating negative curl probes against the deployed edge functions behaved exactly as designed (create-booking anon+tampered → 410; no-auth → 401; verify-document/ai-chat anon-key-only → 401).
+
+**Still PARKED / NOT done (unchanged — deliberately):** none of the `supabase/migrations-pending/` column/RLS lockdowns (20 PHASE_* files + README) have been promoted. SMS and Sentry/Datadog credentials remain STOP-1. Positive authenticated-session edge paths (verify-document success, ai-chat 50/min 429) still **REQUIRE-LIVE-VERIFICATION** with a real end-user JWT.
+
+**Verification (post-reconciliation):** `npm run typecheck` clean · `npm test` **59 files / 1243 tests green** · `npm run build` clean. New HEAD = `332c1a7`.
 
 ---
 
@@ -16,9 +37,11 @@ All fixes follow an **additive-hardening** philosophy: close the hole now with a
 
 **Verification posture (current):**
 - `npm run typecheck` (`tsc --noEmit`) — clean.
-- `npm test` (`vitest run`, full glob discovery) — **51 files / 1175 tests green**.
+- `npm test` (`vitest run`, full glob discovery) — **59 files / 1243 tests green** (was 51/1175 at Phase-P write time; the merge from `main` added the Hindsight test files — see §0).
 - `npm run build` (`tsc --noEmit && vite build`) — clean (benign chunk-size warning on VendorPackages/charts only).
 - `npm run lint` — ~1590 findings, overwhelmingly `@typescript-eslint/no-explicit-any` in UI/chart/test code; tracked as non-blocking CI debt. Lint=0 was explicitly **not** the goal.
+
+> **Note:** §0 (top) records deployment/reconciliation progress made *after* this Phase-P posture was written — apply-path migrations and 4 edge functions are now live in prod, and several §5 items have advanced from `PENDING-DEPLOYMENT` to `LIVE`.
 
 ---
 
