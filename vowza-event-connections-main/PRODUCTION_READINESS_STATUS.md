@@ -523,4 +523,60 @@ on this legacy path, not an authz hole. Event/artist bookings were never part of
 > **STOP CONDITION:** no push / merge / deploy / `db push` / parked-lockdown promotion
 > performed. P0-L is fixed-in-code; production closure awaits the standard deploy order.
 
+# 11. Self-booking on the RPC path — restored (SECURITY FIX + BEHAVIOR PRESERVATION, fixed-in-code)
+
+**Date:** 2026-10-01 · **Commit:** `f04f919` · **Migration:**
+`supabase/migrations/20261247000000_prevent_self_booking_on_rpc_path.sql`
+· **Status:** fixed-in-code on the **apply path** (not parked); closes in production
+on the next `supabase db push` (not yet run). Resolves the §5 residual risk
+"self-booking prevention is not enforced on the live per-category RPC path."
+
+## 11.1 The regression (introduced by our own Phase B rewrite)
+
+The universal rule — *a vendor/artist cannot book their own package* — was enforced in
+production **only** as per-table INSERT RLS policies
+(`migrations-archive/20260918000000_prevent_self_booking.sql`, applied). Phase B then
+moved booking creation off the browser INSERT onto per-category
+`public.create_<cat>_booking(...)` functions. Those are `SECURITY DEFINER`, so they run
+as the function owner and **bypass RLS entirely** — including the self-booking INSERT
+policy. Each RPC forces `customer_id = auth.uid()` and copies `provider_id` from the
+trusted package, but **none checks that the caller does not own that provider**
+(confirmed in `create_dancer_booking` `20261213000000` and `create_catering_booking`
+`20261207000000`). Net effect on the live RPC path: a vendor could book their own package
+again — the production rule was silently dropped.
+
+## 11.2 What was closed
+
+- One shared `SECURITY DEFINER public.enforce_booking_no_self_booking()` (hardened
+  `SET search_path = ''`): `RAISE … ERRCODE '42501'` when the authenticated caller owns
+  the booked `provider_profile` (`EXISTS provider_profiles WHERE id = NEW.provider_id AND
+  user_id = auth.uid()`). A NULL `auth.uid()` (service_role / trusted backend) and a NULL
+  `provider_id` both pass — no false positives on legitimate paths.
+- A **`BEFORE INSERT` row trigger** bound to it on each of the **15 category tables** that
+  received a Phase B RPC and carried the archived self-booking policy (band, catering,
+  anchor, decorator, dancer, dj, drone, makeup, mehendi, priest, rental, singer,
+  videography, water, banquet). Triggers are **not** bypassed by `SECURITY DEFINER`, so
+  the rule now fires on the RPC path and on any residual direct INSERT.
+- Fail-closed drift guard (`provider_id uuid` on every table; `provider_profiles.id` /
+  `.user_id` present) + self-check (function hardened; a row-level BEFORE INSERT trigger
+  on all 15). Follows the Phase C fan-out idiom (`20261238000000`).
+
+**Why apply-path, not parked:** a legitimate customer is never the owner of the provider
+they book, so no real booking flow is rejected — only the forbidden self-booking is. This
+*restores* an already-live rule → BEHAVIOR PRESERVATION for every legitimate path, a
+SECURITY FIX for the bypass. Locked by
+`src/lib/__tests__/self-booking-rpc-path-regression.test.ts` (9 tests). Suite 51/1175.
+
+## 11.3 Out of scope (documented, not silently changed)
+
+- **`photography_package_bookings`** — not rewired to a `SECURITY DEFINER` RPC in Phase B
+  (still a direct authenticated INSERT), so its archived `photographer_id` self-booking
+  INSERT policy still fires. No RPC bypass = no regression; a trigger here would need its
+  photographer ownership model confirmed separately.
+- **generic `public.bookings`** and **`admin_event_package_bookings`** — never carried a
+  self-booking rule in the baseline (admin-curated / generic path); nothing to restore.
+
+> **STOP CONDITION:** no push / merge / deploy / `db push` / parked-lockdown promotion
+> performed. Fixed-in-code; production closure awaits the standard deploy order.
+
 
