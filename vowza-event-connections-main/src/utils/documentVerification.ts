@@ -448,24 +448,16 @@ export async function verifyDocument(
     });
 
     if (serverError || !serverResult) {
-      // Edge function failed — but we have a good client-side OCR result
-      // Return client-side result directly rather than failing closed when OCR was successful
-      const labels2: Record<DocumentType, string> = { aadhaar: 'Aadhaar Card', pan: 'PAN Card', govt_id: 'Government ID' };
-      let maskedNumber: string | null = null;
-      if (classification.extractedAadhaar && hasValidAadhaarNumber) {
-        const digits = classification.extractedAadhaar.replace(/[\s\-]/g, '');
-        maskedNumber = `XXXX XXXX ${digits.slice(-4)}`;
-      }
-      if (classification.extractedPan && hasValidPanNumber) {
-        const p = classification.extractedPan;
-        maskedNumber = `${p.slice(0, 2)}XXXXX${p.slice(-2)}`;
-      }
+      // FAIL-CLOSED (SECURITY FIX): never treat a server-side validation failure
+      // as success. The edge function is now the authority for the advisory
+      // result and requires an authenticated user; if it did not respond we
+      // cannot claim verification from local OCR alone. Previously this path
+      // returned `status: 'verified'` from client OCR only, which let a server
+      // outage (or an unauthenticated caller) silently "pass" verification.
+      console.warn('[verifyDocument] Server validation unavailable:', (serverError as Error)?.message);
       return {
-        status: 'verified',
-        message: `${labels2[expectedType]} detected`,
-        detectedAs: classification.type,
-        confidence: classification.confidence,
-        maskedNumber,
+        status: 'error',
+        message: 'Could not validate the document right now. Please make sure you are signed in and try again.',
       };
     }
 
