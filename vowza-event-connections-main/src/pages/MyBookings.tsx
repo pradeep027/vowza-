@@ -151,10 +151,12 @@ const MyBookings = () => {
     if (payingId) return;
     setPayingId(booking.id);
     try {
-      const table = getBookingTable(booking);
-      const advanceAmt = Math.round(booking.amount * 0.2);
-      const { error } = await supabase.from(table as any).update({ advance_paid_at: new Date().toISOString(), confirmed_at: new Date().toISOString(), calendar_locked: true, status: 'in_progress' }).eq('id', booking.id);
+      const { data, error } = await supabase.rpc('pay_booking_advance' as any, {
+        p_booking_id: booking.id,
+        p_booking_source: booking._source || 'generic',
+      });
       if (error) throw error;
+      const advanceAmt = Number(data) || Math.round(booking.amount * 0.2);
       await NotificationService.notifyAdvancePaymentSuccess(booking.customer_id, booking.provider_id, booking.id, advanceAmt);
       toast.success('Advance paid! Booking confirmed.');
       refetch();

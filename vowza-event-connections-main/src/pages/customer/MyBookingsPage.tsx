@@ -342,14 +342,12 @@ function BookingCard({
               onClick={() => {
                 toast.promise(
                   (async () => {
-                    const table = booking._source === 'photography' ? 'photography_package_bookings' : booking._source === 'catering' ? 'catering_bookings' : booking._source === 'drone' ? 'drone_bookings' : booking._source === 'videography' ? 'videography_bookings' : booking._source === 'dj' ? 'dj_bookings' : booking._source === 'decorator' ? 'decorator_bookings' : booking._source === 'makeup' ? 'makeup_bookings' : booking._source === 'mehendi' ? 'mehendi_bookings' : booking._source === 'anchor' ? 'anchor_bookings' : booking._source === 'banquet' ? 'banquet_bookings' : booking._source === 'rental' ? 'rental_bookings' : booking._source === 'priest' ? 'priest_bookings' : booking._source === 'water' ? 'water_bookings' : booking._source === 'band' ? 'band_bookings' : booking._source === 'singer' ? 'singer_bookings' : booking._source === 'dancer' ? 'dancer_bookings' : 'bookings';
-                    const advanceAmt = Math.round(booking.amount * 0.2);
-                    await supabase.from(table as any).update({
-                      advance_paid_at: new Date().toISOString(),
-                      confirmed_at: new Date().toISOString(),
-                      calendar_locked: true,
-                      status: 'in_progress',
-                    }).eq('id', booking.id);
+                    const { data, error } = await supabase.rpc('pay_booking_advance' as any, {
+                      p_booking_id: booking.id,
+                      p_booking_source: booking._source || 'generic',
+                    });
+                    if (error) throw error;
+                    const advanceAmt = Number(data) || Math.round(booking.amount * 0.2);
                     await NotificationService.notifyAdvancePaymentSuccess(booking.customer_id, booking.provider_id, booking.id, advanceAmt);
                     // Immediately refetch to update UI
                     setTimeout(() => refetch(), 500);
