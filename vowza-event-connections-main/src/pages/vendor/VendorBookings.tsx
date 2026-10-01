@@ -307,10 +307,10 @@ export default function VendorBookings() {
   const handleCompleteService = async () => {
     if (!completeTarget || completing) return;
     setCompleting(true);
-    const total = Number(completeTarget.amount ?? completeTarget.total_amount ?? 0);
+    // Amount, platform fee, and settlement are all derived server-side by the
+    // complete_booking_service RPC; the browser passes only id + source.
     const result = await completeService(
-      completeTarget.id, completeTarget._source || 'generic',
-      vendorId!, user!.id, completeTarget.customer_id, total, 5 // 5% platform fee
+      completeTarget.id, completeTarget._source || 'generic'
     );
     setCompleting(false);
     if (result.success) {

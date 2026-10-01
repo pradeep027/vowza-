@@ -129,6 +129,55 @@ is only ever between 2b and 2a.
    `{"bio":"..."}` **must** return 200. Until that 403 is observed, the hole is not
    closed, whatever the migration output said.
 
+### `PHASE_vendor_settlements_rls_lockdown.sql`
+
+Phase 2 of two for **P0 Phase D (payment / settlement integrity)**. Drops the two
+`auth.uid() IS NOT NULL`-only write policies on `public.vendor_settlements`
+(`authenticated_insert_settlements`, `authenticated_update_settlements`) that let
+ANY signed-in user INSERT a fabricated settlement (arbitrary `vendor_id`,
+`booking_amount`, `vendor_earnings`) or UPDATE any existing one, and adds an
+admin-only `UPDATE` for settle/dispute. The scoped SELECT policies are untouched.
+
+| Phase | What | Where it lives | State |
+|---|---|---|---|
+| 1 | Add the `complete_booking_service` SECURITY DEFINER RPC (reads amount/provider/customer from the stored row, derives the fee from `platform_settings`, writes the settlement server-side) | `supabase/migrations/20261242000000_complete_booking_service_authoritative.sql` | in the normal migration path (additive, safe anytime) |
+| 2a | Frontend completes a service through the RPC instead of raw-inserting the settlement | `src/services/bookingExecutionService.ts` (`completeService`), `src/pages/vendor/VendorBookings.tsx` | in the working tree |
+| 2b | Drop the broad write policies; add admin-only UPDATE | **this folder** | withheld |
+
+Applying 2b before phase 1 is live **and** the phase-2a frontend is the served
+bundle **breaks service completion**: the old bundle raw-inserts the settlement, and
+2b is precisely what starts returning 403 for that insert. Phase 1 is additive and
+harmless on its own; the ordering hazard is only ever between 2b and 2a. 2b's own
+`$catalog$` also refuses to apply unless the Phase 1 RPC is already installed — so
+it can never leave the table with no write path at all.
+
+#### Promoting it
+
+1. Apply phase 1 and confirm `public.complete_booking_service(uuid, text)` exists.
+2. Deploy the phase-2a frontend to Vercel.
+3. In a **fresh private window** on https://vowza.co.in, complete a test service as
+   a vendor, then confirm the RPC path is the one running — a fresh row whose
+   `vendor_user_id` is the provider and whose money matches `platform_settings`:
+
+   ```sql
+   select created_at, vendor_user_id, booking_amount, platform_fee_amount, vendor_earnings
+     from public.vendor_settlements
+    order by created_at desc
+    limit 5;
+   ```
+
+   A row written by the RPC is the only positive proof the new path is live. A cached
+   or failed build would leave the old raw-insert bundle serving, and pushing 2b on
+   top of that is the failure this arrangement exists to prevent.
+4. Only then: `git mv` it into `supabase/migrations/` as
+   `<next-timestamp>_vendor_settlements_rls_lockdown.sql`, and push. Its own
+   `$catalog$` and `$verify$` blocks re-prove the lockdown at apply time and abort if
+   it is wrong.
+5. Run the negative probe from the file header — as an ordinary logged-in user, a
+   direct `POST /rest/v1/vendor_settlements` **must** return 403, and so must a
+   `PATCH`. Until that 403 is observed, the hole is not closed, whatever the migration
+   output said.
+
 ## Adding a file here
 
 Name it `PHASE_<x>_<slug>.sql`, **without** a timestamp prefix, so that it is
