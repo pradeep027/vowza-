@@ -56,11 +56,11 @@ export default function AdminAnalytics() {
       setMonthlyUsers(usersByMonth);
 
       // Monthly bookings
-      const { data: bookings } = await supabase.from('bookings').select('created_at, total_amount');
+      const { data: bookings } = await supabase.from('bookings').select('created_at, amount');
       const bkByMonth = months.map(m => ({
         month: m.label,
         bookings: (bookings??[]).filter((b:any)=>{ const d=new Date(b.created_at); return d.getFullYear()===m.year&&d.getMonth()===m.month; }).length,
-        revenue: (bookings??[]).filter((b:any)=>{ const d=new Date(b.created_at); return d.getFullYear()===m.year&&d.getMonth()===m.month; }).reduce((s:number,b:any)=>s+(b.total_amount||0),0),
+        revenue: (bookings??[]).filter((b:any)=>{ const d=new Date(b.created_at); return d.getFullYear()===m.year&&d.getMonth()===m.month; }).reduce((s:number,b:any)=>s+(b.amount||0),0),
       }));
       setMonthlyBookings(bkByMonth);
     } catch (e) { console.error(e); }

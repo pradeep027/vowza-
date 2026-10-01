@@ -90,7 +90,7 @@ export function useAdminStats() {
       ] = await Promise.all([
         safeSelect('provider_profiles', 'id,verification_status'),
         safeCount('profiles'),
-        safeSelect('bookings', 'id,status,total_amount,created_at'),
+        safeSelect('bookings', 'id,status,amount,created_at'),
         safeSelect('payments', 'amount,created_at,status'),
         safeCount('artist_categories'),
         safeSelect('reviews', 'rating'),

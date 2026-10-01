@@ -84,7 +84,7 @@ export default function AdminDashboardHome() {
       });
 
       const [bookRes, artistsRes, paymentsRes, recentRes] = await Promise.allSettled([
-        supabase.from('bookings').select('created_at,total_amount,status'),
+        supabase.from('bookings').select('created_at,amount,status'),
         supabase.from('provider_profiles').select('profession,verification_status,created_at'),
         supabase.from('payments').select('amount,created_at,status'),
         supabase.from('provider_profiles').select('id,profession,verification_status,created_at')
