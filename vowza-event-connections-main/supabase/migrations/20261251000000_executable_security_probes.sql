@@ -60,15 +60,20 @@ BEGIN
     RETURN;
   END IF;
   BEGIN
-    -- Impersonate the package OWNER on the authenticated RPC path.
-    SET LOCAL ROLE authenticated;
+    -- Drive auth.uid() to the package OWNER via the request.jwt.claims GUC only;
+    -- run as the migration role (NO SET LOCAL ROLE). The shared self-booking
+    -- trigger (20261247000000) keys off auth.uid(), and create_dancer_booking is
+    -- SECURITY DEFINER (executes as its OWNER regardless of the caller's SQL
+    -- role), so impersonating `authenticated` proves nothing extra about
+    -- self-booking authority -- it only reintroduces the `supabase db push`
+    -- apply-session grant artifact that aborted probe 2 (see its note and the
+    -- 20261248000000 probe-B fix).
     PERFORM set_config('request.jwt.claims',
       json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
 
     PERFORM public.create_dancer_booking(v_pkg_id, current_date);
 
     -- Reaching here means the provider booked their OWN package: a regression.
-    RESET ROLE;
     PERFORM set_config('request.jwt.claims', NULL, true);
     RAISE EXCEPTION 'PROBE_FAIL: provider self-booked their own dancer package via create_dancer_booking';
   EXCEPTION
@@ -80,9 +85,8 @@ BEGIN
       RAISE EXCEPTION 'PROBE_FAIL: expected 42501 self-booking rejection, got (%: %)', SQLSTATE, SQLERRM;
   END;
 
-  -- The caught exception already rolled the subtransaction back; make the
-  -- session role/claims explicit for anything that follows.
-  RESET ROLE;
+  -- The caught exception already rolled the subtransaction back; clear the
+  -- JWT-claims GUC explicitly for anything that follows.
   PERFORM set_config('request.jwt.claims', NULL, true);
 
   IF v_got42 THEN
@@ -107,6 +111,7 @@ DECLARE
   v_bid             uuid;
   v_stored          numeric;
   v_illegal_blocked boolean := false;
+  v_ctx             text;
 BEGIN
   SELECT dp.id, pp.user_id, COALESCE(dp.package_price, 0)
     INTO v_pkg_id, v_owner, v_price
@@ -129,7 +134,18 @@ BEGIN
   END IF;
 
   BEGIN
-    SET LOCAL ROLE authenticated;
+    -- Drive auth.uid() to a NON-owner customer via the request.jwt.claims GUC
+    -- only; run as the migration role (NO SET LOCAL ROLE authenticated).
+    -- create_dancer_booking is SECURITY DEFINER (executes as its OWNER) and the
+    -- self-booking + status-DAG triggers key off auth.uid(), so the SQL role is
+    -- incidental to every invariant proved here. The earlier `SET LOCAL ROLE
+    -- authenticated` made this probe brittle under `supabase db push`: it
+    -- false-aborted with a spurious `42501 permission denied for table
+    -- dancer_packages` even though the identical path succeeds interactively --
+    -- the same apply-session role artifact fixed in 20261248000000's probe B.
+    -- Dropping it removes the artifact without weakening the proof (a leaked
+    -- browser amount would still make v_stored != v_price; an allowed illegal
+    -- status jump would still fail the assertion).
     PERFORM set_config('request.jwt.claims',
       json_build_object('sub', v_customer, 'role', 'authenticated')::text, true);
 
@@ -139,7 +155,6 @@ BEGIN
       v_bid := public.create_dancer_booking(v_pkg_id, current_date);
     EXCEPTION WHEN OTHERS THEN
       IF SQLERRM LIKE 'PROBE_FAIL%' THEN RAISE; END IF;
-      RESET ROLE;
       PERFORM set_config('request.jwt.claims', NULL, true);
       RAISE NOTICE 'probe 2 SKIPPED (amount/status): could not seed via create_dancer_booking (%: %).', SQLSTATE, SQLERRM;
       RETURN;
@@ -157,7 +172,6 @@ BEGIN
     END;
 
     -- Read the authoritative amount back with RLS bypassed (migration role).
-    RESET ROLE;
     PERFORM set_config('request.jwt.claims', NULL, true);
     SELECT total_amount INTO v_stored FROM public.dancer_bookings WHERE id = v_bid;
 
@@ -176,11 +190,13 @@ BEGIN
       IF SQLERRM LIKE 'ROLLBACK_PROBE%' THEN
         RAISE NOTICE 'probe 2 OK (amount/status): total_amount server-authoritative; illegal status jump rejected 23514 (rolled back).';
       ELSE
-        RAISE EXCEPTION 'PROBE_FAIL: amount/status probe errored unexpectedly (%: %)', SQLSTATE, SQLERRM;
+        -- Unexpected: surface SQLSTATE + message + the PL/pgSQL context (which
+        -- statement/line) so any future apply-session artifact is diagnosable.
+        GET STACKED DIAGNOSTICS v_ctx = PG_EXCEPTION_CONTEXT;
+        RAISE EXCEPTION 'PROBE_FAIL: amount/status probe errored unexpectedly (%: %) [context: %]', SQLSTATE, SQLERRM, v_ctx;
       END IF;
   END;
 
-  RESET ROLE;
   PERFORM set_config('request.jwt.claims', NULL, true);
 END
 $probe2$;

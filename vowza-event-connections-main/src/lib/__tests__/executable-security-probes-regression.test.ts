@@ -43,9 +43,14 @@ describe('executable security probes — on the apply path', () => {
 
   it('drives the probes through the authoritative RPC/trigger path (not raw INSERT)', () => {
     expect(CODE).toMatch(/public\.create_dancer_booking\(/);
-    // Impersonation uses the established authenticated + JWT-claims idiom.
-    expect(CODE).toMatch(/SET LOCAL ROLE authenticated;/);
+    // Impersonation is driven by the request.jwt.claims GUC only (auth.uid()),
+    // NOT a SQL-role switch: `SET LOCAL ROLE authenticated` made these probes
+    // brittle under `supabase db push` (spurious 42501 permission-denied on a
+    // category table) — the same apply-session artifact fixed in 20261248000000.
+    // The SECURITY DEFINER RPC + triggers key off auth.uid(), so the JWT claim
+    // alone drives every proof; locking out SET LOCAL ROLE prevents regression.
     expect(CODE).toMatch(/set_config\('request\.jwt\.claims'/);
+    expect(CODE).not.toMatch(/SET LOCAL ROLE/);
   });
 });
 
