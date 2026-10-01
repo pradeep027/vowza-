@@ -32,6 +32,12 @@ export interface EventState {
 
   /** Owning conversation thread (null until persisted). */
   conversationId: string | null;
+  /** Stable event scope identity; never derived from a natural-language label. */
+  eventId: string | null;
+  /** User-facing scope label/aliases are metadata, not identity. */
+  eventLabel: string | null;
+  /** Services explicitly discussed for this event. */
+  requestedServices?: string[];
 
   // ── Event identity ─────────────────────────────────────────────────────────
   /** Canonical event category (PlannerContext vocabulary) or null. */
@@ -87,6 +93,8 @@ export interface EventState {
   // ── Requirements ───────────────────────────────────────────────────────────
   requirements: {
     specialRequirements: string | null;
+    /** User-confirmed budgets keyed by live marketplace profession. */
+    serviceBudgets: Record<string, number>;
     /** Services the user explicitly does NOT want. */
     excludedServices: string[];
   };
@@ -129,10 +137,13 @@ export interface FieldChange {
 // ─── Factories ───────────────────────────────────────────────────────────────
 
 /** A completely empty state — nothing is assumed. */
-export function emptyEventState(conversationId: string | null = null): EventState {
+export function emptyEventState(conversationId: string | null = null, eventId: string | null = null): EventState {
   return {
     schemaVersion: 1,
     conversationId,
+    eventId,
+    eventLabel: null,
+    requestedServices: [],
     eventType: null,
     eventTypeRaw: null,
     religion: null,
@@ -145,7 +156,7 @@ export function emptyEventState(conversationId: string | null = null): EventStat
     budget: { total: null, currency: 'INR', luxuryLevel: null },
     style: { theme: null, colorPalette: null, vibe: null, foodPreference: null, serviceStyle: null },
     ceremonies: [],
-    requirements: { specialRequirements: null, excludedServices: [] },
+    requirements: { specialRequirements: null, serviceBudgets: {}, excludedServices: [] },
     vendors: { shortlisted: [], selected: [], bookings: [] },
     confirmedFields: [],
     superseded: {},
@@ -192,6 +203,11 @@ export function mapContextToEventState(
   };
 
   base.conversationId = base.conversationId ?? conversationId;
+  if (ctx.eventId !== undefined) base.eventId = ctx.eventId;
+  if (ctx.eventLabel !== undefined) base.eventLabel = ctx.eventLabel;
+  if (ctx.requestedServices !== undefined) {
+    base.requestedServices = [...new Set([...(base.requestedServices ?? []), ...ctx.requestedServices])];
+  }
 
   if (ctx.eventType !== undefined) {
     base.eventType = set('eventType', base.eventType, ctx.eventType);
@@ -249,6 +265,15 @@ export function mapContextToEventState(
     );
   }
 
+  if (ctx.serviceBudgets !== undefined) {
+    const previous = base.requirements.serviceBudgets;
+    const next = { ...previous, ...ctx.serviceBudgets };
+    if (JSON.stringify(previous) !== JSON.stringify(next)) {
+      base.requirements.serviceBudgets = next;
+      changes.push({ field: 'requirements.serviceBudgets', previous, next, source: 'user_message' });
+    }
+  }
+
   // Track which canonical fields were explicitly present in the context.
   for (const change of changes) {
     if (!base.confirmedFields.includes(change.field)) {
@@ -296,9 +321,14 @@ export function diffEventStates(a: EventState, b: EventState): FieldChange[] {
     ['style.foodPreference', a.style.foodPreference, b.style.foodPreference],
     ['style.serviceStyle', a.style.serviceStyle, b.style.serviceStyle],
     ['requirements.specialRequirements', a.requirements.specialRequirements, b.requirements.specialRequirements],
+    ['requirements.serviceBudgets', a.requirements.serviceBudgets, b.requirements.serviceBudgets],
+    ['requestedServices', a.requestedServices, b.requestedServices],
   ];
   for (const [field, prevVal, nextVal] of paths) {
-    if (!sameScalar(prevVal, nextVal)) {
+    const equal = typeof prevVal === 'object' || typeof nextVal === 'object'
+      ? JSON.stringify(prevVal ?? null) === JSON.stringify(nextVal ?? null)
+      : sameScalar(prevVal, nextVal);
+    if (!equal) {
       changes.push({ field, previous: prevVal, next: nextVal, source: 'user_message' });
     }
   }
