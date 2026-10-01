@@ -83,7 +83,7 @@ export default function AdminSettings() {
   // Load platform fee from DB on mount
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('platform_settings' as any).select('value').eq('key', 'platform_fee').maybeSingle();
+      const { data } = await supabase.from('platform_settings').select('value').eq('key', 'platform_fee').maybeSingle();
       if (data) {
         const val = (data as any).value;
         setFeeType(val?.type || 'percentage');
@@ -100,7 +100,7 @@ export default function AdminSettings() {
       toast.error('Invalid fee value'); return;
     }
     setFeeSaving(true);
-    const { error } = await supabase.from('platform_settings' as any).update({
+    const { error } = await supabase.from('platform_settings').update({
       value: { type: feeType, rate, enabled: feeEnabled },
       updated_at: new Date().toISOString(),
     }).eq('key', 'platform_fee');

@@ -104,7 +104,7 @@ const CustomerDashboard = () => {
 
     try {
       const { data } = await supabase
-        .from('invoices' as any)
+        .from('invoices')
         .select('*')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });

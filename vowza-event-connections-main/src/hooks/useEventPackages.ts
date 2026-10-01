@@ -264,16 +264,21 @@ export const useCreateEventPackageBooking = () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('admin_event_package_bookings')
-        .insert({
-          ...booking,
-          customer_id: userData.user.id,
-        })
-        .select()
-        .single();
+      // Server-authoritative create. The browser passes ONLY the package id and
+      // the descriptive event fields; package_price / discount_applied /
+      // final_price and customer_id are derived server-side by the SECURITY
+      // DEFINER RPC create_admin_event_package_booking from the authoritative
+      // admin_event_packages row. Any browser-supplied financial values on
+      // `booking` are intentionally NOT forwarded — the price snapshot can no
+      // longer be forged from the client.
+      const { data, error } = await supabase.rpc('create_admin_event_package_booking' as any, {
+        p_package_id: booking.package_id,
+        p_event_date: booking.event_date,
+        p_event_location: booking.event_location ?? null,
+        p_guest_count: booking.guest_count ?? null,
+      });
       if (error) throw error;
-      return data as AdminEventPackageBooking;
+      return data as string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-package-bookings'] });

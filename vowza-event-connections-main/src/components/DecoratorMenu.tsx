@@ -24,7 +24,7 @@ export default function DecoratorMenu({ provider, profile }: { provider: any; pr
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-decorator-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('decorator_packages' as any).select('*, decorator_gallery(*), decorator_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('decorator_packages').select('*, decorator_gallery(*), decorator_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -276,37 +276,40 @@ function DecoratorBookingModal({ isOpen, onClose, pkg, provider, addons }: { isO
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('decorator_bookings' as any).insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
-        customer_id: user.id,
-        event_date: eventDate,
-        event_time: eventTime || null,
-        venue: location.venue_name || location.locality || null,
-        city: location.town_city || null,
-        theme_preference: selectedTheme || null,
-        special_instructions: [colorPreferences && `Colors: ${colorPreferences}`, specialRequests].filter(Boolean).join('\n') || null,
-        selected_addon_ids: selectedAddonIds,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: total,
-        status: 'pending',
-      }).select('id').single();
+      // Server-authoritative creation (P0-1, decorator). Pass identifiers /
+      // selections / descriptive fields ONLY; create_decorator_booking derives
+      // base/addons/total from the trusted package + addon rows and forces
+      // customer_id = auth.uid(). No client amount crosses the trust boundary.
+      // (theme_preference / special_instructions are descriptive only — NOT
+      // pricing inputs; the total is package_price + addons regardless. The modal
+      // does not collect an event_type, so it is left null, as before.)
+      const { data: newId, error } = await supabase.rpc('create_decorator_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_theme_preference: selectedTheme || null,
+        p_addon_ids: selectedAddonIds,
+        p_special_instructions: [colorPreferences && `Colors: ${colorPreferences}`, specialRequests].filter(Boolean).join('\n') || null,
+      });
       if (error) throw error;
+      const bookingId = newId as string;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
-        booking_table: 'decorator_bookings', booking_id: booking.id,
+      await supabase.from('booking_locations').insert({
+        booking_table: 'decorator_bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
         pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id,
+        bookingId: bookingId,
         artistName: provider.business_name || provider.contact_person || 'Decorator',
         eventDate, eventTime,
         venue: location.venue_name || location.locality || 'TBD',

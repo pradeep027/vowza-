@@ -409,7 +409,7 @@ export const NotificationService = {
       type: data.type,
       is_read: false,
     }));
-    const { error } = await supabase.from('notifications' as any).insert(inserts);
+    const { error } = await supabase.from('notifications').insert(inserts);
     if (error) throw error;
   },
 
@@ -423,7 +423,7 @@ export const NotificationService = {
   ): Promise<{ notifications: any[]; unread: number }> {
     const { limit = 50 } = options;
     const { data, error } = await supabase
-      .from('notifications' as any)
+      .from('notifications')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

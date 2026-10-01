@@ -76,7 +76,7 @@ const blank = (): Draft => ({
 const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py-2.5 text-sm text-[#3d1924] outline-none transition placeholder:text-stone-400 focus:border-[#8b1538] focus:ring-2 focus:ring-[#8b1538]/15';
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function CateringPackageManager({ provider }: { provider: any }) {
+export default function CateringPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -86,7 +86,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['catering-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('catering_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
+      const r = await supabase.from('catering_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -109,11 +109,11 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
     let plateIncludes: PlateInclude[] = [...DEFAULT_PLATE_INCLUDES];
 
     try {
-      const secRes = await supabase.from('catering_menu_sections' as any)
+      const secRes = await supabase.from('catering_menu_sections')
         .select('id, name, sort_order').eq('package_id', pkg.id).order('sort_order');
       if (secRes.data && secRes.data.length > 0) {
         for (const sec of secRes.data) {
-          const itemRes = await supabase.from('catering_menu_items' as any)
+          const itemRes = await supabase.from('catering_menu_items')
             .select('name, is_veg, is_premium, is_bestseller').eq('section_id', sec.id).order('sort_order');
           menuSections.push({
             name: sec.name,
@@ -123,7 +123,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
           });
         }
       }
-      const addonRes = await supabase.from('catering_addons' as any)
+      const addonRes = await supabase.from('catering_addons')
         .select('name, price, description').eq('package_id', pkg.id).order('sort_order');
       if (addonRes.data) {
         addons = addonRes.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' }));
@@ -142,7 +142,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
     let galleryUrls: { id: string; url: string; is_cover: boolean }[] = [];
     let coverUrl = '';
     try {
-      const galRes = await supabase.from('catering_gallery' as any).select('id, public_url, is_cover, sort_order').eq('package_id', pkg.id).order('sort_order');
+      const galRes = await supabase.from('catering_gallery').select('id, public_url, is_cover, sort_order').eq('package_id', pkg.id).order('sort_order');
       const gallery = (galRes.data ?? []).map((g: any) => ({ id: g.id, url: g.public_url, is_cover: g.is_cover }));
       const cover = gallery.find((g: any) => g.is_cover);
       coverUrl = cover?.url || '';
@@ -195,10 +195,10 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
 
       let packageId = draft.id;
       if (draft.id) {
-        const r = await supabase.from('catering_packages' as any).update(payload).eq('id', draft.id).select('id').single();
+        const r = await supabase.from('catering_packages').update(payload).eq('id', draft.id).select('id').single();
         if (r.error) throw r.error;
       } else {
-        const r = await supabase.from('catering_packages' as any).insert(payload).select('id').single();
+        const r = await supabase.from('catering_packages').insert(payload).select('id').single();
         if (r.error) throw r.error;
         packageId = r.data.id;
       }
@@ -206,18 +206,18 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
       // Save menu sections & items
       if (packageId) {
         // Delete existing sections (cascade deletes items)
-        await supabase.from('catering_menu_sections' as any).delete().eq('package_id', packageId);
+        await supabase.from('catering_menu_sections').delete().eq('package_id', packageId);
         for (let si = 0; si < draft.menu_sections.length; si++) {
           const sec = draft.menu_sections[si];
           if (!sec.name.trim()) continue;
-          const secR = await supabase.from('catering_menu_sections' as any)
+          const secR = await supabase.from('catering_menu_sections')
             .insert({ package_id: packageId, name: sec.name.trim(), sort_order: si })
             .select('id').single();
           if (secR.error || !secR.data) continue;
           const sectionId = secR.data.id;
           const validItems = sec.items.filter(it => it.name.trim());
           if (validItems.length > 0) {
-            await supabase.from('catering_menu_items' as any).insert(
+            await supabase.from('catering_menu_items').insert(
               validItems.map((it, ii) => ({
                 section_id: sectionId, name: it.name.trim(),
                 is_veg: it.is_veg, is_premium: it.is_premium, is_bestseller: it.is_bestseller,
@@ -228,10 +228,10 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
         }
 
         // Save add-ons
-        await supabase.from('catering_addons' as any).delete().eq('package_id', packageId);
+        await supabase.from('catering_addons').delete().eq('package_id', packageId);
         const validAddons = draft.addons.filter(a => a.name.trim());
         if (validAddons.length > 0) {
-          await supabase.from('catering_addons' as any).insert(
+          await supabase.from('catering_addons').insert(
             validAddons.map((a, i) => ({
               package_id: packageId, name: a.name.trim(),
               price: Number(a.price) || 0, description: a.description || null, sort_order: i,
@@ -246,8 +246,8 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
           if (!upErr) {
             const publicUrl = supabase.storage.from('catering-images').getPublicUrl(path).data.publicUrl;
             // Remove old cover
-            await supabase.from('catering_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true);
-            await supabase.from('catering_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: true, sort_order: 0 });
+            await supabase.from('catering_gallery').delete().eq('package_id', packageId).eq('is_cover', true);
+            await supabase.from('catering_gallery').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: true, sort_order: 0 });
           }
         }
 
@@ -259,7 +259,7 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
             const { error: upErr } = await supabase.storage.from('catering-images').upload(path, file, { contentType: file.type });
             if (!upErr) {
               const publicUrl = supabase.storage.from('catering-images').getPublicUrl(path).data.publicUrl;
-              await supabase.from('catering_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, sort_order: draft.gallery_urls.length + i + 1 });
+              await supabase.from('catering_gallery').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, sort_order: draft.gallery_urls.length + i + 1 });
             }
           }
         }
@@ -268,11 +268,11 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
         if (draft.id && packageId) {
           const currentIds = draft.gallery_urls.map(g => g.id).filter(Boolean);
           if (currentIds.length > 0 || draft.gallery_urls.length === 0) {
-            const { data: existing } = await supabase.from('catering_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false);
+            const { data: existing } = await supabase.from('catering_gallery').select('id').eq('package_id', packageId).eq('is_cover', false);
             const existingIds = (existing ?? []).map((e: any) => e.id);
             const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
             if (toDelete.length > 0) {
-              await supabase.from('catering_gallery' as any).delete().in('id', toDelete);
+              await supabase.from('catering_gallery').delete().in('id', toDelete);
             }
           }
         }
@@ -293,13 +293,13 @@ export default function CateringPackageManager({ provider }: { provider: any }) 
 
   const toggleStatus = async (pkg: any) => {
     const newStatus = pkg.status === 'active' ? 'draft' : 'active';
-    await supabase.from('catering_packages' as any).update({ status: newStatus }).eq('id', pkg.id);
+    await supabase.from('catering_packages').update({ status: newStatus }).eq('id', pkg.id);
     refresh();
   };
 
   const remove = async (pkg: any) => {
     if (!confirm('Delete this package? This cannot be undone.')) return;
-    await supabase.from('catering_packages' as any).delete().eq('id', pkg.id);
+    await supabase.from('catering_packages').delete().eq('id', pkg.id);
     refresh();
     toast.success('Package deleted');
   };

@@ -86,7 +86,7 @@ const blank = (): Draft => ({
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function MehendiPackageManager({ provider }: { provider: any }) {
+export default function MehendiPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -95,14 +95,14 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['mehendi-packages', provider.id],
-    queryFn: async () => { const r = await (supabase.from('mehendi_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false })); if (r.error) throw r.error; return r.data ?? []; },
+    queryFn: async () => { const r = await (supabase.from('mehendi_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false })); if (r.error) throw r.error; return r.data ?? []; },
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['mehendi-packages', provider.id] });
   useEffect(() => { const ch = supabase.channel(`mehendi-packages-${provider.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'mehendi_packages', filter: `provider_id=eq.${provider.id}` }, refresh).subscribe(); return () => { supabase.removeChannel(ch); }; }, [provider.id]);
 
   const edit = async (pkg: any) => {
     let galleryUrls: { id: string; url: string; is_cover: boolean }[] = []; let videoUrls: { id: string; url: string }[] = []; let coverUrl = '';
-    try { const r = await (supabase.from('mehendi_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data??[]).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url||''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch (_) {}
+    try { const r = await (supabase.from('mehendi_gallery').select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data??[]).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url||''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch { /* best-effort; keep the form usable if this load fails */ }
     setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', package_type: pkg.package_type||'', status: pkg.status||'draft',
       package_price: String(pkg.package_price??''), advance_percentage: String(pkg.advance_percentage??'20'),
       design_styles: pkg.design_styles??[], coverage: pkg.coverage??[],
@@ -194,10 +194,10 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
       let packageId = draft.id;
       
       if (draft.id) {
-        const r = await (supabase.from('mehendi_packages' as any).update(payload).eq('id', draft.id).select('id').single());
+        const r = await (supabase.from('mehendi_packages').update(payload).eq('id', draft.id).select('id').single());
         if (r.error) throw r.error;
       } else {
-        const r = await (supabase.from('mehendi_packages' as any).insert(payload).select('id').single());
+        const r = await (supabase.from('mehendi_packages').insert(payload).select('id').single());
         if (r.error) throw r.error;
         packageId = r.data.id;
       }
@@ -209,8 +209,8 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
           const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
           if (!upErr) {
             const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
-            await (supabase.from('mehendi_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true));
-            await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 }));
+            await (supabase.from('mehendi_gallery').delete().eq('package_id', packageId).eq('is_cover', true));
+            await (supabase.from('mehendi_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 }));
           }
         }
         
@@ -222,7 +222,7 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
             const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type });
             if (!upErr) {
               const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
-              await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 }));
+              await (supabase.from('mehendi_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 }));
             }
           }
         }
@@ -235,16 +235,16 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
             const { error: upErr } = await supabase.storage.from('mehendi-media').upload(path, file, { contentType: file.type });
             if (!upErr) {
               const url = supabase.storage.from('mehendi-media').getPublicUrl(path).data.publicUrl;
-              await (supabase.from('mehendi_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i }));
+              await (supabase.from('mehendi_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i }));
             }
           }
         }
         
         if (draft.id) {
           const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean);
-          const { data: ex } = await (supabase.from('mehendi_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false));
+          const { data: ex } = await (supabase.from('mehendi_gallery').select('id').eq('package_id', packageId).eq('is_cover', false));
           const del = (ex ?? []).map((e: any) => e.id).filter((id: string) => !cur.includes(id));
-          if (del.length > 0) await (supabase.from('mehendi_gallery' as any).delete().in('id', del));
+          if (del.length > 0) await (supabase.from('mehendi_gallery').delete().in('id', del));
         }
       }
       
@@ -259,8 +259,8 @@ export default function MehendiPackageManager({ provider }: { provider: any }) {
     }
   };
 
-  const toggleStatus = async (pkg: any) => { await (supabase.from('mehendi_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
-  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('mehendi_packages' as any).delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
+  const toggleStatus = async (pkg: any) => { await (supabase.from('mehendi_packages').update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
+  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('mehendi_packages').delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
   const openNew = () => { setDraft(blank()); setStep(1); };
 
   const ChipSelect = ({ options, selected, onChange, label }: { options: string[]; selected: string[]; onChange: (v: string[]) => void; label: string }) => (

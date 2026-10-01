@@ -301,15 +301,15 @@ export default function ProviderRegistration() {
         district: s1.district || null, address: s1.address || null,
       }).eq('id', user.id);
 
-      // 2. Upload selfie
-      let selfieUrl = '';
+      // 2. Upload selfie to the PRIVATE provider-kyc bucket (Phase G). Store the
+      //    object PATH, never a public URL: KYC / identity media must not be
+      //    served from a public bucket. Path is {user.id}/... so the owner-scoped
+      //    storage RLS matches; an admin reads it later via a signed URL.
+      let selfiePath = '';
       if (s2.selfieBlob) {
-        const path = `selfies/${user.id}_${Date.now()}.jpg`;
-        const { data } = await supabase.storage.from('provider-media').upload(path, s2.selfieBlob, { upsert: true });
-        if (data) {
-          const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path);
-          selfieUrl = pub.publicUrl;
-        }
+        const path = `${user.id}/selfie/${Date.now()}.jpg`;
+        const { data } = await supabase.storage.from('provider-kyc').upload(path, s2.selfieBlob, { upsert: true, contentType: 'image/jpeg' });
+        if (data) selfiePath = path;
       }
 
       // 3. Upload portfolio
@@ -323,16 +323,17 @@ export default function ProviderRegistration() {
         }
       }
 
-      // 4. Upload documents
+      // 4. Upload documents to the PRIVATE provider-kyc bucket (Phase G). Store
+      //    the object PATH under {user.id}/{kind}/... so the owner-scoped storage
+      //    RLS matches; never getPublicUrl() an identity document.
       const uploadDoc = async (file: File, prefix: string) => {
-        const path = `docs/${user.id}_${prefix}_${Date.now()}`;
-        const { data } = await supabase.storage.from('provider-media').upload(path, file, { upsert: true });
-        if (data) { const { data: pub } = supabase.storage.from('provider-media').getPublicUrl(path); return pub.publicUrl; }
-        return '';
+        const path = `${user.id}/${prefix}/${Date.now()}`;
+        const { data } = await supabase.storage.from('provider-kyc').upload(path, file, { upsert: true });
+        return data ? path : '';
       };
-      const aadhaarUrl = s4.aadhaarFile ? await uploadDoc(s4.aadhaarFile, 'aadhaar') : '';
-      const panUrl     = s4.panFile     ? await uploadDoc(s4.panFile,     'pan')     : '';
-      const govtIdUrl  = s4.govtIdFile  ? await uploadDoc(s4.govtIdFile,  'govtid')  : '';
+      const aadhaarPath = s4.aadhaarFile ? await uploadDoc(s4.aadhaarFile, 'aadhaar') : '';
+      const panPath     = s4.panFile     ? await uploadDoc(s4.panFile,     'pan')     : '';
+      const govtIdPath  = s4.govtIdFile  ? await uploadDoc(s4.govtIdFile,  'govtid')  : '';
 
       // 5. Create provider profile
       const { error } = await supabase.from('provider_profiles').insert({
@@ -346,7 +347,7 @@ export default function ProviderRegistration() {
         social_links: { instagram: s3.instagram, website: s3.website },
         verification_status: 'pending',
         onboarding_completed: true,
-        vendor_details: { selfie_url: selfieUrl, aadhaar_url: aadhaarUrl, pan_url: panUrl, govt_id_url: govtIdUrl, address: s1.address },
+        vendor_details: { selfie_path: selfiePath, aadhaar_path: aadhaarPath, pan_path: panPath, govt_id_path: govtIdPath, address: s1.address },
       } as any);
       if (error && error.code !== '23505') throw error;
 

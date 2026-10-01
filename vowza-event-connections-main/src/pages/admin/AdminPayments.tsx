@@ -17,7 +17,7 @@ export default function AdminPayments() {
     setLoading(true);
     try {
       const { data, count, error } = await supabase
-        .from('payments' as any)
+        .from('payments')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);

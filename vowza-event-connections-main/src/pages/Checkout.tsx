@@ -126,28 +126,388 @@ const Checkout = () => {
 
     for (const item of scopedItems) {
       try {
-        const baseAmount = item.price;
-        const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
-        const remaining = baseAmount - advanceAmount;
-        const { data: booking, error } = await supabase.from(item.bookingTable as any).insert({
-          package_id: item.packageId, provider_id: item.providerId, customer_id: user.id,
-          event_date: eventDate, event_time: eventTime || null, event_type: eventType || null,
-          venue: location.venue_name || location.locality || null, city: location.town_city || null,
-          special_requirements: specialRequirements || null,
-          base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
-          advance_amount: advanceAmount, remaining_amount: remaining, status: 'pending',
-        }).select('id').single();
-        if (error) throw new Error(`${item.packageName}: ${error.message}`);
+        let bookingId: string;
+        if (item.bookingTable === 'band_bookings') {
+          // Band pilot: booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_band_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package +
+          // addon rows and forces customer_id = auth.uid(). This closes the
+          // cart creation path, matching BandMenu "Book Now". (P0-1 Step 3.)
+          const { data: newId, error } = await supabase.rpc('create_band_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_addon_ids: [],
+            p_special_requirements: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'catering_bookings') {
+          // Catering pilot (P0-1): catering is priced PER PLATE and needs a guest
+          // count to derive the total — a value the generic cart item does not
+          // carry. Creating a catering booking with client-supplied amounts is
+          // also forbidden. Route catering through the dedicated "Book Now" flow
+          // (CateringBookingModal -> CateringCartPage -> create_catering_booking),
+          // which collects the guest count and derives every amount server-side.
+          // (The generic INSERT below never worked for catering anyway: it writes
+          // event_time / special_requirements, which catering_bookings lacks.)
+          throw new Error(`${item.packageName}: Please use "Book Now" on the catering package — per-plate catering can't be priced from the cart.`);
+        } else if (item.bookingTable === 'anchor_bookings') {
+          // Anchor (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_anchor_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path,
+          // matching AnchorMenu "Book Now". The generic cart item carries no
+          // client count or addon selection, so expected_audience/addons are
+          // omitted (expected_audience is descriptive only — not a pricing
+          // input; the anchor total is package_price + addons regardless).
+          const { data: newId, error } = await supabase.rpc('create_anchor_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_expected_audience: null,
+            p_addon_ids: [],
+            p_special_requirements: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'decorator_bookings') {
+          // Decorator (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_decorator_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DecoratorMenu "Book Now". The generic cart item carries no theme or
+          // addon selection, so theme_preference/addons are omitted (both are
+          // descriptive only — not pricing inputs; the decorator total is
+          // package_price + addons regardless). NOTE: the old generic INSERT below
+          // never worked for decorator anyway — it writes special_requirements, a
+          // column decorator_bookings lacks (it has special_instructions).
+          const { data: newId, error } = await supabase.rpc('create_decorator_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_theme_preference: null,
+            p_addon_ids: [],
+            p_special_instructions: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'dancer_bookings') {
+          // Dancer (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_dancer_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package (advance
+          // from the package's advance_percentage) + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DancerMenu "Book Now". The generic cart item carries no dancer count,
+          // duration or addon selection, so those are omitted — number_of_dancers /
+          // performance_duration / dance_type fall back to the package defaults
+          // server-side (all descriptive only — not pricing inputs; the dancer
+          // total is package_price + addons regardless). The old generic INSERT
+          // below used a flat ADVANCE_PERCENT = 20, ignoring advance_percentage.
+          const { data: newId, error } = await supabase.rpc('create_dancer_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_number_of_dancers: null,
+            p_performance_duration: null,
+            p_addon_ids: [],
+            p_special_requirements: specialRequirements || null,
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'dj_bookings') {
+          // DJ (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_dj_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DJMenu "Book Now". The generic cart item carries no expected_audience,
+          // song requests or addon selection, so those are omitted (expected_audience
+          // is descriptive only — not a pricing input; the DJ total is package_price
+          // + addons regardless). Advance/remaining are derived at accept (flat 20%),
+          // not stored at creation. The old generic INSERT below used a flat
+          // ADVANCE_PERCENT = 20 with client-supplied amounts.
+          const { data: newId, error } = await supabase.rpc('create_dj_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_expected_audience: null,
+            p_song_requests: null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'drone_bookings') {
+          // Drone (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_drone_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // DroneMenu "Book Now". The generic cart item carries no coverage/indoor-
+          // outdoor/permission/addon selection, so those are omitted (all descriptive
+          // only — not pricing inputs; the drone total is chosen base + addons
+          // regardless). Advance/remaining are derived at accept (flat 20%), not
+          // stored at creation. NOTE: the old generic INSERT below never worked for
+          // drone anyway — it writes special_requirements, a column drone_bookings
+          // lacks (it has special_requests).
+          const { data: newId, error } = await supabase.rpc('create_drone_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_coverage_duration: null,
+            p_indoor_outdoor: null,
+            p_drone_permission_available: null,
+            p_restricted_area: null,
+            p_special_requests: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'makeup_bookings') {
+          // Makeup (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_makeup_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // MakeupMenu "Book Now". The generic cart item carries no addon selection,
+          // so p_addon_ids is omitted (the makeup total is package_price + addons
+          // regardless; event_type/venue/city are descriptive only — not pricing
+          // inputs). Advance/remaining are derived at ACCEPT from the package's
+          // advance_percentage (NOT flat 20%), not stored at creation. Unlike drone,
+          // the old generic INSERT below DID work for makeup (makeup_bookings has
+          // special_requirements), but it wrote client amounts + a flat 20% advance,
+          // ignoring the package's advance_percentage — the hole this closes.
+          const { data: newId, error } = await supabase.rpc('create_makeup_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'mehendi_bookings') {
+          // Mehendi (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_mehendi_booking RPC derives
+          // base/addons/total from the trusted package + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // MehendiMenu "Book Now". The generic cart item carries no addon selection
+          // (p_addon_ids omitted) and no num_clients — num_clients is descriptive only
+          // (never a pricing multiplier; the mehendi total is package_price + addons
+          // regardless), so it is left NULL exactly as the old generic INSERT did.
+          // Advance/remaining are derived at ACCEPT from the package's
+          // advance_percentage (NOT flat 20%), not stored at creation.
+          const { data: newId, error } = await supabase.rpc('create_mehendi_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_num_clients: null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'priest_bookings') {
+          // Priest (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_priest_booking RPC derives
+          // base/addons/total/advance/remaining from the trusted package (advance
+          // from the package's advance_percentage) + addon rows and forces
+          // customer_id = auth.uid(). This closes the cart creation path, matching
+          // PriestMenu "Book Now". The generic cart item carries no addon selection,
+          // so p_addon_ids is omitted (the priest total is service_price + addons
+          // regardless; event_type/venue/city are descriptive only — not pricing
+          // inputs). Advance/remaining ARE stored at creation (HONOR the package's
+          // advance_percentage, NOT flat 20%). event_type falls back to the
+          // package_type server-side. NOTE: the old generic INSERT below never worked
+          // for priest anyway — it writes special_requirements, a column
+          // priest_bookings lacks (it has special_instructions).
+          const { data: newId, error } = await supabase.rpc('create_priest_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'rental_bookings') {
+          // Rental (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_rental_booking RPC re-fetches the
+          // package price, RE-MULTIPLIES base = price x server-clamped quantity, sums
+          // the addon prices, derives every amount and forces customer_id = auth.uid().
+          // This closes the cart creation path, matching RentalMenu "Book Now". The
+          // generic cart item carries no quantity (defaults to 1 server-side), no addon
+          // selection (p_addon_ids omitted) and no rental_duration; event_type /
+          // delivery/city are descriptive only — not pricing inputs. Advance/remaining
+          // ARE stored at creation (HONOR the package's advance_percentage, NOT flat
+          // 20%). NOTE: the old generic INSERT below never worked for rental anyway —
+          // it writes special_requirements + venue, columns rental_bookings lacks (it
+          // has special_instructions + delivery_address/city).
+          const { data: newId, error } = await supabase.rpc('create_rental_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_rental_duration: null,
+            p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+            p_city: location.town_city || null,
+            p_quantity_required: 1,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'singer_bookings') {
+          // Singer (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_singer_booking RPC re-fetches
+          // the package price, sums any addon prices, HONORS the package's
+          // advance_percentage (NOT flat 20% — the generic else below used flat
+          // ADVANCE_PERCENT), derives every amount and forces customer_id =
+          // auth.uid(). This closes the cart creation path, matching SingerMenu
+          // "Book Now". Singer has no addon UI (p_addon_ids omitted → 0 addons);
+          // event_type / venue / city / special_requirements are descriptive only.
+          const { data: newId, error } = await supabase.rpc('create_singer_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'videography_bookings') {
+          // Videography (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_videography_booking RPC
+          // re-fetches the package price (starting_price || package_price), sums
+          // any addon prices, HONORS the package's advance_percentage (NOT flat
+          // 20% — the generic else below used flat ADVANCE_PERCENT), derives every
+          // amount and forces customer_id = auth.uid(). This closes the cart
+          // creation path (fed by both VideographyMenu "Add to Cart" and the
+          // UnifiedPhotographyVideographyMenu cart), matching VideographyMenu
+          // "Book Now". No addon UI today (p_addon_ids omitted → 0 addons);
+          // event_type / venue / city / special_requirements are descriptive only.
+          const { data: newId, error } = await supabase.rpc('create_videography_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'water_bookings') {
+          // Water (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_water_booking RPC re-fetches
+          // the package price (base_price), sums any addon prices, HONORS the
+          // package's advance_percentage (NOT flat 20% — the generic else below
+          // used flat ADVANCE_PERCENT), derives every amount and forces customer_id
+          // = auth.uid(). This closes the cart creation path, matching
+          // WaterSupplyMenu "Book Now". It ALSO fixes a pre-existing BUG: the
+          // generic else derived the base charge from item.price, which for water
+          // resolved to Number(pkg.package_price || pkg.price || 0) = 0
+          // (water_packages has NEITHER column — its price is base_price), so the
+          // cart created zero-value water bookings. event_type falls back to
+          // package_type SERVER-SIDE; delivery_time / delivery_address / city /
+          // quantity_required / special_instructions are descriptive only. The cart
+          // has no water addon/quantity picker (p_addon_ids omitted → 0 addons;
+          // p_quantity_required null — it is a free-text delivery note, not a price).
+          const { data: newId, error } = await supabase.rpc('create_water_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_delivery_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+            p_city: location.town_city || null,
+            p_quantity_required: null,
+            p_special_instructions: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else if (item.bookingTable === 'banquet_bookings') {
+          // Banquet (P0-1): booking financials are server-authoritative. Pass
+          // identifiers/selections ONLY; the create_banquet_booking RPC re-fetches
+          // the hall price (hall_rental_price), sums any addon prices, HONORS the
+          // hall's advance_percentage (NOT the flat ADVANCE_PERCENT the generic
+          // else below used), derives every charge and forces customer_id =
+          // auth.uid(). This closes the cart creation path, matching
+          // BanquetHallMenu "Book Now". It ALSO fixes a pre-existing BUG: the
+          // generic else derived the base charge from item.price, which for banquet
+          // resolved to Number(pkg.package_price || pkg.price || 0) = 0
+          // (banquet_halls has NEITHER column — its price is hall_rental_price), so
+          // the cart created zero-value banquet bookings. event_type is descriptive
+          // (no hall fallback at insert); guest_count is a free-text range label,
+          // not a price. The cart has no banquet addon/guest picker (p_addon_ids
+          // omitted → 0 addons; p_guest_count null).
+          const { data: newId, error } = await supabase.rpc('create_banquet_booking' as any, {
+            p_package_id: item.packageId,
+            p_event_date: eventDate,
+            p_event_time: eventTime || null,
+            p_event_type: eventType || null,
+            p_guest_count: null,
+            p_venue: location.venue_name || location.locality || null,
+            p_city: location.town_city || null,
+            p_special_requirements: specialRequirements || null,
+            p_addon_ids: [],
+          });
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = newId as string;
+        } else {
+          const baseAmount = item.price;
+          const advanceAmount = Math.round(baseAmount * ADVANCE_PERCENT / 100);
+          const remaining = baseAmount - advanceAmount;
+          const { data: booking, error } = await supabase.from(item.bookingTable as any).insert({
+            package_id: item.packageId, provider_id: item.providerId, customer_id: user.id,
+            event_date: eventDate, event_time: eventTime || null, event_type: eventType || null,
+            venue: location.venue_name || location.locality || null, city: location.town_city || null,
+            special_requirements: specialRequirements || null,
+            base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
+            advance_amount: advanceAmount, remaining_amount: remaining, status: 'pending',
+          }).select('id').single();
+          if (error) throw new Error(`${item.packageName}: ${error.message}`);
+          bookingId = booking.id;
+        }
 
         await supabase.from('booking_locations' as any).insert({
-          booking_table: item.bookingTable, booking_id: booking.id,
+          booking_table: item.bookingTable, booking_id: bookingId,
           state: location.state, district: location.district, town_city: location.town_city,
           exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
           pincode: location.pincode, landmark: location.address_line || null,
           latitude: location.latitude, longitude: location.longitude,
         });
 
-        await NotificationService.notifyBookingReceived(user.id, item.providerId, booking.id);
+        await NotificationService.notifyBookingReceived(user.id, item.providerId, bookingId);
         successCount++;
       } catch (err: any) { errors.push(err.message || `Failed to book ${item.packageName}`); }
     }

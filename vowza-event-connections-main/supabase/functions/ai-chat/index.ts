@@ -11,6 +11,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { checkRateLimit, clientIdFor, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -52,6 +53,31 @@ serve(async (req) => {
     });
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    // Throttle this cost-incurring (Groq) endpoint per authenticated user via the
+    // atomic server-side limiter. Keyed by the JWT-verified id, never the body.
+    // Fails open if the service-role key is absent so a misconfig can't break chat.
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (serviceRoleKey) {
+      const limiterClient = createClient(supabaseUrl, serviceRoleKey);
+      const { clientId, isAuthenticated } = clientIdFor({ userId: user.id });
+      const rl = await checkRateLimit(
+        limiterClient, clientId, isAuthenticated, RATE_LIMITS.AUTHENTICATED,
+      );
+      if (!rl.allowed) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please slow down." }),
+          {
+            status: 429,
+            headers: {
+              ...CORS,
+              "Content-Type": "application/json",
+              "Retry-After": String(rl.retryAfterSeconds),
+            },
+          },
+        );
+      }
+    }
 
     let messages: LLMMessage[] | undefined;
     try {

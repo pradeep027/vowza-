@@ -665,19 +665,29 @@ export const useBookings = () => {
   }) => {
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        ...bookingData,
-        customer_id: user.id,
-        platform_fee: 0
-      })
-      .select()
-      .single();
+    // Server-authoritative create. This path carries no package id, so it maps
+    // to the no-package "offered amount" negotiation branch of
+    // create_generic_booking, which forces customer_id = auth.uid(),
+    // platform_fee = 0 and status = 'requested' server-side and honors the
+    // offered amount (amount > 0). This hook is currently unconsumed; routing it
+    // through the RPC keeps the direct-insert amount hole from re-opening if it
+    // is ever wired up.
+    const { data, error } = await supabase.rpc('create_generic_booking' as any, {
+      p_provider_id:          bookingData.provider_id,
+      p_event_date:           bookingData.event_date,
+      p_offered_amount:       bookingData.amount,
+      p_event_time:           bookingData.event_time ?? null,
+      p_event_duration_hours: bookingData.event_duration_hours ?? null,
+      p_venue_address:        bookingData.venue_address,
+      p_venue_city:           bookingData.venue_city,
+      p_venue_area:           bookingData.venue_area ?? null,
+      p_requirements:         bookingData.requirements ?? null,
+      p_event_type_id:        bookingData.event_type_id ?? null,
+    });
 
     if (error) throw error;
 
-    return data;
+    return data as string;
   };
 
   const cancelBooking = async (bookingId: string) => {

@@ -227,7 +227,20 @@ export default function VendorEditProfile() {
             {provider.verification_status === 'rejected' && (
               <button
                 onClick={async () => {
-                  await supabase.from("provider_profiles").update({ verification_status: "pending", rejection_reason: null } as any).eq("id", provider.id);
+                  // Owner-constrained resubmit. verification_status is revoked
+                  // from `authenticated` (PHASE_provider_column_lockdown.sql),
+                  // so this routes through provider_resubmit_for_review, which
+                  // permits only the caller's OWN rejected -> pending transition
+                  // and cannot approve, publish, or verify.
+                  const { data, error } = await supabase.rpc(
+                    'provider_resubmit_for_review' as any,
+                    { p_provider_id: provider.id },
+                  );
+                  const res = data as { success?: boolean; message?: string } | null;
+                  if (error || !res?.success) {
+                    toast.error(res?.message ?? error?.message ?? 'Could not resubmit for review. Please try again.');
+                    return;
+                  }
                   toast.success("Profile resubmitted for review! Our team will review within 24–48 hours.");
                   loadAll();
                 }}

@@ -35,6 +35,11 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
   const [providerLoading, setProviderLoading] = useState(true);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<CheckItem[]>([]);
+  // Phase G: KYC media now lives in the PRIVATE provider-kyc bucket as object
+  // paths (vendor_details.*_path). Resolve each to a short-lived signed URL for
+  // display; fall back to the legacy public *_url for records written before the
+  // private-bucket cutover.
+  const [docUrls, setDocUrls] = useState<{ selfie?: string; aadhaar?: string; pan?: string; govt_id?: string }>({});
 
   // ── Fetch: array queries only — NEVER .single() or .maybeSingle() ──────────
   const fetchProvider = useCallback(async (retryCount = 0) => {
@@ -131,12 +136,39 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
     setChecklist([
       { key: 'phone',     label: 'Mobile Verified',         checked: !!profile?.phone },
       { key: 'email',     label: 'Email Verified',          checked: !!profile?.email },
-      { key: 'selfie',    label: 'Selfie Uploaded',         checked: !!vd.selfie_url },
-      { key: 'aadhaar',   label: 'Aadhaar Uploaded',        checked: !!vd.aadhaar_url },
-      { key: 'govtid',    label: 'Govt ID Uploaded',        checked: !!vd.govt_id_url },
+      { key: 'selfie',    label: 'Selfie Uploaded',         checked: !!(vd.selfie_url || vd.selfie_path) },
+      { key: 'aadhaar',   label: 'Aadhaar Uploaded',        checked: !!(vd.aadhaar_url || vd.aadhaar_path) },
+      { key: 'govtid',    label: 'Govt ID Uploaded',        checked: !!(vd.govt_id_url || vd.govt_id_path) },
       { key: 'portfolio', label: 'Portfolio ≥ 2 items',     checked: (provider.gallery_urls?.length ?? 0) >= 2 || portfolio.length >= 2 },
       { key: 'bio',       label: 'Bio Complete (>20 chars)', checked: (provider.bio?.trim()?.length ?? 0) > 20 },
     ]);
+  }, [providerData]);
+
+  // Resolve private provider-kyc object paths to short-lived signed URLs for
+  // display. Legacy records (public *_url) pass straight through, so documents
+  // uploaded before the private-bucket cutover keep rendering.
+  useEffect(() => {
+    if (!providerData) { setDocUrls({}); return; }
+    const vd = providerData.provider?.vendor_details ?? {};
+    let cancelled = false;
+    const resolve = async (pathKey: string, urlKey: string): Promise<string | undefined> => {
+      const p = vd[pathKey];
+      if (p) {
+        const { data } = await supabase.storage.from('provider-kyc').createSignedUrl(p, 300);
+        if (data?.signedUrl) return data.signedUrl;
+      }
+      return vd[urlKey] || undefined;
+    };
+    (async () => {
+      const [selfie, aadhaar, pan, govt_id] = await Promise.all([
+        resolve('selfie_path', 'selfie_url'),
+        resolve('aadhaar_path', 'aadhaar_url'),
+        resolve('pan_path', 'pan_url'),
+        resolve('govt_id_path', 'govt_id_url'),
+      ]);
+      if (!cancelled) setDocUrls({ selfie, aadhaar, pan, govt_id });
+    })();
+    return () => { cancelled = true; };
   }, [providerData]);
 
   const toggleCheck = (key: string) =>
@@ -296,10 +328,10 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
                       </div>
                     )}
                   </div>
-                  {vd.selfie_url && (
+                  {docUrls.selfie && (
                     <div className="border-t border-border/40 pt-4">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Selfie</p>
-                      <img src={vd.selfie_url} alt="Selfie" className="w-28 h-28 rounded-2xl object-cover border border-border" />
+                      <img src={docUrls.selfie} alt="Selfie" className="w-28 h-28 rounded-2xl object-cover border border-border" />
                     </div>
                   )}
                   {(social.instagram || social.website || social.youtube) && (
@@ -377,10 +409,10 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
                     <p className="text-xs text-blue-700 leading-relaxed">Verify all documents are genuine and match the selfie before approving.</p>
                   </div>
                   {([
-                    { label: 'Aadhaar Card',  url: vd.aadhaar_url, req: true  },
-                    { label: 'Government ID', url: vd.govt_id_url, req: true  },
-                    { label: 'PAN Card',      url: vd.pan_url,     req: false },
-                  ] as {label:string;url?:string;req:boolean}[]).map(doc => (
+                    { label: 'Aadhaar Card',  url: docUrls.aadhaar, has: !!(vd.aadhaar_url || vd.aadhaar_path), req: true  },
+                    { label: 'Government ID', url: docUrls.govt_id, has: !!(vd.govt_id_url || vd.govt_id_path), req: true  },
+                    { label: 'PAN Card',      url: docUrls.pan,     has: !!(vd.pan_url     || vd.pan_path),     req: false },
+                  ] as {label:string;url?:string;has:boolean;req:boolean}[]).map(doc => (
                     <div key={doc.label} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -388,7 +420,7 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
                           {doc.label}
                           {doc.req && <span className="text-red-500 text-[10px]">*</span>}
                         </p>
-                        {doc.url
+                        {doc.has
                           ? <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Uploaded</span>
                           : <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">Not uploaded</span>}
                       </div>
@@ -402,17 +434,21 @@ export default function AdminArtistDetail({ artist, onClose, onApprove, onReject
                               <ExternalLink className="w-3 h-3" /> Open
                             </a>
                           </div>
-                        : <div className="w-full h-20 rounded-xl bg-secondary border-2 border-dashed border-border flex items-center justify-center">
-                            <p className="text-xs text-muted-foreground">Not submitted</p>
-                          </div>}
+                        : doc.has
+                          ? <div className="w-full h-20 rounded-xl bg-secondary border-2 border-dashed border-border flex items-center justify-center">
+                              <p className="text-xs text-muted-foreground">Loading secure document…</p>
+                            </div>
+                          : <div className="w-full h-20 rounded-xl bg-secondary border-2 border-dashed border-border flex items-center justify-center">
+                              <p className="text-xs text-muted-foreground">Not submitted</p>
+                            </div>}
                     </div>
                   ))}
-                  {vd.selfie_url && (
+                  {docUrls.selfie && (
                     <div className="border-t border-border/40 pt-4">
                       <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
                         <Camera className="w-3.5 h-3.5 text-muted-foreground" /> Live Selfie
                       </p>
-                      <img src={vd.selfie_url} alt="Selfie" className="w-32 h-32 rounded-xl object-cover border border-border" />
+                      <img src={docUrls.selfie} alt="Selfie" className="w-32 h-32 rounded-xl object-cover border border-border" />
                     </div>
                   )}
                 </div>

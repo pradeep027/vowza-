@@ -165,25 +165,25 @@ export default function CateringMenu({ provider, profile }: { provider: any; pro
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-catering-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('catering_packages' as any).select('*, catering_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('catering_packages').select('*, catering_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       const pkgs = r.data ?? [];
 
       // Fetch menu sections, items, and addons for each package
       for (const pkg of pkgs) {
-        const secRes = await supabase.from('catering_menu_sections' as any)
+        const secRes = await supabase.from('catering_menu_sections')
           .select('id, name, sort_order').eq('package_id', pkg.id).order('sort_order');
         const sections: any[] = [];
         if (secRes.data && secRes.data.length > 0) {
           for (const sec of secRes.data) {
-            const itemRes = await supabase.from('catering_menu_items' as any)
+            const itemRes = await supabase.from('catering_menu_items')
               .select('name, is_veg, is_premium, is_bestseller').eq('section_id', sec.id).order('sort_order');
             sections.push({ name: sec.name, items: itemRes.data ?? [] });
           }
         }
         pkg._menuSections = sections;
 
-        const addonRes = await supabase.from('catering_addons' as any)
+        const addonRes = await supabase.from('catering_addons')
           .select('id, name, price, description').eq('package_id', pkg.id).order('sort_order');
         pkg._addons = addonRes.data ?? [];
 

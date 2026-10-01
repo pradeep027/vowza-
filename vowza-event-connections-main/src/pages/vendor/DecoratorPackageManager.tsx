@@ -69,7 +69,7 @@ const blank = (): Draft => ({
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function DecoratorPackageManager({ provider }: { provider: any }) {
+export default function DecoratorPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -79,7 +79,7 @@ export default function DecoratorPackageManager({ provider }: { provider: any })
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['decorator-packages', provider.id],
     queryFn: async () => {
-      const r = await (supabase.from('decorator_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
+      const r = await (supabase.from('decorator_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -97,12 +97,12 @@ export default function DecoratorPackageManager({ provider }: { provider: any })
     let videoUrls: { id: string; url: string }[] = [];
     let coverUrl = '';
     try {
-      const r = await (supabase.from('decorator_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order'));
+      const r = await (supabase.from('decorator_gallery').select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order'));
       const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type || 'image' }));
       coverUrl = g.find((x: any) => x.is_cover)?.url || '';
       galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type === 'image');
       videoUrls = g.filter((x: any) => x.media_type === 'video').map((x: any) => ({ id: x.id, url: x.url }));
-    } catch (_) {}
+    } catch { /* best-effort; keep the form usable if this load fails */ }
     setDraft({
       id: pkg.id, name: pkg.name||'', description: pkg.description||'',
       package_type: pkg.package_type||'', status: pkg.status||'draft',
@@ -132,8 +132,8 @@ export default function DecoratorPackageManager({ provider }: { provider: any })
         teardown_included: draft.teardown_time === 'Included',
       };
       let packageId = draft.id;
-      if (draft.id) { const r = await (supabase.from('decorator_packages' as any).update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
-      else { const r = await (supabase.from('decorator_packages' as any).insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
+      if (draft.id) { const r = await (supabase.from('decorator_packages').update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
+      else { const r = await (supabase.from('decorator_packages').insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
 
       if (packageId) {
         // Cover
@@ -141,21 +141,21 @@ export default function DecoratorPackageManager({ provider }: { provider: any })
           const ext = draft.cover_file.name.split('.').pop();
           const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`;
           const { error: upErr } = await supabase.storage.from('decorator-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
-          if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('decorator_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); }
+          if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery').delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('decorator_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 })); }
         }
         // Gallery photos
-        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('decorator-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
+        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('decorator-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
         // Videos
-        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('decorator-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
+        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('decorator-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('decorator-media').getPublicUrl(path).data.publicUrl; await (supabase.from('decorator_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
         // Delete removed
-        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('decorator_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('decorator_gallery' as any).delete().in('id', del)); }
+        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('decorator_gallery').select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('decorator_gallery').delete().in('id', del)); }
       }
       toast.success('Decorator package saved!'); setDraft(null); setStep(1); refresh();
     } catch (err: any) { toast.error(err.message || 'Could not save package'); } finally { setBusy(false); }
   };
 
-  const toggleStatus = async (pkg: any) => { await (supabase.from('decorator_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
-  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('decorator_packages' as any).delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
+  const toggleStatus = async (pkg: any) => { await (supabase.from('decorator_packages').update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
+  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('decorator_packages').delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
   const openNew = () => { setDraft(blank()); setStep(1); };
 
   const ChipSelect = ({ options, selected, onChange, label }: { options: string[]; selected: string[]; onChange: (v: string[]) => void; label: string }) => (

@@ -135,6 +135,6 @@ export async function insertBroadcastNotifications(
   message: string,
 ): Promise<void> {
   const inserts = userIds.map(uid => ({ user_id: uid, title, message, type: 'admin_notification', is_read: false }));
-  const { error } = await supabase.from('notifications' as any).insert(inserts);
+  const { error } = await supabase.from('notifications').insert(inserts);
   if (error) throw error;
 }

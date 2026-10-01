@@ -32,8 +32,6 @@ export async function approveArtist(
   console.log('[approve] providerUserId :', providerUserId);
   console.log('[approve] adminUserId    :', adminUserId);
 
-  const now = new Date().toISOString();
-
   // ── STEP 1: Verify row exists BEFORE attempting update ──────────────────
   console.log('[approve] STEP 1 — pre-check row exists...');
   const { data: preRows, error: preErr } = await supabase
@@ -66,28 +64,31 @@ export async function approveArtist(
   const realProviderId = (preRows[0] as any).id;
   console.log('[approve] row confirmed. real id:', realProviderId, 'current status:', (preRows[0] as any).verification_status);
 
-  // ── STEP 2: UPDATE — NO .select() chained (RLS blocks chained reads) ────
-  const payload = {
-    verification_status: 'approved',
-    is_published:        true,
-    is_verified:         true,
-    verified_at:         now,
-    verified_by:         adminUserId,
-    rejection_reason:    null,
-  };
-  console.log('[approve] STEP 2 — UPDATE payload:', JSON.stringify(payload));
+  // ── STEP 2: Route the protected-column write through the hardened RPC ────
+  //
+  // Direct UPDATE of the verification/approval columns is being revoked from
+  // `authenticated` (see supabase/migrations-pending/PHASE_provider_column_lockdown.sql).
+  // admin_set_provider_verification is SECURITY DEFINER, derives the acting
+  // admin from auth.uid() (never a client-supplied id), enforces
+  // has_role(admin|super_admin) server-side, sets verified_by to the caller,
+  // and audits the action. adminUserId is therefore no longer sent from the
+  // client.
+  console.log('[approve] STEP 2 — calling admin_set_provider_verification RPC...');
 
-  const { error: updErr } = await supabase
-    .from('provider_profiles')
-    .update(payload as any)
-    .eq('id', realProviderId);
+  const { data: rpcData, error: rpcErr } = await supabase.rpc(
+    'admin_set_provider_verification' as any,
+    { p_provider_id: realProviderId, p_action: 'approve' },
+  );
+  const rpcRes = rpcData as { success?: boolean; code?: string; message?: string } | null;
+  console.log('[approve] RPC error:', rpcErr ?? 'none', 'result:', rpcRes);
 
-  console.log('[approve] UPDATE error:', updErr ?? 'none');
-
-  if (updErr) {
-    const msg = `UPDATE failed: ${updErr.message} (code:${updErr.code})`;
+  if (rpcErr) {
+    const msg = `Approval RPC failed: ${rpcErr.message} (code:${rpcErr.code})`;
     console.error('[approve]', msg);
     return { success: false, message: msg };
+  }
+  if (!rpcRes?.success) {
+    return { success: false, message: rpcRes?.message ?? 'The server refused the approval.' };
   }
 
   // ── STEP 3: Separate SELECT to confirm saved value ───────────────────────
@@ -172,7 +173,6 @@ export async function rejectArtist(
   queryClient?: QueryClient,
 ): Promise<ApprovalResult> {
   if (!reason?.trim()) return { success: false, message: 'Rejection reason is required' };
-  const now = new Date().toISOString();
   console.log('[reject] START providerId:', providerId, 'reason:', reason);
 
   try {
@@ -194,21 +194,18 @@ export async function rejectArtist(
       realId = (byUid[0] as any).id;
     }
 
-    // UPDATE — no .select() chained
-    const { error: updErr } = await supabase
-      .from('provider_profiles')
-      .update({
-        verification_status: 'rejected',
-        is_published:        false,
-        is_verified:         false,
-        rejection_reason:    reason.trim(),
-        verified_at:         now,
-        verified_by:         adminUserId,
-      } as any)
-      .eq('id', realId);
-
-    console.log('[reject] UPDATE error:', updErr ?? 'none');
-    if (updErr) return { success: false, message: `UPDATE failed: ${updErr.message}` };
+    // Route the protected-column write through the hardened RPC (see
+    // approveArtist STEP 2 and PHASE_provider_column_lockdown.sql). The RPC
+    // derives the admin from auth.uid(), enforces has_role server-side, records
+    // verified_by / verified_at itself, and audits the action.
+    const { data: rpcData, error: rpcErr } = await supabase.rpc(
+      'admin_set_provider_verification' as any,
+      { p_provider_id: realId, p_action: 'reject', p_reason: reason.trim() },
+    );
+    const rpcRes = rpcData as { success?: boolean; code?: string; message?: string } | null;
+    console.log('[reject] RPC error:', rpcErr ?? 'none', 'result:', rpcRes);
+    if (rpcErr) return { success: false, message: `Rejection RPC failed: ${rpcErr.message}` };
+    if (!rpcRes?.success) return { success: false, message: rpcRes?.message ?? 'The server refused the rejection.' };
 
     // Remove provider role.
     //
@@ -263,11 +260,15 @@ export async function suspendArtist(
   queryClient?: QueryClient,
 ): Promise<ApprovalResult> {
   try {
-    const { error } = await supabase
-      .from('provider_profiles')
-      .update({ verification_status: 'suspended', is_published: false, rejection_reason: reason } as any)
-      .eq('id', providerId);
+    // Suspension flips verification_status='suspended' and unpublishes; route
+    // it through the same hardened, audited RPC as approve/reject.
+    const { data: rpcData, error } = await supabase.rpc(
+      'admin_set_provider_verification' as any,
+      { p_provider_id: providerId, p_action: 'suspend', p_reason: reason },
+    );
     if (error) throw error;
+    const rpcRes = rpcData as { success?: boolean; message?: string } | null;
+    if (!rpcRes?.success) return { success: false, message: rpcRes?.message ?? 'The server refused the suspension.' };
     invalidateAllCaches(queryClient);
     return { success: true, message: 'Artist suspended' };
   } catch (e: any) {

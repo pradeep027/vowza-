@@ -24,7 +24,7 @@ export default function BandMenu({ provider, profile }: { provider: any; profile
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-band-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('band_packages' as any).select('*, band_gallery(*), band_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('band_packages').select('*, band_gallery(*), band_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -192,21 +192,26 @@ function BandBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen: 
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('band_bookings' as any).insert({
-        package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
-        event_date: eventDate, event_time: eventTime || null,
-        event_type: eventType || pkg.band_category || null,
-        venue: location.venue_name || location.locality || null, city: location.town_city || null,
-        selected_addon_ids: selectedAddonIds,
-        special_requirements: specialRequirements || null,
-        base_amount: baseAmount, addons_amount: addonsAmount,
-        total_amount: total, advance_amount: advanceAmount, remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // P0-1: financials (base/addons/total/advance/remaining) are derived
+      // SERVER-SIDE by the create_band_booking RPC from the authoritative
+      // package + addon rows. The browser sends identifiers, selections and
+      // descriptive fields ONLY — never amounts. The baseAmount/total/etc.
+      // computed above are for on-screen display only (UX), not authority.
+      const { data: newBookingId, error } = await supabase.rpc('create_band_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || pkg.band_category || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_addon_ids: selectedAddonIds,
+        p_special_requirements: specialRequirements || null,
+      });
       if (error) throw error;
+      const booking = { id: newBookingId as string };
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'band_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

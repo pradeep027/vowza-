@@ -23,7 +23,7 @@ export default function VideographyMenu({ provider, profile }: { provider: any; 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-videography-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('videography_packages' as any).select('*, videography_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('videography_packages').select('*, videography_gallery(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -179,24 +179,30 @@ function VideographyBookingModal({ isOpen, onClose, pkg, provider }: { isOpen: b
     if (!termsAccepted) { toast.error('Please accept the booking terms'); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('videography_bookings' as any).insert({
-        package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
-        event_date: eventDate, event_time: eventTime || null,
-        event_type: eventType || null,
-        venue: location.venue_name || location.locality || null,
-        city: location.town_city || null,
-        special_requirements: [
+      // SECURITY (P0-1): the browser sends ONLY identifiers / selections /
+      // descriptive fields. create_videography_booking derives every amount
+      // (base / addons / total / advance / remaining) from the trusted package
+      // + addon rows and forces customer_id = auth.uid(). The baseAmount /
+      // advanceAmount / remaining computed above are for LOCAL DISPLAY ONLY and
+      // are never trusted by the server.
+      const { data: newId, error } = await supabase.rpc('create_videography_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_special_requirements: [
           selectedStyles.length ? `Styles: ${selectedStyles.join(', ')}` : '',
           specialRequirements
         ].filter(Boolean).join('\n') || null,
-        base_amount: baseAmount, addons_amount: 0, total_amount: baseAmount,
-        advance_amount: advanceAmount, remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+        p_addon_ids: [],
+      });
       if (error) throw error;
+      const booking = { id: newId as string };
 
       // Save structured location to booking_locations
-      await supabase.from('booking_locations' as any).insert({
+      await supabase.from('booking_locations').insert({
         booking_table: 'videography_bookings', booking_id: booking.id,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),

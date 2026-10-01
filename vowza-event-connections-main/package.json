@@ -12,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run src/lib/plannerRecommendation.test.ts src/lib/promotionMediaPlaylist.test.ts src/lib/vendorTrust.test.ts src/lib/__tests__/budget-crash-regression.test.ts src/lib/__tests__/plannerMemory.test.ts src/lib/__tests__/aiOrchestrator-conversation.test.ts src/lib/__tests__/event-scope-isolation.test.ts",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -96,7 +96,7 @@ const blank = (): Draft => ({
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function RentalPackageManager({ provider }: { provider: any }) {
+export default function RentalPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -106,7 +106,7 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['rental-packages', provider.id],
     queryFn: async () => {
-      const r = await (supabase.from('rental_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
+      const r = await (supabase.from('rental_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -128,17 +128,17 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
     let videoUrls: { id: string; url: string }[] = [];
     let coverUrl = '';
     try {
-      const addonRes = await (supabase.from('rental_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order'));
+      const addonRes = await (supabase.from('rental_addons').select('name, price, description').eq('package_id', pkg.id).order('sort_order'));
       if (addonRes.data) addons = addonRes.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' }));
-    } catch (_) {}
+    } catch { /* best-effort; keep the form usable if this load fails */ }
     try {
-      const galRes = await (supabase.from('rental_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order'));
+      const galRes = await (supabase.from('rental_gallery').select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order'));
       const gallery = (galRes.data ?? []).map((g: any) => ({ id: g.id, url: g.public_url, is_cover: g.is_cover, media_type: g.media_type || 'image' }));
       const cover = gallery.find((g: any) => g.is_cover);
       coverUrl = cover?.url || '';
       galleryUrls = gallery.filter((g: any) => !g.is_cover && g.media_type === 'image');
       videoUrls = gallery.filter((g: any) => g.media_type === 'video').map((g: any) => ({ id: g.id, url: g.url }));
-    } catch (_) {}
+    } catch { /* best-effort; keep the form usable if this load fails */ }
 
     setDraft({
       id: pkg.id, name: pkg.name || '', description: pkg.description || '',
@@ -199,19 +199,19 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
 
       let packageId = draft.id;
       if (draft.id) {
-        const r = await (supabase.from('rental_packages' as any).update(payload).eq('id', draft.id).select('id').single());
+        const r = await (supabase.from('rental_packages').update(payload).eq('id', draft.id).select('id').single());
         if (r.error) throw r.error;
       } else {
-        const r = await (supabase.from('rental_packages' as any).insert(payload).select('id').single());
+        const r = await (supabase.from('rental_packages').insert(payload).select('id').single());
         if (r.error) throw r.error;
         packageId = r.data.id;
       }
 
       if (packageId) {
-        await (supabase.from('rental_addons' as any).delete().eq('package_id', packageId));
+        await (supabase.from('rental_addons').delete().eq('package_id', packageId));
         const validAddons = draft.addons.filter(a => a.name.trim());
         if (validAddons.length > 0) {
-          await (supabase.from('rental_addons' as any).insert(validAddons.map((a, i) => ({
+          await (supabase.from('rental_addons').insert(validAddons.map((a, i) => ({
             package_id: packageId, name: a.name.trim(), price: Number(a.price) || 0,
             description: a.description || null, sort_order: i,
           }))));
@@ -223,8 +223,8 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
           const { error: upErr } = await supabase.storage.from('rental-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
           if (!upErr) {
             const publicUrl = supabase.storage.from('rental-media').getPublicUrl(path).data.publicUrl;
-            await (supabase.from('rental_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true));
-            await (supabase.from('rental_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: true, sort_order: 0 }));
+            await (supabase.from('rental_gallery').delete().eq('package_id', packageId).eq('is_cover', true));
+            await (supabase.from('rental_gallery').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: true, sort_order: 0 }));
           }
         }
         if (draft.gallery_files.length > 0) {
@@ -235,7 +235,7 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
             const { error: upErr } = await supabase.storage.from('rental-media').upload(path, file, { contentType: file.type });
             if (!upErr) {
               const publicUrl = supabase.storage.from('rental-media').getPublicUrl(path).data.publicUrl;
-              await (supabase.from('rental_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 }));
+              await (supabase.from('rental_gallery').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 }));
             }
           }
         }
@@ -248,16 +248,16 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
             const { error: upErr } = await supabase.storage.from('rental-media').upload(path, file, { contentType: file.type });
             if (!upErr) {
               const publicUrl = supabase.storage.from('rental-media').getPublicUrl(path).data.publicUrl;
-              await (supabase.from('rental_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, media_type: 'video', sort_order: 100 + i }));
+              await (supabase.from('rental_gallery').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, is_cover: false, media_type: 'video', sort_order: 100 + i }));
             }
           }
         }
         if (draft.id) {
           const currentIds = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean);
-          const { data: existing } = await (supabase.from('rental_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false));
+          const { data: existing } = await (supabase.from('rental_gallery').select('id').eq('package_id', packageId).eq('is_cover', false));
           const existingIds = (existing ?? []).map((e: any) => e.id);
           const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
-          if (toDelete.length > 0) await (supabase.from('rental_gallery' as any).delete().in('id', toDelete));
+          if (toDelete.length > 0) await (supabase.from('rental_gallery').delete().in('id', toDelete));
         }
       }
       toast.success('Rental package saved!');
@@ -268,12 +268,12 @@ export default function RentalPackageManager({ provider }: { provider: any }) {
 
   const toggleStatus = async (pkg: any) => {
     const newStatus = pkg.status === 'active' ? 'draft' : 'active';
-    await (supabase.from('rental_packages' as any).update({ status: newStatus }).eq('id', pkg.id));
+    await (supabase.from('rental_packages').update({ status: newStatus }).eq('id', pkg.id));
     refresh();
   };
   const remove = async (pkg: any) => {
     if (!confirm('Delete this package? This cannot be undone.')) return;
-    await (supabase.from('rental_packages' as any).delete().eq('id', pkg.id));
+    await (supabase.from('rental_packages').delete().eq('id', pkg.id));
     refresh(); toast.success('Package deleted');
   };
   const openNew = () => { setDraft(blank()); setStep(1); };

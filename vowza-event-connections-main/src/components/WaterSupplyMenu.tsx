@@ -24,7 +24,7 @@ export default function WaterSupplyMenu({ provider, profile }: { provider: any; 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-water-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('water_packages' as any).select('*, water_gallery(*), water_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('water_packages').select('*, water_gallery(*), water_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -188,32 +188,38 @@ function WaterBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen:
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('water_bookings' as any).insert({
-        package_id: pkg.id, provider_id: provider.id, customer_id: user.id,
-        event_date: eventDate, delivery_time: deliveryTime || null,
-        event_type: eventType || pkg.package_type || null,
-        delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null, city: location.town_city || null,
-        quantity_required: quantityRequired || null,
-        selected_addon_ids: selectedAddonIds,
-        special_instructions: specialInstructions || null,
-        base_amount: baseAmount, addons_amount: addonsAmount,
-        total_amount: total, advance_amount: advanceAmount, remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // P0-1: booking financials are server-authoritative. The browser passes ONLY
+      // identifiers / selections / descriptive fields; create_water_booking (SECURITY
+      // DEFINER) forces customer_id = auth.uid(), derives base/addons/total/advance/
+      // remaining from the trusted package + addon rows, and takes provider_id from
+      // the package — NO amount crosses the trust boundary. event_type falls back to
+      // the package's package_type SERVER-SIDE (so we pass the raw eventType only).
+      const { data: newBookingId, error } = await supabase.rpc('create_water_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_delivery_time: deliveryTime || null,
+        p_event_type: eventType || null,
+        p_delivery_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', ') || null,
+        p_city: location.town_city || null,
+        p_quantity_required: quantityRequired || null,
+        p_special_instructions: specialInstructions || null,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const bookingId = newBookingId as string;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
-        booking_table: 'water_bookings', booking_id: booking.id,
+      await supabase.from('booking_locations').insert({
+        booking_table: 'water_bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
         pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id, artistName: provider.business_name || provider.contact_person || 'Water Supplier',
+        bookingId: bookingId, artistName: provider.business_name || provider.contact_person || 'Water Supplier',
         eventDate, eventTime: deliveryTime, venue: location.venue_name || location.locality || 'TBD', city: location.town_city || '',
         amount: total, advanceAmount, remainingBalance: remaining,
         eventType: eventType || pkg.package_type || 'Water Supply', status: 'pending',

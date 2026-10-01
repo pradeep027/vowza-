@@ -24,7 +24,7 @@ export default function BanquetHallMenu({ provider, profile }: { provider: any; 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-banquet-halls', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('banquet_halls' as any).select('*, hall_gallery(*), hall_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('banquet_halls').select('*, hall_gallery(*), hall_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -260,40 +260,39 @@ function BanquetBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpe
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('banquet_bookings' as any).insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
-        customer_id: user.id,
-        event_date: eventDate,
-        event_time: eventTime || null,
-        event_type: eventType || null,
-        guest_count: guestCount || null,
-        venue: location.venue_name || location.locality || null,
-        city: location.town_city || null,
-        selected_addon_ids: selectedAddonIds,
-        special_requirements: specialRequirements || null,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: total,
-        advance_amount: advanceAmount,
-        remaining_amount: remaining,
-        status: 'pending',
-      }).select('id').single();
+      // P0-1 SECURITY FIX: booking financials are derived server-side by the
+      // create_banquet_booking SECURITY DEFINER RPC. The browser passes ONLY
+      // identifiers / selections / descriptive fields — never any amount. The RPC
+      // forces customer_id = auth.uid(), takes provider_id from the trusted hall,
+      // and re-derives base/addons/total/advance/remaining from the stored
+      // hall_rental_price + hall_addons rows honoring the hall's advance_percentage.
+      const { data: newId, error } = await supabase.rpc('create_banquet_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_guest_count: guestCount || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_special_requirements: specialRequirements || null,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const bookingId = newId as string;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
-        booking_table: 'banquet_bookings', booking_id: booking.id,
+      await supabase.from('booking_locations').insert({
+        booking_table: 'banquet_bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
         pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id,
+        bookingId,
         artistName: provider.business_name || provider.contact_person || 'Venue',
         eventDate, eventTime,
         venue: location.venue_name || location.locality || 'TBD',

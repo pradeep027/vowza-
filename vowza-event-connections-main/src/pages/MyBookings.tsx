@@ -109,7 +109,7 @@ const MyBookings = () => {
     if (!user) return;
     (async () => {
       const { data } = await supabase
-        .from('reschedule_requests' as any)
+        .from('reschedule_requests')
         .select('id, booking_id, status, requested_date, requested_time, refund_amount, refund_status, created_at')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
@@ -122,7 +122,7 @@ const MyBookings = () => {
     if (!user) return;
     const ch = supabase.channel(`reschedule-rt-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reschedule_requests', filter: `customer_id=eq.${user.id}` }, () => {
-        supabase.from('reschedule_requests' as any).select('id, booking_id, status, requested_date, requested_time, refund_amount, refund_status, created_at').eq('customer_id', user.id).order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data as any); });
+        supabase.from('reschedule_requests').select('id, booking_id, status, requested_date, requested_time, refund_amount, refund_status, created_at').eq('customer_id', user.id).order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data as any); });
         refetch();
       })
       .subscribe();
@@ -151,10 +151,12 @@ const MyBookings = () => {
     if (payingId) return;
     setPayingId(booking.id);
     try {
-      const table = getBookingTable(booking);
-      const advanceAmt = Math.round(booking.amount * 0.2);
-      const { error } = await supabase.from(table as any).update({ advance_paid_at: new Date().toISOString(), confirmed_at: new Date().toISOString(), calendar_locked: true, status: 'in_progress' }).eq('id', booking.id);
+      const { data, error } = await supabase.rpc('pay_booking_advance' as any, {
+        p_booking_id: booking.id,
+        p_booking_source: booking._source || 'generic',
+      });
       if (error) throw error;
+      const advanceAmt = Number(data) || Math.round(booking.amount * 0.2);
       await NotificationService.notifyAdvancePaymentSuccess(booking.customer_id, booking.provider_id, booking.id, advanceAmt);
       toast.success('Advance paid! Booking confirmed.');
       refetch();
@@ -184,7 +186,7 @@ const MyBookings = () => {
 
       // 2. Record cancellation with refund details
       if (amountPaid > 0) {
-        await supabase.from('booking_cancellations' as any).insert({
+        await supabase.from('booking_cancellations').insert({
           booking_id: booking.id,
           booking_table: table,
           customer_id: user.id,
@@ -248,7 +250,7 @@ const MyBookings = () => {
       const amountPaid = advancePaid ? Math.round(rescheduleBooking.amount * 0.2) : 0;
 
       // Insert reschedule request
-      const { error } = await supabase.from('reschedule_requests' as any).insert({
+      const { error } = await supabase.from('reschedule_requests').insert({
         booking_id: rescheduleBooking.id,
         booking_table: table,
         customer_id: user.id,
@@ -277,7 +279,7 @@ const MyBookings = () => {
       toast.success('Reschedule request sent! Waiting for artist approval.');
       setRescheduleBooking(null); setNewDate(''); setNewTime(''); setRescheduleReason(''); setAvailError(null);
       // Refresh reschedule requests
-      const { data: fresh } = await supabase.from('reschedule_requests' as any).select('id, booking_id, status, requested_date, requested_time, refund_amount, refund_status, created_at').eq('customer_id', user.id).order('created_at', { ascending: false });
+      const { data: fresh } = await supabase.from('reschedule_requests').select('id, booking_id, status, requested_date, requested_time, refund_amount, refund_status, created_at').eq('customer_id', user.id).order('created_at', { ascending: false });
       if (fresh) setRescheduleRequests(fresh as any);
     } catch (err: any) { toast.error(err.message || 'Failed to submit reschedule request'); }
     finally { setIsRescheduling(false); }

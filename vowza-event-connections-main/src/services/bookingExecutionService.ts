@@ -191,82 +191,30 @@ export async function resendStartOTP(
 }
 
 /* ─── 3. COMPLETE SERVICE ──────────────────────────────────────────────────── */
+/**
+ * Server-authoritative completion. The browser passes ONLY the booking id and
+ * its source. The SECURITY DEFINER RPC public.complete_booking_service reads the
+ * authoritative amount from the stored row, derives the platform fee from
+ * platform_settings, authorizes the caller as the booking's provider, and writes
+ * the status + settlement + audit + notification atomically and idempotently.
+ * No amount, fee, earnings, or ownership value is accepted from the client.
+ */
 export async function completeService(
   bookingId: string,
   bookingSource: string,
-  vendorId: string,
-  vendorUserId: string,
-  customerId: string,
-  bookingAmount: number,
-  platformFeeRate: number,
 ): Promise<CompleteServiceResult> {
   try {
-    const table = getBookingTable(bookingSource);
-    const now = new Date().toISOString();
-
-    // Verify booking is in_progress
-    const { data: booking } = await supabase.from(table as any)
-      .select('status, work_started_at, work_completed_at')
-      .eq('id', bookingId).single();
-
-    if (!booking) return { success: false, error: 'Booking not found' };
-    if ((booking as any).work_completed_at) return { success: false, error: 'Service already completed' };
-    if ((booking as any).status !== 'in_progress') return { success: false, error: 'Service has not started yet' };
-
-    // Mark completed
-    await supabase.from(table as any).update({
-      status: 'completed',
-      work_completed_at: now,
-      settlement_status: 'pending',
-    }).eq('id', bookingId);
-
-    // Calculate settlement
-    const platformFee = Math.round(bookingAmount * platformFeeRate / 100);
-    const vendorEarnings = bookingAmount - platformFee;
-    const advancePaid = Math.round(bookingAmount * 0.2); // 20% advance already paid
-    const remainingDue = bookingAmount - advancePaid;
-
-    // Create settlement record
-    const { data: settlement, error: settErr } = await supabase
-      .from('vendor_settlements' as any)
-      .insert({
-        booking_id: bookingId,
-        booking_table: table,
-        vendor_id: vendorId,
-        vendor_user_id: vendorUserId,
-        customer_id: customerId,
-        booking_amount: bookingAmount,
-        platform_fee_rate: platformFeeRate,
-        platform_fee_amount: platformFee,
-        vendor_earnings: vendorEarnings,
-        advance_paid: advancePaid,
-        remaining_due: remainingDue,
-        settlement_status: 'pending',
-      })
-      .select('id')
-      .single();
-
-    if (settErr) console.error('[Settlement] insert error:', settErr);
-
-    // Log audit
-    await supabase.from('booking_events' as any).insert({
-      booking_table: table, booking_id: bookingId,
-      event_type: 'WORK_COMPLETED',
-      actor_id: vendorUserId, actor_role: 'vendor',
-      metadata: { vendor_id: vendorId, completed_at: now, booking_amount: bookingAmount, vendor_earnings: vendorEarnings },
+    const { data, error } = await supabase.rpc('complete_booking_service' as any, {
+      p_booking_id: bookingId,
+      p_booking_source: bookingSource,
     });
 
-    // Notify customer
-    await supabase.from('notifications' as any).insert({
-      user_id: customerId,
-      title: 'Service Completed',
-      message: `Your service has been completed. Thank you for using Vowza!`,
-      type: 'booking_completed',
-      reference_id: bookingId,
-      is_read: false,
-    });
+    if (error) {
+      console.error('[BookingExecution] completeService RPC error:', error);
+      return { success: false, error: error.message || 'Failed to complete service' };
+    }
 
-    return { success: true, settlementId: (settlement as any)?.id };
+    return { success: true, settlementId: (data as string) ?? undefined };
   } catch (err: any) {
     console.error('[BookingExecution] completeService error:', err);
     return { success: false, error: err.message || 'Failed to complete service' };

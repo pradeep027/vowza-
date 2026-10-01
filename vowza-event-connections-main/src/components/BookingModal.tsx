@@ -279,45 +279,51 @@ const BookingModal = ({ isOpen, onClose, provider, providerName, selectedPackage
 
       const bookingAmount = parseInt(amount);
 
-      // ─── INSERT BOOKING WITH VALIDATED VENDOR ID ──────────────────────────
-      // provider.id is now validated to match selectedPackage.provider_id (if package selected)
-      const { data: bookingData, error } = await supabase
-        .from('bookings')
-        .insert({
-          customer_id:          user.id,
-          provider_id:          provider.id,  // ✅ Real UUID from provider_profiles
-          package_id:           selectedPackage?.id || null,  // ✅ Real UUID from pricing_packages
-          event_type_id:        eventTypeId || null,
-          event_date:           eventDate,
-          event_time:           eventTime || null,
-          event_duration_hours: parseInt(duration),
-          venue_address:        venueAddress,
-          venue_city:           venueCity,
-          venue_area:           venueArea || null,
-          requirements:         requirements || null,
-          amount:               bookingAmount,
-          platform_fee:         0,
-          status:               'requested',
-        })
-        .select()
-        .single();
+      // ─── SERVER-AUTHORITATIVE BOOKING CREATE ──────────────────────────────
+      // The browser no longer inserts into public.bookings directly. It calls
+      // the SECURITY DEFINER RPC create_generic_booking, which forces
+      // customer_id = auth.uid(), forces platform_fee = 0 and status =
+      // 'requested', and decides `amount` server-side: when a package is
+      // selected the amount is the authoritative pricing_packages.price of a
+      // package that must belong to this provider (any client amount is
+      // ignored); with no package it honors this offered amount — the
+      // customer's own negotiation value. The old insert also sent a
+      // `package_id` key that public.bookings has no column for; that latent
+      // bug is gone — the package id is passed ONLY so the server can look up
+      // the price, and is never stored on the booking row.
+      const { data: newBookingId, error } = await supabase.rpc('create_generic_booking' as any, {
+        p_provider_id:          provider.id,
+        p_event_date:           eventDate,
+        p_package_id:           selectedPackage?.id ?? null,
+        // Honored ONLY in the no-package negotiation branch; the server ignores
+        // it when p_package_id is set and derives the price from the package.
+        p_offered_amount:       selectedPackage ? null : bookingAmount,
+        p_event_time:           eventTime || null,
+        p_event_duration_hours: parseInt(duration),
+        p_venue_address:        venueAddress,
+        p_venue_city:           venueCity,
+        p_venue_area:           venueArea || null,
+        p_requirements:         requirements || null,
+        p_event_type_id:        eventTypeId || null,
+      });
 
       if (error) throw error;
+      const bookingId = newBookingId as string;
 
       // Save structured location
       await supabase.from('booking_locations' as any).insert({
-        booking_table: 'bookings', booking_id: bookingData.id,
+        booking_table: 'bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: venueAddress, pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingData.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       // Store booking details for success page
       const eventTypeName = eventTypes.find(e => e.id === eventTypeId)?.name;
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: bookingData.id,
+        bookingId: bookingId,
         artistName: providerName,
         eventDate: eventDate,
         eventTime: eventTime,

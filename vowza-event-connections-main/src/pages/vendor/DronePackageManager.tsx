@@ -101,7 +101,7 @@ const blank = (): Draft => ({
 const inputClass = 'w-full rounded-xl border border-[#e7d9c4] bg-white px-3.5 py-2.5 text-sm text-[#3d1924] outline-none transition placeholder:text-stone-400 focus:border-[#8b1538] focus:ring-2 focus:ring-[#8b1538]/15';
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function DronePackageManager({ provider }: { provider: any }) {
+export default function DronePackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -112,7 +112,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
     queryKey: ['drone-packages', provider.id],
     queryFn: async () => {
       const r = await (supabase
-        .from('drone_packages' as any)
+        .from('drone_packages')
         .select('*')
         .eq('provider_id', provider.id)
         .order('created_at', { ascending: false }));
@@ -142,7 +142,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
 
     try {
       const addonRes = await (supabase
-        .from('drone_addons' as any)
+        .from('drone_addons')
         .select('name, price, description')
         .eq('package_id', pkg.id)
         .order('sort_order'));
@@ -155,7 +155,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
 
     try {
       const galRes = await (supabase
-        .from('drone_gallery' as any)
+        .from('drone_gallery')
         .select('id, public_url, is_cover, sort_order')
         .eq('package_id', pkg.id)
         .order('sort_order'));
@@ -254,7 +254,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
       let packageId = draft.id;
       if (draft.id) {
         const r = await (supabase
-          .from('drone_packages' as any)
+          .from('drone_packages')
           .update(payload)
           .eq('id', draft.id)
           .select('id')
@@ -262,7 +262,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
         if (r.error) throw r.error;
       } else {
         const r = await (supabase
-          .from('drone_packages' as any)
+          .from('drone_packages')
           .insert(payload)
           .select('id')
           .single());
@@ -272,10 +272,10 @@ export default function DronePackageManager({ provider }: { provider: any }) {
 
       // Save add-ons
       if (packageId) {
-        await (supabase.from('drone_addons' as any).delete().eq('package_id', packageId));
+        await (supabase.from('drone_addons').delete().eq('package_id', packageId));
         const validAddons = draft.addons.filter(a => a.name.trim());
         if (validAddons.length > 0) {
-          await (supabase.from('drone_addons' as any).insert(
+          await (supabase.from('drone_addons').insert(
             validAddons.map((a, i) => ({
               package_id: packageId,
               name: a.name.trim(),
@@ -295,8 +295,8 @@ export default function DronePackageManager({ provider }: { provider: any }) {
             .upload(path, draft.cover_file, { contentType: draft.cover_file.type });
           if (!upErr) {
             const publicUrl = supabase.storage.from('drone-media').getPublicUrl(path).data.publicUrl;
-            await (supabase.from('drone_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true));
-            await (supabase.from('drone_gallery' as any).insert({
+            await (supabase.from('drone_gallery').delete().eq('package_id', packageId).eq('is_cover', true));
+            await (supabase.from('drone_gallery').insert({
               package_id: packageId, storage_path: path,
               public_url: publicUrl, is_cover: true, sort_order: 0,
             }));
@@ -314,7 +314,7 @@ export default function DronePackageManager({ provider }: { provider: any }) {
               .upload(path, file, { contentType: file.type });
             if (!upErr) {
               const publicUrl = supabase.storage.from('drone-media').getPublicUrl(path).data.publicUrl;
-              await (supabase.from('drone_gallery' as any).insert({
+              await (supabase.from('drone_gallery').insert({
                 package_id: packageId, storage_path: path,
                 public_url: publicUrl, is_cover: false,
                 sort_order: draft.gallery_urls.length + i + 1,
@@ -327,14 +327,14 @@ export default function DronePackageManager({ provider }: { provider: any }) {
         if (draft.id) {
           const currentIds = draft.gallery_urls.map(g => g.id).filter(Boolean);
           const { data: existing } = await (supabase
-            .from('drone_gallery' as any)
+            .from('drone_gallery')
             .select('id')
             .eq('package_id', packageId)
             .eq('is_cover', false));
           const existingIds = (existing ?? []).map((e: any) => e.id);
           const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
           if (toDelete.length > 0) {
-            await (supabase.from('drone_gallery' as any).delete().in('id', toDelete));
+            await (supabase.from('drone_gallery').delete().in('id', toDelete));
           }
         }
       }
@@ -353,13 +353,13 @@ export default function DronePackageManager({ provider }: { provider: any }) {
   /* ─── Toggle / Remove ────────────────────────────────────────────────── */
   const toggleStatus = async (pkg: any) => {
     const newStatus = pkg.status === 'active' ? 'draft' : 'active';
-    await (supabase.from('drone_packages' as any).update({ status: newStatus }).eq('id', pkg.id));
+    await (supabase.from('drone_packages').update({ status: newStatus }).eq('id', pkg.id));
     refresh();
   };
 
   const remove = async (pkg: any) => {
     if (!confirm('Delete this package? This cannot be undone.')) return;
-    await (supabase.from('drone_packages' as any).delete().eq('id', pkg.id));
+    await (supabase.from('drone_packages').delete().eq('id', pkg.id));
     refresh();
     toast.success('Package deleted');
   };

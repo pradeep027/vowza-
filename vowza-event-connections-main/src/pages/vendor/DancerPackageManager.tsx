@@ -29,7 +29,7 @@ const blank = (): Draft => ({
   cover_file: null, cover_url: '', gallery_files: [], gallery_urls: [], video_files: [], video_urls: [],
 });
 
-export default function DancerPackageManager({ provider }: { provider: any }) {
+export default function DancerPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -40,7 +40,7 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['dancer-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('dancer_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
+      const r = await supabase.from('dancer_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -56,12 +56,12 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
   const openEdit = async (pkg: any) => {
     let coverUrl = ''; let galleryUrls: { id: string; url: string }[] = []; let videoUrls: { id: string; url: string }[] = [];
     try {
-      const r = await supabase.from('dancer_gallery' as any).select('id, public_url, is_cover, media_type, sort_order').eq('package_id', pkg.id).order('sort_order');
+      const r = await supabase.from('dancer_gallery').select('id, public_url, is_cover, media_type, sort_order').eq('package_id', pkg.id).order('sort_order');
       const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type || 'image' }));
       coverUrl = g.find((x: any) => x.is_cover)?.url || '';
       galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type === 'image');
       videoUrls = g.filter((x: any) => x.media_type === 'video');
-    } catch (_) {}
+    } catch { /* best-effort; keep the form usable if this load fails */ }
     setDraft({
       id: pkg.id, name: pkg.name || '', description: pkg.description || '',
       dance_type: pkg.dance_type || '', package_type: pkg.package_type || '',
@@ -90,10 +90,10 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
       };
       let packageId = draft.id;
       if (draft.id) {
-        const r = await supabase.from('dancer_packages' as any).update(payload).eq('id', draft.id).select('id').single();
+        const r = await supabase.from('dancer_packages').update(payload).eq('id', draft.id).select('id').single();
         if (r.error) throw r.error;
       } else {
-        const r = await supabase.from('dancer_packages' as any).insert(payload).select('id').single();
+        const r = await supabase.from('dancer_packages').insert(payload).select('id').single();
         if (r.error) throw r.error;
         packageId = r.data.id;
       }
@@ -107,8 +107,8 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
           const { error: upErr } = await supabase.storage.from('dancer-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
           if (!upErr) {
             const url = supabase.storage.from('dancer-media').getPublicUrl(path).data.publicUrl;
-            await supabase.from('dancer_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true);
-            await supabase.from('dancer_gallery' as any).insert({ package_id: packageId, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 });
+            await supabase.from('dancer_gallery').delete().eq('package_id', packageId).eq('is_cover', true);
+            await supabase.from('dancer_gallery').insert({ package_id: packageId, public_url: url, is_cover: true, media_type: 'image', sort_order: 0 });
           }
         }
         // Gallery images
@@ -119,7 +119,7 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
           const { error: upErr } = await supabase.storage.from('dancer-media').upload(path, file, { contentType: file.type });
           if (!upErr) {
             const url = supabase.storage.from('dancer-media').getPublicUrl(path).data.publicUrl;
-            await supabase.from('dancer_gallery' as any).insert({ package_id: packageId, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 });
+            await supabase.from('dancer_gallery').insert({ package_id: packageId, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 });
           }
         }
         // Videos
@@ -130,15 +130,15 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
           const { error: upErr } = await supabase.storage.from('dancer-media').upload(path, file, { contentType: file.type });
           if (!upErr) {
             const url = supabase.storage.from('dancer-media').getPublicUrl(path).data.publicUrl;
-            await supabase.from('dancer_gallery' as any).insert({ package_id: packageId, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i });
+            await supabase.from('dancer_gallery').insert({ package_id: packageId, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i });
           }
         }
         // Clean up deleted items in edit mode
         if (draft.id) {
           const keepIds = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean);
-          const { data: existing } = await supabase.from('dancer_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false);
+          const { data: existing } = await supabase.from('dancer_gallery').select('id').eq('package_id', packageId).eq('is_cover', false);
           const toDelete = (existing ?? []).map((e: any) => e.id).filter((id: string) => !keepIds.includes(id));
-          if (toDelete.length > 0) await supabase.from('dancer_gallery' as any).delete().in('id', toDelete);
+          if (toDelete.length > 0) await supabase.from('dancer_gallery').delete().in('id', toDelete);
         }
       }
 
@@ -151,7 +151,7 @@ export default function DancerPackageManager({ provider }: { provider: any }) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this package?')) return;
-    const { error } = await supabase.from('dancer_packages' as any).delete().eq('id', id);
+    const { error } = await supabase.from('dancer_packages').delete().eq('id', id);
     if (error) toast.error(error.message);
     else { toast.success('Package deleted'); qc.invalidateQueries({ queryKey: ['dancer-packages', provider.id] }); }
   };

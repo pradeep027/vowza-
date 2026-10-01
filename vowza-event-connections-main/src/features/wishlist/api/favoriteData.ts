@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 /** All provider_ids saved as favorites by the given user. Throws on error. */
 export async function getFavoriteProviderIds(userId: string): Promise<string[]> {
   const { data, error } = await supabase
-    .from('favorites' as any)
+    .from('favorites')
     .select('provider_id')
     .eq('user_id', userId);
   if (error) throw error;
@@ -23,18 +23,18 @@ export async function getFavoriteProviderIds(userId: string): Promise<string[]> 
 
 /** Insert a favorite row. Silent on DB errors (network errors throw) — as before. */
 export async function addFavorite(userId: string, providerId: string): Promise<void> {
-  await supabase.from('favorites' as any).insert({ user_id: userId, provider_id: providerId });
+  await supabase.from('favorites').insert({ user_id: userId, provider_id: providerId });
 }
 
 /** Delete a favorite row. Silent on DB errors (network errors throw) — as before. */
 export async function removeFavorite(userId: string, providerId: string): Promise<void> {
-  await supabase.from('favorites' as any).delete().eq('user_id', userId).eq('provider_id', providerId);
+  await supabase.from('favorites').delete().eq('user_id', userId).eq('provider_id', providerId);
 }
 
 /** Whether the given favorite row exists for this user+provider. */
 export async function isFavorite(userId: string, providerId: string): Promise<boolean> {
   const { data } = await supabase
-    .from('favorites' as any)
+    .from('favorites')
     .select('id')
     .eq('user_id', userId)
     .eq('provider_id', providerId)

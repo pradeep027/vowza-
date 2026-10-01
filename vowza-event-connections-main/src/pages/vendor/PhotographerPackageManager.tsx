@@ -82,7 +82,7 @@ function DebouncedTextarea({ value, onCommit, className, ...props }: { value: st
 }
 
 /* ─── Parent component: CRUD, list, realtime – untouched logic ─── */
-export default function PhotographerPackageManager({ provider }: { provider: any }) {
+export default function PhotographerPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -90,7 +90,7 @@ export default function PhotographerPackageManager({ provider }: { provider: any
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['photography-packages', provider.id],
     queryFn: async () => {
-      const result = await supabase.from('photography_packages' as any).select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)').eq('photographer_id', provider.id).order('created_at', { ascending: false });
+      const result = await supabase.from('photography_packages').select('*, photography_package_images(*), photography_package_highlights(*), photography_package_addons(*), photography_albums(*)').eq('photographer_id', provider.id).order('created_at', { ascending: false });
       if (result.error) throw result.error;
       return result.data ?? [];
     },
@@ -127,7 +127,7 @@ export default function PhotographerPackageManager({ provider }: { provider: any
       const uploaded = await supabase.storage.from('photography-package-images').upload(path, file, { contentType: file.type });
       if (uploaded.error) throw uploaded.error;
       const publicUrl = supabase.storage.from('photography-package-images').getPublicUrl(path).data.publicUrl;
-      const inserted = await supabase.from('photography_package_images' as any).insert({ package_id: packageId, storage_path: path, public_url: publicUrl, alt_text: file.name, is_cover: index === 0 && !draft?.images.length, sort_order: (draft?.images.length ?? 0) + index });
+      const inserted = await supabase.from('photography_package_images').insert({ package_id: packageId, storage_path: path, public_url: publicUrl, alt_text: file.name, is_cover: index === 0 && !draft?.images.length, sort_order: (draft?.images.length ?? 0) + index });
       if (inserted.error) throw inserted.error;
     }
   };
@@ -148,18 +148,18 @@ export default function PhotographerPackageManager({ provider }: { provider: any
         description: d.description.trim() || null, status: d.status, is_active: d.status !== 'archived', is_visible: d.status === 'published',
         album_included: d.albumIncluded, album_type: null, album_size: null, album_pages: null,
       };
-      const result = d.id ? await supabase.from('photography_packages' as any).update(payload).eq('id', d.id).select().single() : await supabase.from('photography_packages' as any).insert(payload).select().single();
+      const result = d.id ? await supabase.from('photography_packages').update(payload).eq('id', d.id).select().single() : await supabase.from('photography_packages').insert(payload).select().single();
       if (result.error) throw result.error;
       const packageId = result.data.id;
       if (d.id) await Promise.all(['photography_package_highlights', 'photography_package_addons', 'photography_albums'].map(table => supabase.from(table as any).delete().eq('package_id', packageId)));
       if (d.highlights.length) {
-        const inserted = await supabase.from('photography_package_highlights' as any).insert(d.highlights.map((text, sort_order) => ({ package_id: packageId, text, sort_order })));
+        const inserted = await supabase.from('photography_package_highlights').insert(d.highlights.map((text, sort_order) => ({ package_id: packageId, text, sort_order })));
         if (inserted.error) throw inserted.error;
       }
       const addons = d.addons.filter(addon => addon.name.trim() && addon.price !== '').map((addon, sort_order) => ({ package_id: packageId, name: addon.name.trim(), price: Number(addon.price), description: addon.description.trim() || null, sort_order }));
-      if (addons.length) { const inserted = await supabase.from('photography_package_addons' as any).insert(addons); if (inserted.error) throw inserted.error; }
+      if (addons.length) { const inserted = await supabase.from('photography_package_addons').insert(addons); if (inserted.error) throw inserted.error; }
       const albums = d.albumIncluded ? d.albums.filter(album => album.type.trim() && album.size.trim() && album.pages && album.price !== '').map((album, sort_order) => ({ package_id: packageId, type: album.type.trim(), size: album.size.trim(), pages: Number(album.pages), price: Number(album.price), is_active: album.is_active, sort_order })) : [];
-      if (albums.length) { const inserted = await supabase.from('photography_albums' as any).insert(albums); if (inserted.error) throw inserted.error; }
+      if (albums.length) { const inserted = await supabase.from('photography_albums').insert(albums); if (inserted.error) throw inserted.error; }
       await upload(packageId, d.files);
       toast.success('Photography package saved');
       setDraft(null); refresh();
@@ -168,20 +168,20 @@ export default function PhotographerPackageManager({ provider }: { provider: any
 
   const updateImageOrder = async (images: Image[]) => {
     if (!draft?.id) return;
-    const responses = await Promise.all(images.map((image, sort_order) => supabase.from('photography_package_images' as any).update({ sort_order }).eq('id', image.id)));
+    const responses = await Promise.all(images.map((image, sort_order) => supabase.from('photography_package_images').update({ sort_order }).eq('id', image.id)));
     const error = responses.find((response: any) => response.error)?.error;
     if (error) toast.error(error.message); else { setDraft(current => current && ({ ...current, images })); refresh(); }
   };
   const setCover = async (image: Image) => {
     if (!draft?.id) return;
-    const off = await supabase.from('photography_package_images' as any).update({ is_cover: false }).eq('package_id', draft.id);
-    const on = !off.error && await supabase.from('photography_package_images' as any).update({ is_cover: true }).eq('id', image.id);
+    const off = await supabase.from('photography_package_images').update({ is_cover: false }).eq('package_id', draft.id);
+    const on = !off.error && await supabase.from('photography_package_images').update({ is_cover: true }).eq('id', image.id);
     if (off.error || (on as any)?.error) return toast.error(off.error?.message || (on as any).error.message);
     setDraft(current => current && ({ ...current, images: current.images.map(c => ({ ...c, is_cover: c.id === image.id })) }));
   };
   const removeImage = async (image: Image) => {
     if (!confirm('Remove this image?')) return;
-    const result = await supabase.from('photography_package_images' as any).delete().eq('id', image.id);
+    const result = await supabase.from('photography_package_images').delete().eq('id', image.id);
     if (result.error) return toast.error(result.error.message);
     await supabase.storage.from('photography-package-images').remove([image.storage_path]);
     setDraft(current => current && ({ ...current, images: current.images.filter(existing => existing.id !== image.id) }));
@@ -189,7 +189,7 @@ export default function PhotographerPackageManager({ provider }: { provider: any
 
   return <div className="max-w-[1200px] space-y-6">
     <div className="flex items-start justify-between gap-3"><div><h1 className="text-xl font-bold">Photography Packages</h1><p className="text-sm text-muted-foreground">Create customer-ready photography packages and optional upgrades.</p></div><button onClick={() => setDraft(blank())} className="rounded-xl bg-[#8B1538] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#70102d]"><Plus className="mr-1 inline h-4" />Create package</button></div>
-    {isLoading ? <div className="h-48 animate-pulse rounded-2xl bg-muted" /> : <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{packages.map((pack: any) => { const image = pack.photography_package_images?.find((item: any) => item.is_cover) ?? pack.photography_package_images?.[0]; return <div key={pack.id} className="overflow-hidden rounded-2xl border bg-white"><div className="h-36 bg-secondary">{image && <img src={image.public_url} alt="" className="h-full w-full object-cover" />}</div><div className="p-4"><div className="flex justify-between"><h2 className="font-bold">{pack.name}</h2><span className="text-xs uppercase">{pack.status}</span></div><p className="font-bold">₹{Number(pack.price).toLocaleString('en-IN')}</p><p className="text-xs text-muted-foreground">{pack.photography_type} · {pack.duration} · {pack.team_size_custom || pack.team_size} team</p><div className="mt-4 flex gap-2"><button onClick={() => edit(pack)} className="flex-1 rounded-lg border py-2 text-xs"><Pencil className="mr-1 inline h-3" />Edit</button><button onClick={() => supabase.from('photography_packages' as any).insert({ photographer_id: provider.id, name: `${pack.name} (Copy)`, price: pack.price, photography_type: pack.photography_type, duration: pack.duration, team_size: pack.team_size, status: 'draft', is_visible: false, is_active: true }).then(refresh)} className="rounded-lg border p-2"><Copy className="h-3" /></button><button onClick={() => supabase.from('photography_packages' as any).update({ status: pack.status === 'published' ? 'draft' : 'published', is_visible: pack.status !== 'published' }).eq('id', pack.id).then(refresh)} className="rounded-lg border p-2">{pack.status === 'published' ? <EyeOff className="h-3" /> : <Eye className="h-3" />}</button><button onClick={() => confirm('Delete this package?') && supabase.from('photography_packages' as any).delete().eq('id', pack.id).then(refresh)} className="rounded-lg border p-2 text-red-600"><Trash2 className="h-3" /></button></div></div></div>; })}</div>}
+    {isLoading ? <div className="h-48 animate-pulse rounded-2xl bg-muted" /> : <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{packages.map((pack: any) => { const image = pack.photography_package_images?.find((item: any) => item.is_cover) ?? pack.photography_package_images?.[0]; return <div key={pack.id} className="overflow-hidden rounded-2xl border bg-white"><div className="h-36 bg-secondary">{image && <img src={image.public_url} alt="" className="h-full w-full object-cover" />}</div><div className="p-4"><div className="flex justify-between"><h2 className="font-bold">{pack.name}</h2><span className="text-xs uppercase">{pack.status}</span></div><p className="font-bold">₹{Number(pack.price).toLocaleString('en-IN')}</p><p className="text-xs text-muted-foreground">{pack.photography_type} · {pack.duration} · {pack.team_size_custom || pack.team_size} team</p><div className="mt-4 flex gap-2"><button onClick={() => edit(pack)} className="flex-1 rounded-lg border py-2 text-xs"><Pencil className="mr-1 inline h-3" />Edit</button><button onClick={() => supabase.from('photography_packages').insert({ photographer_id: provider.id, name: `${pack.name} (Copy)`, price: pack.price, photography_type: pack.photography_type, duration: pack.duration, team_size: pack.team_size, status: 'draft', is_visible: false, is_active: true }).then(refresh)} className="rounded-lg border p-2"><Copy className="h-3" /></button><button onClick={() => supabase.from('photography_packages').update({ status: pack.status === 'published' ? 'draft' : 'published', is_visible: pack.status !== 'published' }).eq('id', pack.id).then(refresh)} className="rounded-lg border p-2">{pack.status === 'published' ? <EyeOff className="h-3" /> : <Eye className="h-3" />}</button><button onClick={() => confirm('Delete this package?') && supabase.from('photography_packages').delete().eq('id', pack.id).then(refresh)} className="rounded-lg border p-2 text-red-600"><Trash2 className="h-3" /></button></div></div></div>; })}</div>}
     {draft && <Editor initialDraft={draft} close={() => setDraft(null)} save={save} busy={busy} setCover={setCover} removeImage={removeImage} updateImageOrder={updateImageOrder} onDraftChange={setDraft} />}
   </div>;
 }

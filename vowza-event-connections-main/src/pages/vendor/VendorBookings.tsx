@@ -71,7 +71,7 @@ export default function VendorBookings() {
     if (!vendorId) return;
     (async () => {
       const { data } = await supabase
-        .from('reschedule_requests' as any)
+        .from('reschedule_requests')
         .select('*')
         .eq('provider_id', vendorId)
         .eq('status', 'pending')
@@ -85,7 +85,7 @@ export default function VendorBookings() {
     if (!vendorId) return;
     const ch = supabase.channel(`vendor-reschedule-${vendorId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reschedule_requests' }, () => {
-        supabase.from('reschedule_requests' as any).select('*').eq('provider_id', vendorId).eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data); });
+        supabase.from('reschedule_requests').select('*').eq('provider_id', vendorId).eq('status', 'pending').order('created_at', { ascending: false }).then(({ data }) => { if (data) setRescheduleRequests(data); });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -103,7 +103,7 @@ export default function VendorBookings() {
       if (bookErr) throw bookErr;
 
       // 2. Mark reschedule request as approved
-      const { error: reqErr } = await supabase.from('reschedule_requests' as any).update({
+      const { error: reqErr } = await supabase.from('reschedule_requests').update({
         status: 'approved',
         decided_by: user?.id,
         decided_at: new Date().toISOString(),
@@ -112,7 +112,7 @@ export default function VendorBookings() {
       if (reqErr) throw reqErr;
 
       // 3. Notify customer
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: req.customer_id,
         title: 'Reschedule Approved',
         message: `Your reschedule request was approved! New date: ${new Date(req.requested_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${req.requested_time ? ` at ${req.requested_time}` : ''}.`,
@@ -136,7 +136,7 @@ export default function VendorBookings() {
       const refundAmt = req.refund_eligible ? Math.round(Number(req.original_amount_paid) * 0.8) : 0;
 
       // Mark request as declined + process refund
-      const { error: reqErr } = await supabase.from('reschedule_requests' as any).update({
+      const { error: reqErr } = await supabase.from('reschedule_requests').update({
         status: 'declined',
         decided_by: user?.id,
         decided_at: new Date().toISOString(),
@@ -152,7 +152,7 @@ export default function VendorBookings() {
       const refundMsg = refundAmt > 0
         ? ` A refund of ₹${refundAmt.toLocaleString('en-IN')} (80%) has been processed.`
         : '';
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: req.customer_id,
         title: 'Reschedule Declined',
         message: `Your reschedule request was declined by the artist. The original booking date remains.${refundMsg}`,
@@ -203,7 +203,7 @@ export default function VendorBookings() {
       if (cancelErr) throw cancelErr;
 
       // 2. Record vendor cancellation with penalty
-      await supabase.from('vendor_cancellations' as any).insert({
+      await supabase.from('vendor_cancellations').insert({
         booking_id: b.id,
         booking_table: table,
         vendor_id: vendorId,
@@ -218,7 +218,7 @@ export default function VendorBookings() {
       });
 
       // 3. Notify customer
-      await supabase.from('notifications' as any).insert({
+      await supabase.from('notifications').insert({
         user_id: b.customer_id,
         title: 'Booking Cancelled by Artist',
         message: `Your booking has been cancelled by the artist. ${customerRefund > 0 ? `Full refund of ₹${customerRefund.toLocaleString('en-IN')} has been processed.` : 'No advance was paid.'}`,
@@ -307,10 +307,10 @@ export default function VendorBookings() {
   const handleCompleteService = async () => {
     if (!completeTarget || completing) return;
     setCompleting(true);
-    const total = Number(completeTarget.amount ?? completeTarget.total_amount ?? 0);
+    // Amount, platform fee, and settlement are all derived server-side by the
+    // complete_booking_service RPC; the browser passes only id + source.
     const result = await completeService(
-      completeTarget.id, completeTarget._source || 'generic',
-      vendorId!, user!.id, completeTarget.customer_id, total, 5 // 5% platform fee
+      completeTarget.id, completeTarget._source || 'generic'
     );
     setCompleting(false);
     if (result.success) {
@@ -353,29 +353,228 @@ export default function VendorBookings() {
       : booking._source === 'dancer' ? 'dancer_bookings'
       : 'bookings';
     const total = Number(booking.amount ?? booking.total_amount ?? 0);
-    const advanceAmount = Math.round(total * 0.2);
-    const remainingAmount = total - advanceAmount;
 
     if (newStatus === 'confirmed') {
       // ACCEPT: set status to 'accepted' uniformly across all tables
       const dbStatus = 'accepted';
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const updatePayload: any = {
-        status: dbStatus,
-        accepted_at: new Date().toISOString(),
-        advance_amount: advanceAmount,
-        remaining_amount: remainingAmount,
-        payment_deadline: deadline,
-        calendar_locked: false, // Not locked until advance paid
-      };
-      if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
 
-      const { error } = await supabase.from(table as any).update(updatePayload).eq('id', booking.id);
-      if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+      // Band pilot: the advance/remaining are financial truth and must not be
+      // computed or PATCHed from the browser. Route the whole accept through the
+      // server-authoritative RPC, which re-derives them from the STORED total
+      // and verifies this vendor owns the booking. (P0-1 Step 2.)
+      let advanceAmount = Math.round(total * 0.2);
+      if (table === 'band_bookings') {
+        const { data, error } = await supabase.rpc('accept_band_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        // Trust the server-derived advance for the notification copy, not a
+        // client recompute.
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'catering_bookings') {
+        // Catering pilot (P0-1): same posture as band — advance/remaining are
+        // financial truth and must not be computed or PATCHed from the browser.
+        // accept_catering_booking re-derives them from the STORED total (flat
+        // 20%) and verifies this vendor owns the booking before flipping it to
+        // accepted. (P0-1 Step 3.)
+        const { data, error } = await supabase.rpc('accept_catering_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'anchor_bookings') {
+        // Anchor (P0-1): same posture as band/catering — advance/remaining are
+        // financial truth and must not be computed or PATCHed from the browser.
+        // accept_anchor_booking re-derives them from the STORED total (flat 20%)
+        // and verifies this vendor owns the booking before flipping it to
+        // accepted. (P0-1 Step 5.)
+        const { data, error } = await supabase.rpc('accept_anchor_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'decorator_bookings') {
+        // Decorator (P0-1): same posture as band/catering/anchor — advance/
+        // remaining are financial truth and must not be computed or PATCHed from
+        // the browser. accept_decorator_booking re-derives them from the STORED
+        // total (flat 20%) and verifies this vendor owns the booking before
+        // flipping it to accepted. (P0-1 Step 6.)
+        const { data, error } = await supabase.rpc('accept_decorator_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'dancer_bookings') {
+        // Dancer (P0-1): same posture as band/catering/anchor/decorator —
+        // advance/remaining are financial truth and must not be computed or
+        // PATCHed from the browser. accept_dancer_booking re-derives them from
+        // the STORED total using the package's authoritative advance_percentage
+        // (NOT a flat 20% — dancer's KEY difference) and verifies this vendor
+        // owns the booking before flipping it to accepted. (P0-1 Step 7.)
+        const { data, error } = await supabase.rpc('accept_dancer_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'dj_bookings') {
+        // DJ (P0-1): same posture as band/catering/anchor/decorator — advance/
+        // remaining are financial truth and must not be computed or PATCHed from
+        // the browser. accept_dj_booking re-derives them from the STORED total
+        // (flat 20% — DJ is not a per-package advance_percentage category) and
+        // verifies this vendor owns the booking before flipping it to accepted.
+        const { data, error } = await supabase.rpc('accept_dj_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'drone_bookings') {
+        // Drone (P0-1): same posture as band/catering/anchor/decorator/dj —
+        // advance/remaining are financial truth and must not be computed or
+        // PATCHed from the browser. accept_drone_booking re-derives them from the
+        // STORED total (flat 20% — Drone is not a per-package advance_percentage
+        // category, even though drone_packages has the column) and verifies this
+        // vendor owns the booking before flipping it to accepted.
+        const { data, error } = await supabase.rpc('accept_drone_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'makeup_bookings') {
+        // Makeup (P0-1): same posture as band/catering/anchor/decorator —
+        // advance/remaining are financial truth and must not be computed or
+        // PATCHed from the browser. accept_makeup_booking re-derives them from
+        // the STORED total using the package's authoritative advance_percentage
+        // (HONORS advance_percentage, NOT a flat 20% — like dancer, unlike
+        // dj/drone) and verifies this vendor owns the booking before flipping it
+        // to accepted.
+        const { data, error } = await supabase.rpc('accept_makeup_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'mehendi_bookings') {
+        // Mehendi (P0-1): same posture as makeup/dancer — advance/remaining are
+        // financial truth and must not be computed or PATCHed from the browser.
+        // accept_mehendi_booking re-derives them from the STORED total using the
+        // package's authoritative advance_percentage (HONORS advance_percentage,
+        // NOT a flat 20% — like dancer/makeup, unlike dj/drone) and verifies this
+        // vendor owns the booking before flipping it to accepted.
+        const { data, error } = await supabase.rpc('accept_mehendi_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'priest_bookings') {
+        // Priest (P0-1): same posture as dancer/makeup/mehendi — advance/remaining
+        // are financial truth and must not be computed or PATCHed from the browser.
+        // accept_priest_booking re-derives them from the STORED total using the
+        // package's authoritative advance_percentage (HONORS advance_percentage,
+        // NOT a flat 20% — like dancer/makeup/mehendi, unlike dj/drone) and verifies
+        // this vendor owns the booking before flipping it to accepted.
+        const { data, error } = await supabase.rpc('accept_priest_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'rental_bookings') {
+        // Rental (P0-1): same posture as dancer/makeup/mehendi/priest — advance/
+        // remaining are financial truth and must not be computed or PATCHed from the
+        // browser. accept_rental_booking re-derives them from the STORED total using
+        // the package's authoritative advance_percentage (HONORS advance_percentage,
+        // NOT a flat 20% — the old generic PATCH below used a flat 20%) and verifies
+        // this vendor owns the booking before flipping it to accepted. The stored total
+        // already reflects the server-clamped quantity multiplier (base = price x qty).
+        const { data, error } = await supabase.rpc('accept_rental_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'singer_bookings') {
+        // Singer (P0-1): same posture as dancer/makeup/mehendi/priest/rental —
+        // advance/remaining are financial truth and must not be computed or
+        // PATCHed from the browser. accept_singer_booking re-derives them from the
+        // STORED total using the package's authoritative advance_percentage
+        // (HONORS advance_percentage, NOT the flat 20% the old generic PATCH below
+        // used) and verifies this vendor owns the booking before flipping it to
+        // accepted.
+        const { data, error } = await supabase.rpc('accept_singer_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'videography_bookings') {
+        // Videography (P0-1): same posture as dancer/makeup/mehendi/priest/rental/
+        // singer — advance/remaining are financial truth and must not be computed
+        // or PATCHed from the browser. accept_videography_booking re-derives them
+        // from the STORED total using the package's authoritative advance_percentage
+        // (HONORS advance_percentage, NOT the flat 20% the old generic PATCH below
+        // used) and verifies this vendor owns the booking before flipping it to
+        // accepted.
+        const { data, error } = await supabase.rpc('accept_videography_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'water_bookings') {
+        // Water (P0-1): same posture as dancer/makeup/mehendi/priest/rental/singer/
+        // videography — advance/remaining are financial truth and must not be
+        // computed or PATCHed from the browser. accept_water_booking re-derives them
+        // from the STORED total using the package's authoritative advance_percentage
+        // (HONORS advance_percentage, NOT the flat 20% the old generic PATCH below
+        // used) and verifies this vendor owns the booking before flipping it to
+        // accepted.
+        const { data, error } = await supabase.rpc('accept_water_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else if (table === 'banquet_bookings') {
+        // Banquet (P0-1): same posture as dancer/priest/rental/singer/videography/
+        // water — advance/remaining are financial truth and must not be computed or
+        // PATCHed from the browser. accept_banquet_booking re-derives them from the
+        // STORED total using the hall's authoritative advance_percentage (HONORS
+        // advance_percentage, NOT the flat 20% the old generic PATCH below used) and
+        // verifies this vendor owns the booking before flipping it to accepted.
+        const { data, error } = await supabase.rpc('accept_banquet_booking' as any, {
+          p_booking_id: booking.id,
+        });
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+        const serverAdvance = Number((data as any)?.advance_amount);
+        if (Number.isFinite(serverAdvance)) advanceAmount = serverAdvance;
+      } else {
+        const remainingAmount = total - advanceAmount;
+        const updatePayload: any = {
+          status: dbStatus,
+          accepted_at: new Date().toISOString(),
+          advance_amount: advanceAmount,
+          remaining_amount: remainingAmount,
+          payment_deadline: deadline,
+          calendar_locked: false, // Not locked until advance paid
+        };
+        if (table === 'bookings') updatePayload.updated_at = new Date().toISOString();
+
+        const { error } = await supabase.from(table as any).update(updatePayload).eq('id', booking.id);
+        if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
+      }
 
       // Notify customer: booking accepted, pay advance
       if (booking.customer_id) {
-        await supabase.from('notifications' as any).insert({
+        await supabase.from('notifications').insert({
           user_id: booking.customer_id,
           title: 'Booking Accepted — Pay Advance',
           message: `Your booking has been accepted! Please pay the 20% advance (₹${advanceAmount.toLocaleString('en-IN')}) within 24 hours to confirm. Your payment will be securely held by Vowza until the service is completed.`,
@@ -395,7 +594,7 @@ export default function VendorBookings() {
       if (error) { toast.error(`Failed: ${error.message}`); setBusy(null); return; }
 
       if (booking.customer_id) {
-        await supabase.from('notifications' as any).insert({
+        await supabase.from('notifications').insert({
           user_id: booking.customer_id,
           title: 'Booking Declined',
           message: 'Your booking request could not be accepted. Please explore other artists.',

@@ -130,7 +130,7 @@ const AdminDashboard = () => {
   const fetchCategories = async () => {
     try {
       const { data } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .select('*')
         .order('sort_order');
       
@@ -150,7 +150,7 @@ const AdminDashboard = () => {
 
     try {
       const { error } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .insert({
           name: newCategory.name,
           profession_type: newCategory.profession_type,
@@ -172,7 +172,7 @@ const AdminDashboard = () => {
   const handleDeleteCategory = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('artist_categories' as any)
+        .from('artist_categories')
         .delete()
         .eq('id', id);
 
@@ -188,7 +188,7 @@ const AdminDashboard = () => {
   const fetchAnalytics = async () => {
     try {
       const { data } = await supabase
-        .from('platform_analytics' as any)
+        .from('platform_analytics')
         .select('*')
         .order('date', { ascending: false })
         .limit(30);
@@ -204,7 +204,7 @@ const AdminDashboard = () => {
   const fetchCommissions = async () => {
     try {
       const { data } = await supabase
-        .from('commission_tracking' as any)
+        .from('commission_tracking')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -330,49 +330,57 @@ const AdminDashboard = () => {
     setIsProcessing(true);
 
     try {
-      const now = new Date().toISOString();
-
-      // Update provider profile status
-      const { error: updateError } = await supabase
+      // Resolve the provider_profiles row id: the verification RPC keys on the
+      // profile id (p_provider_id), while this screen tracks workers by user_id.
+      const { data: profileRow, error: lookupError } = await supabase
         .from('provider_profiles')
-        .update({
-          verification_status: status,
-          rejection_reason: status === 'rejected' ? rejectionReason : null,
-          verified_at: status === 'approved' ? now : null,
-        } as any)
-        .eq('user_id', workerId);
+        .select('id')
+        .eq('user_id', workerId)
+        .maybeSingle();
 
-      if (updateError) throw updateError;
+      if (lookupError) throw lookupError;
+      if (!profileRow) throw new Error('No provider profile found for this worker.');
 
-      // If approved, assign provider role and update provider profile
+      // Route the protected-column write through the hardened RPC. Direct
+      // UPDATE of the verification columns is revoked from `authenticated`
+      // (see supabase/migrations-pending/PHASE_provider_column_lockdown.sql);
+      // admin_set_provider_verification is SECURITY DEFINER, derives the admin
+      // from auth.uid(), enforces has_role(admin|super_admin) server-side, and
+      // audits the action. It sets verification_status, verified_at/by and the
+      // publish flags atomically, so the previous second UPDATE is gone.
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'admin_set_provider_verification' as any,
+        {
+          p_provider_id: (profileRow as any).id,
+          p_action: status === 'approved' ? 'approve' : 'reject',
+          p_reason: status === 'rejected' ? rejectionReason.trim() : null,
+        },
+      );
+      if (rpcError) throw rpcError;
+      const rpcRes = rpcData as { success?: boolean; message?: string } | null;
+      if (!rpcRes?.success) {
+        throw new Error(rpcRes?.message ?? 'The server refused the verification change.');
+      }
+
+      // If approved, assign provider role so the vendor can reach their
+      // dashboard. grantRole() rather than .upsert({ onConflict }) -- upsert
+      // needs the UPDATE privilege on user_roles, which `authenticated` lacks.
       if (status === 'approved') {
-        // grantRole() rather than .upsert({ onConflict }) -- upsert needs the
-        // UPDATE privilege on user_roles, which `authenticated` does not have.
         const roleResult = await grantRole(workerId, 'provider');
         if (!roleResult.ok) {
           throw new Error(`Failed to assign provider role: ${roleResult.message}`);
         }
-
-        await supabase
-          .from('provider_profiles')
-          .update({ verification_status: 'approved' } as any)
-          .eq('user_id', workerId);
-      } else {
-        await supabase
-          .from('provider_profiles')
-          .update({ verification_status: 'rejected', rejection_reason: rejectionReason } as any)
-          .eq('user_id', workerId);
       }
 
       toast.success(`Worker ${status} successfully`);
-      
+
       // Send notification to artist
       if (status === 'approved') {
         await NotificationService.notifyArtistApproved(workerId);
       } else {
         await NotificationService.notifyArtistRejected(workerId, rejectionReason);
       }
-      
+
       setRejectionReason('');
       setSelectedWorker(null);
       fetchWorkers();

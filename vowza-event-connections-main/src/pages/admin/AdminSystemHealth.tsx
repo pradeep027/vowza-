@@ -180,14 +180,14 @@ export default function AdminSystemHealth() {
 
     // 11. Payments
     try {
-      const { count, error } = await supabase.from('payments' as any).select('id', { count: 'exact', head: true });
+      const { count, error } = await supabase.from('payments').select('id', { count: 'exact', head: true });
       if (error) throw error;
       updateCheck('payments', { status: 'ok', detail: `${count ?? 0} payment records` });
     } catch (e: any) { updateCheck('payments', { status: e.message?.includes('does not exist') ? 'unknown' : 'error', error: e.message, detail: e.message?.includes('does not exist') ? 'Table not found' : 'Payment system issue' }); }
 
     // 12. Location
     try {
-      const { count, error } = await supabase.from('booking_locations' as any).select('id', { count: 'exact', head: true });
+      const { count, error } = await supabase.from('booking_locations').select('id', { count: 'exact', head: true });
       if (error) throw error;
       updateCheck('location', { status: 'ok', detail: `${count ?? 0} location records` });
     } catch (e: any) { updateCheck('location', { status: 'error', error: e.message }); }
@@ -340,7 +340,7 @@ function SecurityMonitoringSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      let q = supabase.from('security_events' as any)
+      let q = supabase.from('security_events')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);

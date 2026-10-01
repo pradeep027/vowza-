@@ -71,7 +71,7 @@ const blank = (): Draft => ({
 });
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function PriestPackageManager({ provider }: { provider: any }) {
+export default function PriestPackageManager({ provider }: { provider: { id: string } }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -81,7 +81,7 @@ export default function PriestPackageManager({ provider }: { provider: any }) {
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['priest-packages', provider.id],
     queryFn: async () => {
-      const r = await (supabase.from('priest_packages' as any).select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
+      const r = await (supabase.from('priest_packages').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false }));
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -96,8 +96,8 @@ export default function PriestPackageManager({ provider }: { provider: any }) {
 
   const edit = async (pkg: any) => {
     let addons: Addon[] = []; let galleryUrls: { id: string; url: string; is_cover: boolean }[] = []; let videoUrls: { id: string; url: string }[] = []; let coverUrl = '';
-    try { const r = await (supabase.from('priest_addons' as any).select('name, price, description').eq('package_id', pkg.id).order('sort_order')); if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' })); } catch (_) {}
-    try { const r = await (supabase.from('priest_gallery' as any).select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url || ''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch (_) {}
+    try { const r = await (supabase.from('priest_addons').select('name, price, description').eq('package_id', pkg.id).order('sort_order')); if (r.data) addons = r.data.map((a: any) => ({ name: a.name, price: String(a.price ?? ''), description: a.description || '' })); } catch { /* best-effort; keep the form usable if this load fails */ }
+    try { const r = await (supabase.from('priest_gallery').select('id, public_url, is_cover, sort_order, media_type').eq('package_id', pkg.id).order('sort_order')); const g = (r.data ?? []).map((x: any) => ({ id: x.id, url: x.public_url, is_cover: x.is_cover, media_type: x.media_type||'image' })); coverUrl = g.find((x: any) => x.is_cover)?.url || ''; galleryUrls = g.filter((x: any) => !x.is_cover && x.media_type==='image'); videoUrls = g.filter((x: any) => x.media_type==='video').map((x: any) => ({ id: x.id, url: x.url })); } catch { /* best-effort; keep the form usable if this load fails */ }
     setDraft({ id: pkg.id, name: pkg.name||'', description: pkg.description||'', package_type: pkg.package_type||'', status: pkg.status||'draft',
       service_price: String(pkg.service_price??''), advance_percentage: String(pkg.advance_percentage??'20'),
       dakshina_included: pkg.dakshina_included??false, travel_charges: String(pkg.travel_charges??''),
@@ -138,30 +138,30 @@ export default function PriestPackageManager({ provider }: { provider: any }) {
         daily_capacity: Number(draft.daily_capacity)||2, max_bookings_per_day: Number(draft.max_bookings_per_day)||2,
       };
       let packageId = draft.id;
-      if (draft.id) { const r = await (supabase.from('priest_packages' as any).update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
-      else { const r = await (supabase.from('priest_packages' as any).insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
+      if (draft.id) { const r = await (supabase.from('priest_packages').update(payload).eq('id', draft.id).select('id').single()); if (r.error) throw r.error; }
+      else { const r = await (supabase.from('priest_packages').insert(payload).select('id').single()); if (r.error) throw r.error; packageId = r.data.id; }
 
       if (packageId) {
-        await (supabase.from('priest_addons' as any).delete().eq('package_id', packageId));
+        await (supabase.from('priest_addons').delete().eq('package_id', packageId));
         const valid = draft.addons.filter(a => a.name.trim());
-        if (valid.length > 0) await (supabase.from('priest_addons' as any).insert(valid.map((a, i) => ({ package_id: packageId, name: a.name.trim(), price: Number(a.price)||0, description: a.description||null, sort_order: i }))));
+        if (valid.length > 0) await (supabase.from('priest_addons').insert(valid.map((a, i) => ({ package_id: packageId, name: a.name.trim(), price: Number(a.price)||0, description: a.description||null, sort_order: i }))));
         if (draft.cover_file) {
           const ext = draft.cover_file.name.split('.').pop();
           const path = `${user!.id}/${packageId}/cover-${crypto.randomUUID()}.${ext}`;
           const { error: upErr } = await supabase.storage.from('priest-media').upload(path, draft.cover_file, { contentType: draft.cover_file.type });
-          if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery' as any).delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('priest_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, sort_order: 0 })); }
+          if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery').delete().eq('package_id', packageId).eq('is_cover', true)); await (supabase.from('priest_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: true, sort_order: 0 })); }
         }
-        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('priest-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
+        if (draft.gallery_files.length > 0) { for (let i = 0; i < draft.gallery_files.length; i++) { const file = draft.gallery_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/gallery-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('priest-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'image', sort_order: draft.gallery_urls.length + i + 1 })); } } }
         // Upload videos
-        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('priest-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery' as any).insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
-        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('priest_gallery' as any).select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('priest_gallery' as any).delete().in('id', del)); }
+        if (draft.video_files.length > 0) { for (let i = 0; i < draft.video_files.length; i++) { const file = draft.video_files[i]; const ext = file.name.split('.').pop(); const path = `${user!.id}/${packageId}/video-${crypto.randomUUID()}.${ext}`; const { error: upErr } = await supabase.storage.from('priest-media').upload(path, file, { contentType: file.type }); if (!upErr) { const url = supabase.storage.from('priest-media').getPublicUrl(path).data.publicUrl; await (supabase.from('priest_gallery').insert({ package_id: packageId, storage_path: path, public_url: url, is_cover: false, media_type: 'video', sort_order: 100 + i })); } } }
+        if (draft.id) { const cur = [...draft.gallery_urls.map(g => g.id), ...draft.video_urls.map(v => v.id)].filter(Boolean); const { data: ex } = await (supabase.from('priest_gallery').select('id').eq('package_id', packageId).eq('is_cover', false)); const del = (ex??[]).map((e: any) => e.id).filter((id: string) => !cur.includes(id)); if (del.length > 0) await (supabase.from('priest_gallery').delete().in('id', del)); }
       }
       toast.success('Service package saved!'); setDraft(null); setStep(1); refresh();
     } catch (err: any) { toast.error(err.message || 'Could not save'); } finally { setBusy(false); }
   };
 
-  const toggleStatus = async (pkg: any) => { await (supabase.from('priest_packages' as any).update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
-  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('priest_packages' as any).delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
+  const toggleStatus = async (pkg: any) => { await (supabase.from('priest_packages').update({ status: pkg.status === 'active' ? 'draft' : 'active' }).eq('id', pkg.id)); refresh(); };
+  const remove = async (pkg: any) => { if (!confirm('Delete this package?')) return; await (supabase.from('priest_packages').delete().eq('id', pkg.id)); refresh(); toast.success('Deleted'); };
   const openNew = () => { setDraft(blank()); setStep(1); };
 
   const ChipSelect = ({ options, selected, onChange, label }: { options: string[]; selected: string[]; onChange: (v: string[]) => void; label: string }) => (

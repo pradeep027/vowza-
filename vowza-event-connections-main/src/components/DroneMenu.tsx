@@ -26,7 +26,7 @@ export default function DroneMenu({ provider, profile }: { provider: any; profil
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['public-drone-packages', provider.id],
     queryFn: async () => {
-      const r = await supabase.from('drone_packages' as any).select('*, drone_gallery(*), drone_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
+      const r = await supabase.from('drone_packages').select('*, drone_gallery(*), drone_addons(*)').eq('provider_id', provider.id).eq('status', 'active').order('created_at');
       if (r.error) throw r.error;
       return r.data ?? [];
     },
@@ -226,40 +226,43 @@ function DroneBookingModal({ isOpen, onClose, pkg, provider, addons }: { isOpen:
     if (locErr) { toast.error(locErr); setStep(2); return; }
     setBusy(true);
     try {
-      const { data: booking, error } = await supabase.from('drone_bookings' as any).insert({
-        package_id: pkg.id,
-        provider_id: provider.id,
-        customer_id: user.id,
-        event_type: eventType || null,
-        event_date: eventDate,
-        event_time: eventTime || null,
-        coverage_duration: duration || null,
-        venue: location.venue_name || location.locality || null,
-        indoor_outdoor: indoorOutdoor,
-        drone_permission_available: dronePermission,
-        restricted_area: restrictedArea,
-        special_requests: specialRequests || null,
-        selected_addon_ids: selectedAddonIds,
-        base_amount: baseAmount,
-        addons_amount: addonsAmount,
-        total_amount: total,
-        status: 'pending',
-      }).select('id').single();
+      // P0-1 (Drone): booking financials are server-authoritative. Pass identifiers
+      // / selections / descriptive fields ONLY; the create_drone_booking RPC fetches
+      // the authoritative package price + addon prices server-side, derives
+      // base/addons/total, forces customer_id = auth.uid(), takes provider_id from
+      // the trusted package, and inserts atomically. Advance/remaining are NOT stored
+      // at creation (deferred to accept, matching this screen). No financial value
+      // crosses the trust boundary from the browser. (Replaces the direct INSERT.)
+      const { data: newId, error } = await supabase.rpc('create_drone_booking' as any, {
+        p_package_id: pkg.id,
+        p_event_date: eventDate,
+        p_event_time: eventTime || null,
+        p_event_type: eventType || null,
+        p_venue: location.venue_name || location.locality || null,
+        p_city: location.town_city || null,
+        p_coverage_duration: duration || null,
+        p_indoor_outdoor: indoorOutdoor,
+        p_drone_permission_available: dronePermission,
+        p_restricted_area: restrictedArea,
+        p_special_requests: specialRequests || null,
+        p_addon_ids: selectedAddonIds,
+      });
       if (error) throw error;
+      const bookingId = newId as string;
 
       // Save structured location
-      await supabase.from('booking_locations' as any).insert({
-        booking_table: 'drone_bookings', booking_id: booking.id,
+      await supabase.from('booking_locations').insert({
+        booking_table: 'drone_bookings', booking_id: bookingId,
         state: location.state, district: location.district, town_city: location.town_city,
         exact_address: [location.venue_name, location.locality, location.address_line].filter(Boolean).join(', '),
         pincode: location.pincode, landmark: location.address_line || null,
         latitude: location.latitude, longitude: location.longitude,
       });
 
-      await NotificationService.notifyBookingReceived(user.id, provider.id, booking.id);
+      await NotificationService.notifyBookingReceived(user.id, provider.id, bookingId);
 
       sessionStorage.setItem('vowza_booking_success', JSON.stringify({
-        bookingId: booking.id,
+        bookingId: bookingId,
         artistName: provider.business_name || provider.contact_person || 'Drone Operator',
         eventDate, eventTime, duration,
         venue: location.venue_name || location.locality || 'TBD',

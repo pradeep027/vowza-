@@ -14,7 +14,7 @@ export default function WaterSupplierMenu({ provider, profile }: { provider: any
   const { user } = useAuth();
   const [lines, setLines] = useState<Record<string, Line>>({});
   const { data: products = [], isLoading } = useQuery({ queryKey: ['public-water-products', provider.id], queryFn: async () => {
-    const { data, error } = await supabase.from('water_products' as any).select('*, water_categories(name,code), water_product_variants(*), water_product_images(*)').eq('provider_id', provider.id).eq('is_active', true).eq('is_visible', true).eq('is_archived', false).order('created_at');
+    const { data, error } = await supabase.from('water_products').select('*, water_categories(name,code), water_product_variants(*), water_product_images(*)').eq('provider_id', provider.id).eq('is_active', true).eq('is_visible', true).eq('is_archived', false).order('created_at');
     if (error) throw error;
     return (data ?? []) as any[];
   } });
@@ -30,7 +30,7 @@ export default function WaterSupplierMenu({ provider, profile }: { provider: any
   }, [provider.id, queryClient]);
 
   const { data: availability = [] } = useQuery({ queryKey: ['water-variant-availability', provider.id], queryFn: async () => { const { data, error } = await supabase.rpc('get_water_variant_availability' as any, { p_provider_id: provider.id }); if (error) throw error; return (data ?? []) as any[]; } });
-  const { data: reviews = [] } = useQuery({ queryKey: ['water-product-reviews', provider.id], queryFn: async () => { const { data, error } = await supabase.from('water_product_reviews' as any).select('product_id,rating,water_products!inner(provider_id)').eq('water_products.provider_id', provider.id); if (error) throw error; return (data ?? []) as any[]; } });
+  const { data: reviews = [] } = useQuery({ queryKey: ['water-product-reviews', provider.id], queryFn: async () => { const { data, error } = await supabase.from('water_product_reviews').select('product_id,rating,water_products!inner(provider_id)').eq('water_products.provider_id', provider.id); if (error) throw error; return (data ?? []) as any[]; } });
   const availabilityByVariant = useMemo(() => new Map(availability.map((row: any) => [row.variant_id, row.is_in_stock])), [availability]);
   const ratingByProduct = useMemo(() => reviews.reduce((map: Map<string, { total: number; count: number }>, review: any) => { const current = map.get(review.product_id) ?? { total: 0, count: 0 }; current.total += Number(review.rating); current.count += 1; map.set(review.product_id, current); return map; }, new Map<string, { total: number; count: number }>()), [reviews]);
   const groups = useMemo(() => products.reduce((result: Record<string, any[]>, product: any) => { const key = product.water_categories?.name ?? 'Water Products'; (result[key] ??= []).push(product); return result; }, {}), [products]);

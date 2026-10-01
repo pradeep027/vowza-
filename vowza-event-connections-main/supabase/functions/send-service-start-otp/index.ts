@@ -3,6 +3,7 @@
 // Required server-only secrets: BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 
 const corsHeaders = {
@@ -41,7 +42,7 @@ const messages: Record<string, string> = {
 };
 
 async function notifyServiceStartParticipants(
-  adminClient: any,
+  adminClient: SupabaseClient,
   otpId: string,
   bookingId: string,
   bookingSource: string,
