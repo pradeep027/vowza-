@@ -149,9 +149,24 @@ $probe$;
 
 -- Probe B: POSITIVE price-override. A legitimate event-owner attaches a REAL
 -- provider at a tampered price; assert the STORED price equals the provider's
--- authoritative price_min, not the browser value. Impersonates a real auth.users
--- row + a real provider_profiles row; rolled back via a sentinel exception.
--- Skipped (not failed) when the DB has no users/providers to drive it.
+-- authoritative price_min, not the browser value. Rolled back via a sentinel
+-- exception. Skipped (not failed) when the DB has no users/providers to drive it.
+--
+-- Runs as the MIGRATION ROLE (deliberately NO `SET LOCAL ROLE authenticated`):
+-- add_artist_to_event / create_event_booking are SECURITY DEFINER and execute as
+-- their OWNER regardless of the caller's SQL role, so the stored price is a
+-- property of the function body, identical under any caller role -- impersonating
+-- `authenticated` proves nothing extra about PRICE authority (the role-based
+-- EXECUTE lock is proven separately by the catalog assert above and by Probe A).
+-- auth.uid() is driven purely by the request.jwt.claims GUC, which the ownership
+-- guard and the forced customer_id binding read independently of the SQL role.
+-- The earlier `SET LOCAL ROLE authenticated` made this probe brittle to the apply
+-- session: it false-aborted with a spurious `42501 permission denied for table
+-- artist_bookings` under `supabase db push`, even though the catalog grants are
+-- fully permissive+symmetric and the identical role-switched path succeeds when
+-- run interactively (SQL editor). Dropping the impersonation removes the artifact
+-- without weakening the proof -- a regression that leaked p_price would still make
+-- v_stored = v_tamper (!= v_pmin) and fail the assertion.
 DO $probe$
 DECLARE
   v_uid    uuid;
@@ -161,6 +176,7 @@ DECLARE
   v_bid    uuid;
   v_tamper integer;
   v_stored integer;
+  v_ctx    text;
 BEGIN
   SELECT id INTO v_uid FROM auth.users LIMIT 1;
   SELECT id, COALESCE(price_min, 0) INTO v_pid, v_pmin FROM public.provider_profiles LIMIT 1;
@@ -170,15 +186,15 @@ BEGIN
   END IF;
   v_tamper := v_pmin + 1000000;  -- guaranteed != the authoritative price
   BEGIN
-    SET LOCAL ROLE authenticated;
+    -- Drive auth.uid() via the JWT-claims GUC only; stay as the migration role so
+    -- the SECURITY DEFINER functions execute as their owner (no role-switch artifact).
     PERFORM set_config('request.jwt.claims',
       json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);
     v_eid := public.create_event_booking(
       v_uid, 'price-probe', 'probe', current_date, 'probe', 1, 1);
     v_bid := public.add_artist_to_event(
       v_eid, v_pid, 'price-probe', 'probe', v_tamper);
-    -- Read back as the owner (bypass RLS) so the assertion sees the real row.
-    RESET ROLE;
+    -- Owner-level read (migration role bypasses RLS) so the assertion sees the row.
     PERFORM set_config('request.jwt.claims', NULL, true);
     SELECT price INTO v_stored FROM public.artist_bookings WHERE id = v_bid;
     IF v_stored IS DISTINCT FROM v_pmin THEN
@@ -192,7 +208,10 @@ BEGIN
       IF SQLERRM LIKE 'ROLLBACK_POSITIVE_PROBE%' THEN
         RAISE NOTICE 'probe B OK: tampered price neutralized; stored price = provider_profiles.price_min (rolled back).';
       ELSE
-        RAISE EXCEPTION 'PROBE_FAIL: price-override probe errored (%: %)', SQLSTATE, SQLERRM;
+        -- Unexpected: surface SQLSTATE + message + the PL/pgSQL context (which
+        -- statement/line) so any future apply-session artifact is diagnosable.
+        GET STACKED DIAGNOSTICS v_ctx = PG_EXCEPTION_CONTEXT;
+        RAISE EXCEPTION 'PROBE_FAIL: price-override probe errored (%: %) [context: %]', SQLSTATE, SQLERRM, v_ctx;
       END IF;
   END;
 END;
