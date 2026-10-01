@@ -82,11 +82,15 @@ BEGIN
     END LOOP;
 
     -- (c) the admin bypass depends on public.has_role(uuid, app_role).
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-         WHERE n.nspname = 'public' AND p.proname = 'has_role'
-           AND pg_get_function_identity_arguments(p.oid) = 'uuid, app_role'
-    ) THEN
+    -- Resolve by signature with to_regprocedure rather than string-matching
+    -- pg_get_function_identity_arguments: that catalog function renders the arg
+    -- type schema-qualified ('uuid, public.app_role') whenever app_role is not
+    -- search_path-visible in the apply session, so an exact '= uuid, app_role'
+    -- match false-aborts even though the function exists (migration
+    -- 20261204000000 calls has_role successfully on this same DB). to_regprocedure
+    -- does normal name resolution against the fully-qualified signature and
+    -- returns NULL only if the function is truly absent.
+    IF to_regprocedure('public.has_role(uuid, public.app_role)') IS NULL THEN
         RAISE EXCEPTION 'ABORT bookings status guard: public.has_role(uuid, app_role) not found.';
     END IF;
 

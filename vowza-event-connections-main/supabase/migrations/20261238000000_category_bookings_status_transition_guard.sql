@@ -70,11 +70,12 @@ BEGIN
         END IF;
     END LOOP;
 
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-         WHERE n.nspname = 'public' AND p.proname = 'has_role'
-           AND pg_get_function_identity_arguments(p.oid) = 'uuid, app_role'
-    ) THEN
+    -- Resolve by signature with to_regprocedure rather than string-matching
+    -- pg_get_function_identity_arguments: that catalog function renders app_role
+    -- schema-qualified ('uuid, public.app_role') when it is not search_path-visible
+    -- in the apply session, so an exact '= uuid, app_role' match false-aborts even
+    -- though has_role exists (migration 20261204000000 calls it on this same DB).
+    IF to_regprocedure('public.has_role(uuid, public.app_role)') IS NULL THEN
         RAISE EXCEPTION 'ABORT category status guard: public.has_role(uuid, app_role) not found.';
     END IF;
 

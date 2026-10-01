@@ -182,8 +182,15 @@ BEGIN
     IF NOT v_sec THEN
         RAISE EXCEPTION 'ABORT accept_catering_booking: function is not SECURITY DEFINER.';
     END IF;
-    IF v_cfg IS NULL OR NOT ('search_path=' = ANY(v_cfg)) THEN
-        RAISE EXCEPTION 'ABORT accept_catering_booking: search_path is not locked to empty.';
+    -- A hardened `SET search_path = ''` is serialized into proconfig QUOTED, as
+    -- the element `search_path=""` (empty value), NOT the bare `search_path=`, so
+    -- an exact array-equality check false-aborts. Assert a pinned search_path
+    -- entry exists (tolerant of the quoted-empty form) — the same posture every
+    -- other category self-check verifies via `proconfig LIKE '%search_path=%'`.
+    IF v_cfg IS NULL OR NOT EXISTS (
+        SELECT 1 FROM unnest(v_cfg) AS s WHERE s LIKE 'search_path=%'
+    ) THEN
+        RAISE EXCEPTION 'ABORT accept_catering_booking: search_path is not pinned (proconfig=%).', v_cfg;
     END IF;
     IF has_function_privilege('anon', v_oid, 'EXECUTE') THEN
         RAISE EXCEPTION 'ABORT accept_catering_booking: anon can EXECUTE (must be authenticated only).';
