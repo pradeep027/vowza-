@@ -62,8 +62,8 @@ interface ProviderProfile {
   total_bookings: number;
   total_earnings?: number;
   bio: string | null;
-  min_price?: number | null;
-  max_price?: number | null;
+  price_min?: number | null;
+  price_max?: number | null;
   [key: string]: any;
 }
 
@@ -128,8 +128,8 @@ const ProviderDashboard = () => {
       setProviderProfile(profile as any);
       setIsAvailable(profile.is_available);
       setEditBio(profile.bio || '');
-      setEditMinPrice((profile as any).min_price?.toString() || '');
-      setEditMaxPrice((profile as any).max_price?.toString() || '');
+      setEditMinPrice((profile as any).price_min?.toString() || '');
+      setEditMaxPrice((profile as any).price_max?.toString() || '');
 
       // Fetch bookings
       const { data: bookingsData, error: bookingsError } = await supabase
@@ -297,8 +297,8 @@ const ProviderDashboard = () => {
         .from('provider_profiles')
         .update({
           bio: editBio,
-          min_price: parseInt(editMinPrice) || null,
-          max_price: parseInt(editMaxPrice) || null
+          price_min: parseInt(editMinPrice) || null,
+          price_max: parseInt(editMaxPrice) || null
         })
         .eq('id', providerProfile.id);
 

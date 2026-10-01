@@ -190,6 +190,7 @@ export interface BudgetAllocation {
 }
 
 export interface EventBudgetPlan {
+  eventId?: string;
   eventType: EventCategory;
   city: string;
   totalBudget: number;
@@ -330,6 +331,7 @@ export class EventBudgetPlanner {
     );
 
     return {
+      eventId: context.eventId,
       eventType: eventType,
       city: finalCity,
       totalBudget: finalBudget,
