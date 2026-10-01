@@ -3,8 +3,10 @@ name: Quality Gate
 on:
   push:
     branches: [main]
+  # Gate every pull request regardless of its base branch (e.g. PRs into
+  # long-lived integration branches like chore/production-readiness-baseline),
+  # not only PRs targeting main.
   pull_request:
-    branches: [main]
 
 # Phase 1 boundary: quality gate only.
 # No deployment, no secrets, no Supabase access, no Vercel calls, no production mutation.
@@ -40,7 +42,10 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
 
-      - name: Tests (curated suite)
+      - name: Tests (full suite)
+        # `npm test` is `vitest run` with vitest's default discovery glob, so
+        # this runs every *.test.ts under src/ (46 files / 1130 tests as of the
+        # Phase J runner reconciliation). New specs are picked up automatically.
         run: npm test
 
       - name: Production build
