@@ -1,6 +1,7 @@
 // ─── ErrorBoundary — Catches unhandled React render errors ───────────────────
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { reportError } from "@/lib/observability";
 
 interface Props  { children: ReactNode; fallback?: ReactNode; resetKey?: unknown; }
 interface State  { hasError: boolean; error: Error | null; }
@@ -13,8 +14,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // In production wire this to Sentry / Datadog
-    console.error("[ErrorBoundary]", error, info.componentStack);
+    // Route through the single observability sink (console today; the parked
+    // Sentry/Datadog transport attaches there without touching this call).
+    reportError(error, {
+      source: "ErrorBoundary",
+      componentStack: info.componentStack ?? undefined,
+    });
   }
 
   componentDidUpdate(prevProps: Props) {
