@@ -319,3 +319,208 @@ from §1 remain the reference. Re-run to confirm no drift:
 > **STOP CONDITION (honored):** No booking/payment/RLS/authz behavior was changed. The
 > above is findings only. Await explicit go-ahead before implementing remediation.
 
+---
+
+# 9. LIVE production verification (Step 2 — READ-ONLY, no mutations)
+
+**Date:** 2026-09-22 · **Target:** production project `vavfeataqwwbpjonknne`
+("vowza027's Project", ap-southeast-1) — the linked project.
+**Method (Rule 7-compliant):** Supabase CLI token read from Windows Credential
+Manager (never printed); **SELECT-only** catalog queries sent to the Management API
+`POST /v1/projects/{ref}/database/query`. **Zero** INSERT/UPDATE/DELETE/DDL was
+issued. `supabase migration list --linked` used for applied-migration history.
+Every §8 UNKNOWN is now resolved; tags below are **LIVE-VERIFIED** (queried prod
+catalog), **REPO-VERIFIED** (repo static evidence only), or **UNKNOWN** (still
+undetermined — none remain from §8.7).
+
+## 9.1 Resolution of the five §8.7 UNKNOWNs
+
+| # | §8.7 question | Tag | Live finding |
+|---|---|---|---|
+| 1 | Sweep applied to prod? | **LIVE-VERIFIED** | `migration list` shows `20261201000002…000012`, `20261202000000/1`, `20261203000000` all applied. The self-verifying probes in `000002`/`000004` would have aborted the apply if the escalation were open ⇒ **admin role-escalation is provably CLOSED in prod.** |
+| 2 | RLS enabled on category tables? | **LIVE-VERIFIED** | `relrowsecurity=true` on **all** of `bookings`, `payments`, `user_roles`, `provider_profiles`, `profiles`, `portfolio_items`, `artist_bookings`, all 16 category tables + `admin_event_package_bookings`. `relforcerowsecurity=false` everywhere (so `SECURITY DEFINER`/`service_role` still bypass — by design). |
+| 3 | Live RLS + grants on `payments`? | **LIVE-VERIFIED** | RLS on; **only** a SELECT policy (no write policy) ⇒ writes are functionally **service-role-only**. **But** table GRANT is `anon=ALL, authenticated=ALL, service_role=ALL` — a latent least-privilege residue (harmless only while RLS stays on + no write policy is ever added). |
+| 4 | OTP RPCs bind caller→vendor? | **LIVE-VERIFIED** | Yes at the DB surface — see 9.3. Both are `EXECUTE`-restricted to `postgres`+`service_role` and internally require the booking's provider to be owned by `p_vendor_user_id`. |
+| 5 | Loose files still effective live? | **LIVE-VERIFIED** | **Superseded** by the sweep: RLS re-enabled everywhere; `user_roles` anon reduced to SELECT; approve/reject RPCs no longer anon. **Residue that survived:** broad `GRANT ALL … TO anon` on `payments`, `portfolio_items`, `artist_bookings`, and every category booking table (rows still gated by RLS). |
+
+## 9.2 Live-verified P0 confirmations (from prod policy/grant catalog)
+
+- **P0-1 (booking money) — LIVE-EXPLOITABLE.** `bookings` UPDATE policy
+  *"Booking parties can update"* qual = `(auth.uid()=customer_id OR provider-owns)`,
+  **`with_check = NULL`** ⇒ either party can set any column incl. `amount`,
+  `platform_fee`, `advance_amount`, `remaining_amount`, `settlement_status`, `status`.
+  INSERT `WITH CHECK` only asserts `auth.uid()=customer_id`. `authenticated=ALL` DML.
+- **Category tables (16) — LIVE-EXPLOITABLE.** Uniform per-table policy set
+  `_customer_insert` (CHECK `customer_id=auth.uid() AND NOT owns-own-provider`),
+  `_customer_update` / `_provider_update` (USING+CHECK = ownership only, **no column
+  guard**). Looser still: `dancer_bookings_provider_update` and
+  `drone_bookings_customer_update` have **`with_check=NULL`**.
+- **P0-2 (vendor self-approval) — LIVE-EXPLOITABLE.** Two owner-write policies coexist
+  on `provider_profiles`: `providers_owner_write` (ALL, `user_id=auth.uid()`,
+  `with_check=NULL`) **and** `Providers can update own profile` (UPDATE, `with_check=NULL`).
+  Either lets an owner set `is_verified/verification_status/is_published/is_featured/
+  verified_by/…`. Legit admin path (`provider_profiles_admin_write_v2`, authenticated +
+  `has_role(admin/super_admin)`; plus `providers_admin_write`) is intact and correct.
+- **`profiles` self-edit — LIVE (verify severity).** *"Users can update own profile"*
+  `with_check=NULL` ⇒ a user can self-edit their row incl. `is_blocked` (self-unblock).
+- **`user_roles` INSERT is TIGHTER live than repo 000002 — LIVE-VERIFIED (good).**
+  `user_roles_insert_unprivileged` CHECK = `((role='customer' AND user_id=auth.uid())
+  OR (role IN (customer,provider) AND has_role admin/super_admin))` ⇒ a normal user can
+  self-insert **only `customer`**, never `provider`/`admin`. Provider requires admin.
+  DELETE admin-only; UPDATE revoked; SELECT own+admin. This **narrows** the §8.4 residual:
+  self-grant of `provider` is **not** available via the table; it is only obtainable via
+  the `claim_provider_role` RPC (which itself requires an existing `provider_profiles`
+  row — see 9.3). The §8.4 "self-onboard as verified vendor" composition therefore reduces
+  to: create provider_profile (self) → `claim_provider_role` (gets role) → **P0-2** self-set
+  `is_verified/is_published`. P0-2 remains the keystone.
+
+## 9.3 SECURITY DEFINER function bodies + EXECUTE grants (LIVE-VERIFIED)
+
+`proacl` legend: `=X/postgres` = **PUBLIC** EXECUTE (anyone incl. anon). Empty grantee
+before `=` is PUBLIC.
+
+### NEW P0 — the "artist/event legacy track" (PUBLIC EXECUTE, no auth) — LIVE-EXPLOITABLE
+
+These three `SECURITY DEFINER` RPCs are granted `PUBLIC`+`anon`+`authenticated` EXECUTE
+and were **not** covered by §8 (which only saw the RLS tables). Because they are
+`SECURITY DEFINER` (owner `postgres`), they **bypass RLS entirely**:
+
+| RPC | proacl | Body defect |
+|---|---|---|
+| `update_artist_booking_status(p_booking_id, p_status, p_negotiation_message)` | **PUBLIC/anon/authenticated** | No auth, no state validation. `UPDATE artist_bookings SET status=p_status … WHERE id=p_booking_id`. **Anyone (anon) can set ANY artist_booking to ANY status string**, RLS bypassed. |
+| `add_artist_to_event(p_event_id, p_provider_id, p_provider_name, p_category, p_price int)` | **PUBLIC/anon/authenticated** | No auth. Inserts `artist_bookings` with **client-supplied `p_price`**. Anon can create priced artist bookings on any event. |
+| `create_event_booking(p_customer_id, …, p_total_budget int, …)` | **PUBLIC/anon/authenticated** | No auth. **Client-supplied `customer_id` + `total_budget`.** Anon can forge event bookings for any customer / spam. (`event_bookings` is the parent that gates `artist_bookings` INSERT policy — so this + `add_artist_to_event` chain.) |
+
+> `artist_bookings` table itself: RLS on; anon/authenticated = **GRANT ALL**; policies
+> gate direct DML sanely (INSERT requires you own the parent event; provider UPDATE is
+> ownership-scoped with `with_check=NULL`). **The exposure is the RPCs, not the table** —
+> they are the DB's single most exploitable surface because they need **no session at all**.
+
+### Mitigated by EXECUTE restriction (service_role-only ⇒ NOT client-reachable)
+
+- `approve_artist(p_provider_id, p_admin_user_id)` / `reject_artist(…)` — **EXECUTE =
+  `postgres`+`service_role` only.** Bodies have **no internal `has_role` gate** (they
+  trust `p_admin_user_id` as data and directly set `is_verified/is_published/verified_by`
+  + grant/revoke the `provider` role). Not a client P0 **because** only a trusted
+  Edge/admin path can call them — but **defense-in-depth-weak**: if ever exposed, or
+  called by a non-admin service path, they self-approve. Recommend adding an internal
+  `has_role(auth.uid(),'admin'|'super_admin')` assertion. **The live client P0 for
+  self-approval remains the RLS path (P0-2), not these RPCs.**
+- `create_service_start_otp` / `verify_service_start_otp` / `service_start_booking_context`
+  / `assert_service_start_is_due` — **EXECUTE = `postgres`+`service_role` only.** Bodies
+  are strong: 17-table whitelist (no dynamic-SQL injection), `FOR UPDATE` locking,
+  bcrypt-hashed OTP (`crypt`/`gen_salt`), 10-min expiry, attempt cap, resend cooldown
+  (60s) + max-resends, `email_sent` gate, due-time enforcement in `Asia/Kolkata`, and a
+  **caller→vendor→booking bind**: `provider_profiles.id = booking.provider_id AND
+  .user_id = p_vendor_user_id`. **Residual (P1):** the bind trusts the **passed**
+  `p_vendor_user_id`, not `auth.uid()` — safe only because EXECUTE is service-role-only
+  and the `send-/verify-service-start-otp` Edge Functions derive the vendor id from the
+  JWT. Recommend the RPCs re-derive from `auth.uid()` (or the Edge Functions be re-audited
+  to prove they never pass an attacker-influenced id). `admin_set_user_role` = service_role
+  only (correct).
+
+### Server-authoritative pricing already EXISTS (good) — LIVE-VERIFIED
+
+`create_photography_package_booking` and `checkout_photography_cart` are `SECURITY
+DEFINER`, `EXECUTE`-open but internally require `auth.uid()` (anon → *Authentication
+required*) and **compute `base/addons/album/total` from catalog price rows**, validating
+package active/visible/published, addon membership+active, and photographer availability;
+`checkout` writes bookings+payments+invoices+timeline+notifications under `FOR UPDATE`.
+`get_public_platform_fee()` returns `platform_settings.value WHERE key='platform_fee'`
+(canonical fee source). `claim_provider_role()` = authenticated-only, uses `auth.uid()`,
+requires a `provider_profiles` row, `ON CONFLICT DO NOTHING`, audits to
+`vowza_audit.privileged_actions`. `handle_new_user` / `has_role` / `user_has_role` sound.
+⇒ **The secure P0-1 pattern is already in the DB for photography; remediation should
+extend/route through it, not build a parallel system. The insecure direct-RLS INSERT
+path coexists and must be closed.**
+
+## 9.4 Updated remediation order (supersedes §8.10; still design-only, Step 10 STOP)
+
+0. **[NEW, cheapest, highest anon-exposure] Lock the artist/event legacy RPCs.** Either
+   `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` and route through an authenticated
+   path, or rewrite the bodies to derive `auth.uid()` + validate ownership/state + compute
+   price server-side. This is the only surface reachable **without a login**.
+1. **P0-1 booking money** — route creation through server-authoritative RPCs (extend the
+   photography pattern to every category); add column-guard triggers on `bookings` + 16
+   category tables forbidding client writes to financial/state columns; server state machine.
+2. **P0-1b state transitions** — see §Step-4 map in the remediation plan.
+3. **P0-2 vendor self-approval** — column-restrict/trigger-guard the owner-write policies;
+   approval only via `approve_artist` (add internal admin assertion for depth).
+4. **P0-3 verify-document** — bind `auth.getUser()`, stop trusting the client verdict.
+5. **P1** — OTP `auth.uid()` hardening; `create-booking` service-role/Auth-override
+   fragility; drop residual `anon` GRANTs on payments/portfolio/category/artist tables;
+   `profiles.is_blocked` self-edit; KYC bucket privacy.
+
+## 9.5 Live verification hygiene
+
+Read-only introspection only; **no** prod mutation. Temp probe artifacts
+(`_vowza_probe.ps1`, `%TEMP%\vowza_funcs*.txt`, `%TEMP%\vowza_acl.txt`) are deleted after
+this session. This section changed only this markdown doc (outside the build graph);
+§1 gates remain the reference.
+
+> **STOP CONDITION (still honored):** Step 2 (read-only live verification) complete; no
+> production behavior changed. Proceeding to design-only Steps 3–9 in
+> `PRODUCTION_SECURITY_REMEDIATION_PLAN.md`. No implementation until go-ahead (Step 10).
+
+---
+
+# 10. P0-L remediation — legacy booking RPCs locked (SECURITY FIX, fixed-in-code)
+
+**Date:** 2026-10-01 · **Commit:** `769329d` · **Migration:**
+`supabase/migrations/20261246000000_revoke_legacy_booking_rpc_public_execute.sql`
+· **Status:** fixed-in-code on the **apply path** (not parked); closes in production
+on the next `supabase db push` (not yet run). Resolves §9.4 item 0 — the only
+surface reachable **without a login**.
+
+## 10.1 What was closed
+
+`create_event_booking`, `add_artist_to_event`, `update_artist_booking_status` were
+`SECURITY DEFINER` with the default `PUBLIC EXECUTE` and no internal auth check, so
+any `anon` caller could create/modify event & artist bookings unauthenticated (and
+create events "as" any user id — the browser supplied `p_customer_id`). The migration:
+
+- `CREATE OR REPLACE`s all three with their exact signatures + a fail-closed guard
+  (`RAISE … ERRCODE '42501'`), `SET search_path = public, pg_temp`:
+  - **create_event_booking** → authenticated; `p_customer_id` must equal `auth.uid()`
+    (and the row is inserted with `auth.uid()`, not the raw arg).
+  - **add_artist_to_event** → authenticated; caller must own `p_event_id`
+    (`EXISTS event_bookings WHERE id=p_event_id AND customer_id=auth.uid()`).
+  - **update_artist_booking_status** → authenticated; event-owner customer OR the
+    assigned provider (`provider_profiles.user_id=auth.uid()`) only.
+- `REVOKE ALL … FROM PUBLIC, anon`; `GRANT EXECUTE … TO authenticated, service_role`.
+- Catalog assertion (anon has no EXECUTE, authenticated does) + apply-time `DO $probe$`
+  blocks that **execute** each forbidden call and assert `42501`, plus a legitimate
+  self call that succeeds and is rolled back. The probes abort the apply if any
+  unauthorized call is not rejected.
+
+**Why apply-path, not parked:** removing anon EXECUTE + enforcing self/ownership does
+not break the live bundle — `EventPlanning.tsx` calls as an authenticated user with
+`p_customer_id = user.id` against an event it just created, which all still pass.
+Locked by `src/lib/__tests__/legacy-booking-rpc-authz-regression.test.ts` (14 tests).
+
+## 10.2 Sweep for other legacy `PUBLIC`/`anon` RPCs with unauthenticated bodies
+
+- **`get_public_platform_fee()` (PUBLIC EXECUTE) — INTENTIONAL, not a hole.** Read-only,
+  hardcoded single-whitelisted-key (`platform_fee`) lookup; no parameter, no writes, no
+  authority value. Deliberate Phase-0b public read (`20261201000011`). Left as-is.
+- **`record_promotion_view_for_visitor(uuid,text)` (anon+authenticated EXECUTE) —
+  INTENTIONAL anon analytics.** Increments a promo-video view counter and may rotate the
+  active video; no financial/booking/role authority. Minor abuse vector (an anon could
+  inflate view counts / force early rotation); noted as low-severity, out of P0-L scope.
+- **`approve_artist` / `reject_artist` (root helper `*.sql`, SECURITY DEFINER, browser-
+  supplied `p_admin_user_id`, no caller-is-admin check) — LIVE-VERIFIED NOT anon-reachable.**
+  Per §9.1 #1/#5 the admin role-escalation sweep (`000002`/`000004`) is applied in prod and
+  these RPCs are "no longer anon"; admin escalation is provably closed live. The root-file
+  copies are stale/insecure but are **not** the live grant. No change shipped; the residual
+  value-authority depth-hardening (internal admin assertion) stays tracked under §9.4 item 3.
+
+## 10.3 Out of scope (documented, not silently changed)
+
+`add_artist_to_event.p_price` is still browser-supplied — a P0-1-style value-authority gap
+on this legacy path, not an authz hole. Event/artist bookings were never part of the
+15-category server-authoritative rewrite; recomputing price here is a separate change.
+
+> **STOP CONDITION:** no push / merge / deploy / `db push` / parked-lockdown promotion
+> performed. P0-L is fixed-in-code; production closure awaits the standard deploy order.
+
+
