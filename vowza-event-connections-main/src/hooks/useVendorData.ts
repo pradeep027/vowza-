@@ -1526,7 +1526,7 @@ export function useVendorProfileCompletion(provider?: any, portfolioCount = 0, p
       { label: 'Packages',       done: packageCount > 0 },
       { label: 'Pricing',        done: Number(provider.price_min ?? 0) > 0 },
       { label: 'Verification',   done: provider.verification_status === 'approved' },
-      { label: 'Documents',      done: !!vd.aadhaar_url && !!vd.govt_id_url },
+      { label: 'Documents',      done: !!(vd.aadhaar_url || vd.aadhaar_path) && !!(vd.govt_id_url || vd.govt_id_path) },
       { label: 'Bank Details',   done: !!provider.bank_account_number },
     ];
 
