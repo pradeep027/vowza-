@@ -34,7 +34,26 @@ const json = (body: unknown, status: number) =>
   });
 
 // ── Build vendor text for embedding (same logic as frontend embeddingGenerator.ts) ──
-function buildVendorText(provider: any, profile: any): string {
+// Loosely-typed, all-optional shapes: these rows come straight from the DB and we
+// only read a known subset of columns here. Typed (not `any`) so the embeddable
+// field set stays reviewable; no runtime behavior change.
+interface VendorProvider {
+  stage_name?: string | null;
+  service_city?: string | null;
+  profession?: string | null;
+  bio?: string | null;
+  specialties?: unknown;
+  languages?: unknown;
+  price_min?: number | null;
+  experience_years?: number | null;
+  vendor_details?: Record<string, unknown> | null;
+  category_details?: Record<string, unknown> | null;
+}
+interface VendorProfile {
+  full_name?: string | null;
+  city?: string | null;
+}
+function buildVendorText(provider: VendorProvider, profile: VendorProfile | null): string {
   const parts: string[] = [];
 
   const name = provider.stage_name || profile?.full_name || "";
@@ -65,7 +84,7 @@ function buildVendorText(provider: any, profile: any): string {
 
   const details = provider.vendor_details || provider.category_details || {};
   for (const [k, v] of Object.entries(details)) {
-    if (v && typeof v !== "object") parts.push(`${k}: ${v}`);
+    if (v && typeof v !== "object") parts.push(`${k}: ${String(v)}`);
   }
 
   return parts.join(". ");
@@ -249,9 +268,9 @@ serve(async (req) => {
       },
       200
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     return json(
-      { error: `Unexpected error: ${err?.message || "unknown"}`, success: false },
+      { error: `Unexpected error: ${err instanceof Error ? err.message : "unknown"}`, success: false },
       500
     );
   }
