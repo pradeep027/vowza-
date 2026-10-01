@@ -8,7 +8,9 @@ This report consolidates the autonomous production-readiness execution (Phases A
 
 ## 1. Executive summary
 
-The application was audited and hardened against the production-ready definition: booking state is not maliciously manipulable; financial values are not browser-controlled; payments cannot be falsely marked successful; refunds/earnings cannot be fabricated; there is no privilege escalation; vendors cannot self-approve; private documents are protected; RLS protects data; Edge Functions enforce authorization; critical writes are atomic/idempotent; critical flows are tested; migrations are additive and reversible.
+The application was audited and hardened against the production-ready definition. The work drives toward these invariants: booking state is not maliciously manipulable; financial values are not browser-controlled; payments cannot be falsely marked successful; refunds/earnings cannot be fabricated; there is no privilege escalation; vendors cannot self-approve; private documents are protected; RLS protects data; Edge Functions enforce authorization; critical writes are atomic/idempotent; critical flows are tested; migrations are additive and reversible.
+
+**These invariants are not all fully enforced yet — this is the honest status, not a READY verdict.** The server-authoritative write paths, state-machine triggers, and settlement/advance RPCs are committed and in the apply path, but the *breaking* companions that actually close the direct-write holes (the RLS/column lockdowns in §4) remain **parked** and have **not** been verified against a live database. Until they are promoted in deploy order, the financial-authority / self-approval / RLS hardening is closed **in code and migration** but is **not yet enforced in production**. Separately, one in-scope P0 — **P0-L** (legacy `PUBLIC EXECUTE` RPCs, §5) — has **no remediation committed at all** (neither applied nor parked) and remains open.
 
 All fixes follow an **additive-hardening** philosophy: close the hole now with a change that does not break the running frontend; the breaking companion (RLS/column lockdown, storage backfill, edge redeploy, SaaS wiring) stays **parked** until deploy ordering is satisfied. **No parked lockdown has been promoted automatically.**
 
@@ -102,6 +104,7 @@ Each item below closes an attack surface at a layer that is **not yet live**. Pr
 
 ## 5. Residual / known risks (noted, not yet actioned)
 
+- **P0-L (OPEN — NOT remediated, in-scope but missed by every phase):** the legacy `SECURITY DEFINER` RPCs `create_event_booking`, `add_artist_to_event`, and `update_artist_booking_status` carry **`PUBLIC EXECUTE`** with no internal auth check (per `PRODUCTION_SECURITY_REMEDIATION_PLAN.md` §6, flagged REPO/LIVE-VERIFIED), so any `anon` caller can create/modify artist & event bookings unauthenticated. `src/pages/EventPlanning.tsx` is a **live caller** of the first two (lines 154, 169), so the functions are not dead code. The planned `revoke_legacy_rpc_public_execute.sql` migration (plan §6.2) was **never written** — it exists neither in `supabase/migrations/` nor parked in `supabase/migrations-pending/`. This is the single most material gap in the A–P completeness claim and must be remediated (REVOKE PUBLIC + add `auth.uid()`/ownership checks, behind the standard deploy order) before production.
 - `dancer_bookings` has no customer `UPDATE` RLS policy.
 - The generic `bookings` `UPDATE` policy lacks a `WITH CHECK` and applies to `PUBLIC` — flagged; must **not** be weakened, needs a tightening migration.
 - Self-booking prevention is not enforced on the live per-category RPC path.
