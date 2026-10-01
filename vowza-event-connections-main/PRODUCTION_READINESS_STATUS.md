@@ -516,9 +516,10 @@ Locked by `src/lib/__tests__/legacy-booking-rpc-authz-regression.test.ts` (14 te
 
 ## 10.3 Out of scope (documented, not silently changed)
 
-`add_artist_to_event.p_price` is still browser-supplied — a P0-1-style value-authority gap
+`add_artist_to_event.p_price` was still browser-supplied — a P0-1-style value-authority gap
 on this legacy path, not an authz hole. Event/artist bookings were never part of the
-15-category server-authoritative rewrite; recomputing price here is a separate change.
+15-category server-authoritative rewrite; recomputing price there was a separate change —
+**now remediated** in the PR #26 pass, see §12 (`20261248000000`).
 
 > **STOP CONDITION:** no push / merge / deploy / `db push` / parked-lockdown promotion
 > performed. P0-L is fixed-in-code; production closure awaits the standard deploy order.
@@ -578,5 +579,37 @@ SECURITY FIX for the bypass. Locked by
 
 > **STOP CONDITION:** no push / merge / deploy / `db push` / parked-lockdown promotion
 > performed. Fixed-in-code; production closure awaits the standard deploy order.
+
+# 12. PR #26 final-review P1 hardening pass — exact status
+
+**Date:** 2026-10-02 · **Branch:** `chore/production-readiness-baseline` (unpushed) · one reviewable commit per fix; no history rewrite.
+
+**Status labels (exact, per directive):** `FIXED-IN-CODE` · `PENDING-DEPLOYMENT` · `REQUIRES-LIVE-VERIFICATION` · `OPEN`.
+
+| # | Finding | Change | Status |
+|---|---------|--------|--------|
+| 1 | `add_artist_to_event.p_price` browser-supplied | `20261248000000` (`ed20289`) derives line price from the trusted package/`provider_profiles`, ignores client value; apply-time tamper probe | `FIXED-IN-CODE` → `PENDING-DEPLOYMENT` (closes on `db push`) |
+| 2a | `verify-document` no end-user auth | edge (`c114986`) requires `auth.getUser()` on the forwarded JWT (`401`); `userId` mismatch `403`; `advisory: true` stamp | `FIXED-IN-CODE` → `PENDING-DEPLOYMENT` (edge deploy parked, Phase H) |
+| 2b | client failed OPEN to `verified` | client (`c114986`) fails CLOSED: server error/empty ⇒ `error`, never `verified` | `FIXED-IN-CODE` (ships with frontend) |
+| 2c | strong KYC (server-side authenticity) | impossible — function never receives bytes; documented inline; trust enforced downstream (admin approval + Phase F trigger) | `OPEN` (architectural; advisory grants no capability) |
+| 3 | generic `bookings` UPDATE `PUBLIC`/no `WITH CHECK` | `20261250000000` (`1f9aba2`) recreates same-named policy `TO authenticated` + explicit `WITH CHECK` = `USING`; anon probe + `pg_policies` assertion | `FIXED-IN-CODE` → `PENDING-DEPLOYMENT` |
+| 4 | `dancer_bookings` missing customer UPDATE | determined a real parity gap; `20261249000000` (`85686fe`) adds owner-bound (`auth.uid() = customer_id`) UPDATE in `USING` + `WITH CHECK`; status-DAG trigger still gates transitions | `FIXED-IN-CODE` → `PENDING-DEPLOYMENT` |
+| 5 | executable negative probes | `20261251000000` (`be40105`) drives self-booking `42501`, authoritative `total_amount`, illegal `pending→completed` `23514` through the real RPC/trigger path; skips on empty DB; `ROLLBACK_PROBE` sentinel | `FIXED-IN-CODE` → `PENDING-DEPLOYMENT`; executable proof `REQUIRES-LIVE-VERIFICATION` |
+
+## 12.1 Finding 4 — why the missing policy was a real gap, not intentional
+
+Every other booking category grants the booking **customer** a scoped `UPDATE` (e.g. `dancer_bookings_provider_update` exists but no customer counterpart). The customer-facing flows that cancel/modify a booking need it, and its absence was an authorization-matrix hole, not a deliberate lockdown. The fix is **not** a permissive catch-all: the policy is bound to `auth.uid() = customer_id` in both `USING` and `WITH CHECK`, and the status-DAG trigger (`20261238000000`) still rejects any illegal transition the customer attempts — so widening write access does not widen what a customer may legally change.
+
+## 12.2 Why executable probes complement (not replace) the static tests
+
+The self-booking, amount-authority and status-DAG protections live in SECURITY DEFINER RPCs + BEFORE triggers that vitest cannot run (Postgres, not Node). The static contract tests lock the migration/function *text*; `20261251000000` locks the *behavior* at apply time against the real objects, aborting the push if any invariant regressed. On empty CI/shadow DBs the probes skip cleanly, so the executable proof is `REQUIRES-LIVE-VERIFICATION` — it only exercises when real `dancer_packages` / `provider_profiles` / `auth.users` fixtures exist.
+
+## 12.3 Validation (this pass)
+
+`npm run typecheck` clean · `npm test` **56 files / 1215 tests** green · `npm run build` clean · `npm run lint` steady at 1586 problems (pre-existing `no-explicit-any` debt; no new findings; SQL not linted; edge fns eslint-only). Each fix is an isolated commit (`ed20289`, `c114986`, `1f9aba2`, `85686fe`, `be40105`); no unrelated history touched.
+
+> **STOP CONDITION:** no push / merge / deploy / `db push` / edge deploy / parked-lockdown
+> promotion performed. All five changes are fixed-in-code on `chore/production-readiness-baseline`;
+> production closure awaits the standard, gated deploy order.
 
 
